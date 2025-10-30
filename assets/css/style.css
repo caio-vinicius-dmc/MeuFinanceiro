@@ -1,0 +1,439 @@
+/* assets/css/style.css */
+
+/* 1. Cores e Tema
+--------------------------------- */
+:root {
+    /* AZUL MODERNO */
+    --bs-primary: #0A78F0; 
+    --bs-primary-rgb: 10, 120, 240;
+    --bs-primary-darker: #0056b3; 
+    
+    --bs-secondary: #6B7280; 
+    --bs-success: #10B981; 
+    --bs-danger: #EF4444; 
+    --bs-warning: #F59E0B; 
+    
+    /* LARGURAS DO SIDEBAR */
+    --sidebar-width: 260px; 
+    --sidebar-width-collapsed: 80px; 
+}
+
+/* Gradiente Vibrante para Sidebar e Header Mobile */
+.bg-primary-dark-grad {
+    background: linear-gradient(180deg, var(--bs-primary-darker) 0%, var(--bs-primary) 100%);
+}
+
+body {
+    background-color: #f8f9fa; 
+    /* Melhoria: Fonte base mais limpa e legível */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+
+/* 2. Layout (Sidebar e Conteúdo)
+--------------------------------- */
+
+.sidebar-nav {
+    width: var(--sidebar-width);
+    background: linear-gradient(180deg, var(--bs-primary-darker) 0%, var(--bs-primary) 100%);
+    border-right: none;
+    transition: width 0.3s ease-in-out;
+}
+
+.sidebar-logo {
+    max-width: 80%;
+    height: auto;
+    opacity: 0.9; 
+    transition: all 0.3s ease-in-out;
+}
+
+body.sidebar-collapsed .sidebar-logo {
+    max-width: 60%;
+}
+
+
+.main-content {
+    transition: margin-left 0.3s ease-in-out;
+    padding: 1.5rem;
+}
+
+.flash-message-container {
+    position: relative;
+    z-index: 10;
+}
+
+@media (min-width: 992px) {
+    
+    .main-content {
+        margin-left: var(--sidebar-width);
+    }
+    .sidebar-nav.offcanvas-lg {
+        width: var(--sidebar-width); 
+        transform: none; 
+        visibility: visible !important; 
+        height: 100vh;
+        position: fixed;
+    }
+
+    body.sidebar-collapsed .main-content {
+        margin-left: var(--sidebar-width-collapsed);
+    }
+    body.sidebar-collapsed .sidebar-nav.offcanvas-lg {
+        width: var(--sidebar-width-collapsed);
+    }
+    body.sidebar-collapsed .sidebar-link-text,
+    body.sidebar-collapsed .sidebar-brand-text {
+        display: none;
+    }
+    /* CORREÇÃO APLICADA: Centraliza o padding horizontal para o hover cobrir a área */
+    body.sidebar-collapsed .sidebar-nav .nav-link {
+        padding-left: 0;
+        padding-right: 0;
+        text-align: center;
+        justify-content: center; /* Centraliza o ícone horizontalmente */
+    }
+    /* CORREÇÃO APLICADA: Remove margem para centralizar o ícone */
+    body.sidebar-collapsed .sidebar-nav .nav-link i {
+        margin-right: 0;
+        width: auto; /* Deixa o ícone ocupar o espaço natural */
+    }
+    body.sidebar-collapsed .sidebar-nav .offcanvas-header {
+        justify-content: center; 
+    }
+    body.sidebar-collapsed .sidebar-nav .offcanvas-header .navbar-brand {
+        margin-right: 0;
+    }
+    body.sidebar-collapsed .sidebar-nav .mt-auto {
+        text-align: center;
+    }
+    body.sidebar-collapsed .sidebar-nav .mt-auto #desktop-sidebar-toggle {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+     body.sidebar-collapsed .sidebar-nav .mt-auto .dropdown-toggle {
+        justify-content: center;
+     }
+     
+     /* NOVO: Esconde a logo do mobile no desktop */
+     #mobile-login-logo {
+        display: none !important;
+     }
+}
+
+
+/* 3. Estilos do Menu (Sidebar)
+--------------------------------- */
+
+.sidebar-nav .offcanvas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+}
+.sidebar-nav .navbar-brand {
+    font-size: 1.5rem;
+    letter-spacing: .5px;
+}
+#desktop-sidebar-toggle {
+    transition: all 0.3s ease-in-out;
+}
+
+
+.sidebar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+    /* Padding original (com margem esquerda) */
+    padding: 0.75rem 0.5rem; 
+    transition: all 0.2s ease-in-out;
+    border-radius: 0.375rem;
+    white-space: nowrap; 
+    overflow: hidden; 
+    display: flex; 
+    align-items: center;
+}
+.sidebar-nav .nav-link:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: none; 
+}
+.sidebar-nav .nav-link.active {
+    color: #ffffff;
+    font-weight: 600;
+    background-color: rgba(255, 255, 255, 0.15);
+}
+.sidebar-nav .nav-link i {
+    font-size: 1.25rem;
+    /* Largura fixa do ícone + margem para o texto */
+    width: 30px; 
+    text-align: center;
+    margin-right: 0.75rem; 
+    transition: margin 0.3s ease-in-out;
+}
+.nav-item-divider {
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.2);
+    margin: 1rem 0;
+}
+.sidebar-nav .mt-auto .dropdown-toggle {
+    transition: all 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.sidebar-nav .mt-auto .dropdown-toggle:hover {
+    color: #fff;
+}
+.sidebar-nav .dropdown-menu {
+    border: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.sidebar-nav .dropdown-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+}
+.sidebar-nav .dropdown-menu .dropdown-item i {
+    width: 25px;
+    text-align: center;
+}
+
+
+/* 4. Estilos de Card (Modernos)
+--------------------------------- */
+.card {
+    border: none; 
+    /* Sombra um pouco mais suave e profissional */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); 
+    border-radius: 0.75rem; 
+    height: 100%; 
+}
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #e9ecef; /* Linha de separação mais sutil */
+    font-weight: 600;
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    font-size: 1.1rem; /* Título um pouco maior */
+}
+
+/* Estilos de Métrica (Dashboard) */
+.card-metric {
+    position: relative;
+    overflow: hidden; 
+    padding: 1.5rem;
+}
+.card-metric-icon {
+    position: absolute;
+    right: -20px;
+    bottom: -20px;
+    font-size: 6rem;
+    color: rgba(0, 0, 0, 0.05);
+    line-height: 1;
+}
+.card-metric .metric-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--bs-secondary);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+.card-metric .metric-value {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: #212529;
+}
+
+/* Estilos para a Tabela de Atividade Recente */
+.list-group-item {
+    border-left: 3px solid transparent;
+    transition: all 0.2s;
+}
+.list-group-item:hover {
+    background-color: #f5f5f5;
+    border-left-color: var(--bs-primary);
+}
+
+
+/* 5. Tela de Login (Split-Screen)
+--------------------------------- */
+.login-wrapper {
+    overflow: hidden; 
+}
+
+.login-form-side {
+    display: flex;
+    align-items: center; 
+    justify-content: center;
+    background-color: #f8f9fa;
+    padding: 2rem;
+    min-height: 100vh; 
+}
+
+.login-image-side {
+    position: relative;
+    background-image: url('../img/background.jpg');
+    background-size: cover;
+    background-position: center;
+    min-height: 100vh;
+}
+
+.login-branding-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(0, 86, 179, 0.85), rgba(10, 120, 240, 0.85));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 2rem;
+}
+.login-card {
+    max-width: 450px;
+    width: 100%;
+    background: #ffffff; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 0.75rem;
+}
+
+/* Regras para Desktop */
+@media (min-width: 992px) {
+    .login-card {
+        background: transparent; 
+        box-shadow: none;       
+        padding: 0 !important;  
+        max-width: 100%; 
+    }
+    
+    .login-form-side .login-card .card-body {
+        padding: 0; 
+    }
+}
+
+
+.login-form-side .form-control,
+.login-form-side .input-group-text {
+    border-radius: 0.5rem;
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+}
+.login-form-side .form-control:focus {
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+    border-color: var(--bs-primary);
+}
+.login-form-side .form-control.bg-light,
+.login-form-side .input-group-text.bg-light {
+    border: 1px solid #dee2e6;
+}
+.login-form-side .form-control.bg-light:focus {
+    background-color: #fff !important;
+}
+
+
+/* 6. Responsividade (Mobile)
+--------------------------------- */
+@media (max-width: 991.98px) {
+    .main-content {
+        margin-left: 0;
+    }
+    .login-form-side {
+        min-height: 100vh; 
+        align-items: flex-start;
+        padding-top: 4rem;
+    }
+    .login-card {
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+        background: #ffffff; 
+    }
+    .login-card .card-body {
+        padding: 1.5rem; 
+    }
+    
+     #mobile-login-logo {
+        display: block !important;
+        max-width: 150px;
+        margin: 0 auto 1.5rem;
+     }
+}
+
+
+/* 7. Estilos do Rodapé (Footer) - FIXO, CENTRALIZADO E MINIMALISTA
+--------------------------------- */
+.app-footer {
+    /* POSICIONAMENTO FIXO (mantido) */
+    position: fixed;
+    bottom: 0;
+    left: 0; 
+    width: 100%; 
+    z-index: 1000; 
+
+    /* ESTILO CLEAN & TAMANHO */
+    background-color: #ffffff;
+    border-top: 1px solid #e9ecef;
+    font-size: 0.8rem;
+    color: #6c757d; 
+    
+    /* CONTROLADOR DE ALTURA E ALINHAMENTO */
+    padding: 0 1.5rem; 
+    height: 45px; 
+}
+
+/* Garante que o div interno do container use a altura total para a centralização Flexbox */
+.app-footer .container-fluid > div {
+    height: 100%;
+}
+
+/* Espaçamento do Rodapé para Respeitar o Sidebar (DESKTOP) */
+@media (min-width: 992px) {
+    .app-footer {
+        left: var(--sidebar-width);
+        width: calc(100% - var(--sidebar-width));
+        padding-left: 1.5rem !important; 
+        padding-right: 1.5rem !important;
+    }
+
+    /* Ajuste para o Sidebar Recolhido */
+    body.sidebar-collapsed .app-footer {
+        left: var(--sidebar-width-collapsed);
+        width: calc(100% - var(--sidebar-width-collapsed));
+    }
+}
+
+/* IMPORTANTE: Garante que o conteúdo não fique escondido atrás do rodapé fixo */
+.main-content {
+    padding-bottom: 60px; 
+}
+
+
+/* ESTILOS DOS ELEMENTOS INTERNOS */
+.app-copyright {
+    color: #6c757d;
+    line-height: 1.2;
+    /* FORÇA O FLEXBOX NO CONTAINER DE COPYRIGHT PARA CENTRALIZAR O TEXTO */
+    display: flex;
+    align-items: center; 
+    margin: 0 !important; /* Remove qualquer margem conflitiva */
+}
+
+/* Garante que o ícone também tenha alinhamento centralizado no lado direito */
+.social-icons {
+     display: flex;
+     align-items: center;
+     height: 100%; /* Opcional, mas garante que o Flexbox do pai funcione */
+}
+
+.social-icons .social-link {
+    display: inline-block;
+    color: #6c757d; 
+    font-size: 1.1rem;
+    margin-left: 10px;
+    transition: color 0.2s ease-in-out;
+}
+
+.social-icons .social-link:hover {
+    color: var(--bs-primary); 
+    text-decoration: none;
+}
