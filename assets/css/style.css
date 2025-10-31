@@ -73,6 +73,19 @@ body.sidebar-collapsed .sidebar-logo {
         visibility: visible !important; 
         height: 100vh;
         position: fixed;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* * CORREÇÃO DE SCROLL (NÍVEL 1): 
+     * O 'offcanvas-body' cresce (flex-grow) e precisa 
+     * de 'min-height: 0' para permitir que seu filho encolha.
+     */
+    .sidebar-nav.offcanvas-lg .offcanvas-body {
+        flex-grow: 1; /* Faz o corpo preencher o espaço vertical */
+        display: flex; 
+        overflow: hidden; /* Evita que este container tenha scroll */
+        min-height: 0; /* <-- CORREÇÃO 1 */
     }
 
     body.sidebar-collapsed .main-content {
@@ -83,15 +96,31 @@ body.sidebar-collapsed .sidebar-logo {
     }
     body.sidebar-collapsed .sidebar-link-text,
     body.sidebar-collapsed .sidebar-brand-text {
-        display: none;
+      display: none;
     }
-    /* CORREÇÃO APLICADA: Centraliza o padding horizontal para o hover cobrir a área */
+
+    /* * ============================================
+     * INÍCIO DA CORREÇÃO 1 (Hover do Menu Recolhido)
+     * ============================================
+     */
+    
+    /* * MODIFICADO: Adiciona o padding horizontal aos links <a>
+     * para que o fundo do hover preencha a sidebar inteira.
+     */
     body.sidebar-collapsed .sidebar-nav .nav-link {
-        padding-left: 0;
-        padding-right: 0;
+        padding-left: 0.75rem; /* Adiciona padding ao item */
+        padding-right: 0.75rem; /* Adiciona padding ao item */
         text-align: center;
         justify-content: center; /* Centraliza o ícone horizontalmente */
+        
+        /* ADICIONADO: Restaura o border-radius quando recolhido */
+        border-radius: 0.375rem;
     }
+    /* ============================================
+     * FIM DA CORREÇÃO 1
+     * ============================================
+     */
+
     /* CORREÇÃO APLICADA: Remove margem para centralizar o ícone */
     body.sidebar-collapsed .sidebar-nav .nav-link i {
         margin-right: 0;
@@ -106,90 +135,102 @@ body.sidebar-collapsed .sidebar-logo {
     body.sidebar-collapsed .sidebar-nav .mt-auto {
         text-align: center;
     }
-    body.sidebar-collapsed .sidebar-nav .mt-auto #desktop-sidebar-toggle {
-        padding-left: 0.75rem;
-        padding-right: 0.75rem;
-    }
+    
      body.sidebar-collapsed .sidebar-nav .mt-auto .dropdown-toggle {
-        justify-content: center;
+         justify-content: center;
      }
      
      /* NOVO: Esconde a logo do mobile no desktop */
      #mobile-login-logo {
-        display: none !important;
+         display: none !important;
      }
 }
 
-
 /* 3. Estilos do Menu (Sidebar)
 --------------------------------- */
-
 .sidebar-nav .offcanvas-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.25rem;
 }
+
 .sidebar-nav .navbar-brand {
     font-size: 1.5rem;
     letter-spacing: .5px;
 }
+
 #desktop-sidebar-toggle {
     transition: all 0.3s ease-in-out;
 }
 
+.sidebar-nav .offcanvas-body {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow-y: auto;
+}
+
+.sidebar-nav .navbar-nav {
+    flex-grow: 1;
+}
 
 .sidebar-nav .nav-link {
     color: rgba(255, 255, 255, 0.7);
     font-weight: 500;
-    /* Padding original (com margem esquerda) */
-    padding: 0.75rem 0.5rem; 
+    padding: 0.75rem 1.25rem;
     transition: all 0.2s ease-in-out;
-    border-radius: 0.375rem;
-    white-space: nowrap; 
-    overflow: hidden; 
-    display: flex; 
+    white-space: nowrap;
+    overflow: hidden;
+    display: flex;
     align-items: center;
 }
+
 .sidebar-nav .nav-link:hover {
     color: #ffffff;
     background-color: rgba(255, 255, 255, 0.1);
-    transform: none; 
 }
+
 .sidebar-nav .nav-link.active {
     color: #ffffff;
     font-weight: 600;
     background-color: rgba(255, 255, 255, 0.15);
 }
+
 .sidebar-nav .nav-link i {
     font-size: 1.25rem;
-    /* Largura fixa do ícone + margem para o texto */
-    width: 30px; 
+    width: 30px;
     text-align: center;
-    margin-right: 0.75rem; 
+    margin-right: 0.75rem;
     transition: margin 0.3s ease-in-out;
 }
+
 .nav-item-divider {
     height: 1px;
     background-color: rgba(255, 255, 255, 0.2);
     margin: 1rem 0;
 }
+
 .sidebar-nav .mt-auto .dropdown-toggle {
     transition: all 0.2s;
     white-space: nowrap;
     overflow: hidden;
 }
+
 .sidebar-nav .mt-auto .dropdown-toggle:hover {
     color: #fff;
 }
+
 .sidebar-nav .dropdown-menu {
     border: none;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
+
 .sidebar-nav .dropdown-menu .dropdown-item {
     display: flex;
     align-items: center;
 }
+
 .sidebar-nav .dropdown-menu .dropdown-item i {
     width: 25px;
     text-align: center;
@@ -303,8 +344,8 @@ body.sidebar-collapsed .sidebar-logo {
 @media (min-width: 992px) {
     .login-card {
         background: transparent; 
-        box-shadow: none;       
-        padding: 0 !important;  
+        box-shadow: none;      
+        padding: 0 !important;   
         max-width: 100%; 
     }
     
@@ -353,9 +394,9 @@ body.sidebar-collapsed .sidebar-logo {
     }
     
      #mobile-login-logo {
-        display: block !important;
-        max-width: 150px;
-        margin: 0 auto 1.5rem;
+         display: block !important;
+         max-width: 150px;
+         margin: 0 auto 1.5rem;
      }
 }
 

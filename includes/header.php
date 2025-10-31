@@ -34,71 +34,69 @@ global $page;
             <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu" aria-label="Close"></button>
         </div>
         
-        <div class="offcanvas-body d-flex flex-column p-0">
-            <ul class="navbar-nav flex-column fs-5 p-3">
-                <li class="nav-item">
-                    <a class="nav-link <?php echo ($page == 'dashboard') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=dashboard'); ?>">
-                        <i class="bi bi-grid-fill me-3"></i> 
-                        <span class="sidebar-link-text">Dashboard</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link <?php echo ($page == 'lancamentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=lancamentos'); ?>">
-                        <i class="bi bi-arrow-down-up me-3"></i> 
-                        <span class="sidebar-link-text">Lançamentos</span>
-                    </a>
-                </li>
+        <div class="offcanvas-body d-flex flex-column">
+            <div class="sidebar-content flex-grow-1">
+                <ul class="navbar-nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo ($page == 'dashboard') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=dashboard'); ?>">
+                            <i class="bi bi-grid-fill me-3"></i> 
+                            <span class="sidebar-link-text">Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo ($page == 'lancamentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=lancamentos'); ?>">
+                            <i class="bi bi-arrow-down-up me-3"></i> 
+                            <span class="sidebar-link-text">Lançamentos</span>
+                        </a>
+                    </li>
 
-                <?php // Menus do Admin e Contador ?>
-                <?php if (isAdmin() || isContador()): ?>
-                    <li class="nav-item-divider"></li>
-                    <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'cadastro_clientes') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_clientes'); ?>">
-                            <i class="bi bi-person-lines-fill me-3"></i> 
-                            <span class="sidebar-link-text">Clientes</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'cadastro_empresas') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_empresas'); ?>">
-                            <i class="bi bi-building me-3"></i> 
-                            <span class="sidebar-link-text">Empresas</span>
-                        </a>
-                    </li>
-                    
-                <?php endif; ?>
+                    <?php // Menus do Admin e Contador ?>
+                    <?php if (isAdmin() || isContador()): ?>
+                        <li class="nav-item-divider"></li>
+                        <li class="nav-item">
+                            <a class="nav-link <?php echo ($page == 'cadastro_clientes') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_clientes'); ?>">
+                                <i class="bi bi-person-lines-fill me-3"></i> 
+                                <span class="sidebar-link-text">Clientes</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?php echo ($page == 'cadastro_empresas') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_empresas'); ?>">
+                                <i class="bi bi-building me-3"></i> 
+                                <span class="sidebar-link-text">Empresas</span>
+                            </a>
+                        </li>
+                        
+                    <?php endif; ?>
 
-                <?php // Menu exclusivo do Admin ?>
-                <?php if (isAdmin()): ?>
-                    <li class="nav-item-divider"></li>
-                    <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'cadastro_usuarios') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_usuarios'); ?>">
-                            <i class="bi bi-people-fill me-3"></i> 
-                            <span class="sidebar-link-text">Usuários</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'logs') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=logs'); ?>">
-                            <i class="bi bi-file-earmark-text me-3"></i> 
-                            <span class="sidebar-link-text">Logs</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'configuracoes_email') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=configuracoes_email'); ?>">
-                            <i class="bi bi-file-earmark-text me-3"></i> 
-                            <span class="sidebar-link-text">Config. Email</span>
-                        </a>
-                    </li>
-                <?php endif; ?>
-            </ul>
+                    <?php // Menu exclusivo do Admin ?>
+                    <?php if (isAdmin()): ?>
+                        <li class="nav-item-divider"></li>
+                        <li class="nav-item">
+                            <a class="nav-link <?php echo ($page == 'cadastro_usuarios') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_usuarios'); ?>">
+                                <i class="bi bi-people-fill me-3"></i> 
+                                <span class="sidebar-link-text">Usuários</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?php echo ($page == 'logs') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=logs'); ?>">
+                                <i class="bi bi-file-earmark-text me-3"></i> 
+                                <span class="sidebar-link-text">Logs</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?php echo ($page == 'configuracoes_email') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=configuracoes_email'); ?>">
+                                <i class="bi bi-file-earmark-text me-3"></i> 
+                                <span class="sidebar-link-text">Config. Email</span>
+                            </a>
+                        </li>
+                    <?php endif; ?>
+                </ul>
+            </div>
             
-            <div class="mt-auto p-3">
-                
-                <div class="text-center mb-3">
-                    <img src="<?php echo base_url('assets/img/logo.png'); ?>" alt="Logo" class="sidebar-logo">
-                </div>
-                
-                <div class"text-center" id="toggle-container">
-                    <button type="button" class="btn btn-outline-light w-100 d-none d-lg-block mb-3" id="desktop-sidebar-toggle">
+            <div class="sidebar-footer">
+                <?php // Bloco da logo removido daqui ?>
+                <div id="toggle-container" class="d-grid">
+                    <button type="button" class="btn btn-outline-light" id="desktop-sidebar-toggle">
                         <i class="bi bi-list"></i> 
                         <span class="sidebar-link-text">Recolher Menu</span>
                     </button>
@@ -124,6 +122,7 @@ global $page;
             </div>
         </div>
     </div>
+</div>
 
 
     <header class="navbar navbar-dark bg-primary-dark-grad sticky-top d-lg-none flex-md-nowrap p-0 shadow">

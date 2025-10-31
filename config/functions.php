@@ -2,7 +2,7 @@
 // config/functions.php
 session_start();
 require_once 'db.php'; // Assumindo que este arquivo contém $pdo global
-define('BASE_URL', 'http://localhost/DMC-Finan%C3%A7as/');
+define('BASE_URL', 'http://localhost/DMC-Finanças/');
 //define('BASE_URL', 'https://jpconsultoriacontabil.dynamicmotioncentury.com.br/');
 
 // Função para gerar URLs absolutas

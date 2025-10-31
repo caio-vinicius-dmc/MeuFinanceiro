@@ -42,6 +42,18 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
+    // --- Lógica para expandir sidebar ao clicar no dropdown (NOVO) ---
+    const userDropdown = document.getElementById('navbarDropdown');
+    if (userDropdown) {
+        userDropdown.addEventListener('click', function() {
+            // Se a sidebar estiver recolhida, expande ela
+            if (document.body.classList.contains('sidebar-collapsed')) {
+                document.body.classList.remove('sidebar-collapsed');
+                localStorage.setItem('sidebarCollapsed', 'false');
+            }
+        });
+    }
+
     // --- Campos Condicionais (Novo Usuário) ---
     const tipoUsuarioSelect = document.getElementById('tipo_usuario');
     if (tipoUsuarioSelect) {
