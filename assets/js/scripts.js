@@ -182,6 +182,24 @@ document.addEventListener("DOMContentLoaded", function() {
          });
     }
 
+    // --- Lógica do Modal de Edição (Formas de Pagamento - NOVO) ---
+    const modalEditarFormaPagamento = document.getElementById('modalEditarFormaPagamento');
+    if (modalEditarFormaPagamento) {
+        modalEditarFormaPagamento.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const id = button.getAttribute('data-id');
+            const nome = button.getAttribute('data-nome');
+            const icone = button.getAttribute('data-icone');
+            const ativo = button.getAttribute('data-ativo');
+            
+            const modalForm = modalEditarFormaPagamento.querySelector('form');
+            modalForm.querySelector('#edit_id').value = id;
+            modalForm.querySelector('#edit_nome').value = nome;
+            modalForm.querySelector('#edit_icone_bootstrap').value = icone;
+            modalForm.querySelector('#edit_ativo').checked = (ativo == '1');
+        });
+    }
+
 });
 
 /**

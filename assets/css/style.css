@@ -478,3 +478,43 @@ body.sidebar-collapsed .sidebar-logo {
     color: var(--bs-primary); 
     text-decoration: none;
 }
+
+/* 8. Estilos dos Cards de Cobrança
+--------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap');
+
+.cobranca-card .card-body {
+    padding: 1.5rem;
+}
+
+.status-bar {
+    height: 6px;
+    border-top-left-radius: var(--bs-card-inner-border-radius);
+    border-top-right-radius: var(--bs-card-inner-border-radius);
+}
+
+.bg-orange {
+    background-color: #fd7e14 !important;
+}
+
+.cobranca-card .valor {
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.cobranca-card .barcode-font {
+    font-family: 'Libre Barcode 39', cursive;
+    font-size: 3rem;
+    line-height: 1;
+    text-align: center;
+    overflow: hidden;
+    white-space: nowrap;
+    color: #343a40;
+    background-color: #fff;
+    padding: 10px 0;
+    border-radius: 5px;
+}
+
+.cobranca-card .copy-btn {
+    cursor: pointer;
+}

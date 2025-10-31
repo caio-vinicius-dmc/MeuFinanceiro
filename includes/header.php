@@ -1,4 +1,7 @@
 <?php
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
 // includes/header.php
 // (functions.php deve ser chamado ANTES do header)
 
@@ -17,6 +20,10 @@ global $page;
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     
     <link rel="stylesheet" href="<?php echo base_url('assets/css/style.css?v=1.9'); ?>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 </head>
 <body class="bg-light-subtle">
 
@@ -47,6 +54,12 @@ global $page;
                         <a class="nav-link <?php echo ($page == 'lancamentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=lancamentos'); ?>">
                             <i class="bi bi-arrow-down-up me-3"></i> 
                             <span class="sidebar-link-text">Lançamentos</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo ($page == 'cobrancas') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cobrancas'); ?>">
+                            <i class="bi bi-receipt-cutoff me-3"></i> 
+                            <span class="sidebar-link-text">Cobranças</span>
                         </a>
                     </li>
 
@@ -87,6 +100,12 @@ global $page;
                             <a class="nav-link <?php echo ($page == 'configuracoes_email') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=configuracoes_email'); ?>">
                                 <i class="bi bi-file-earmark-text me-3"></i> 
                                 <span class="sidebar-link-text">Config. Email</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?php echo ($page == 'gerenciar_formas_pagamento') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_formas_pagamento'); ?>">
+                                <i class="bi bi-wallet2 me-3"></i> 
+                                <span class="sidebar-link-text">Formas de Pagamento</span>
                             </a>
                         </li>
                     <?php endif; ?>

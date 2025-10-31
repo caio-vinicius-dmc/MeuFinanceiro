@@ -24,8 +24,10 @@ $allowed_pages = [
     'cadastro_clientes', 
     'cadastro_empresas',
     'logs',
-    'meu_perfil', // <-- ADICIONADO
-    'configuracoes_email' // <-- ESSA É A CORREÇÃO PRINCIPAL!
+    'meu_perfil',
+    'configuracoes_email',
+    'gerenciar_formas_pagamento',
+    'cobrancas'
 ];
 
 // Se a página não for de login E não estiver logado, força o login
@@ -48,7 +50,7 @@ if (isContador()) {
 } 
 elseif (isClient()) {
     // Cliente só pode ver dashboard e lançamentos
-    $allowed_client_pages = ['dashboard', 'lancamentos', 'meu_perfil']; // <-- Adicionado perfil
+    $allowed_client_pages = ['dashboard', 'lancamentos', 'meu_perfil','cobrancas']; // <-- Adicionado perfil
     if (!in_array($page, $allowed_client_pages)) {
         $page = 'dashboard'; // Redireciona
     }
