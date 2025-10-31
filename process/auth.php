@@ -8,8 +8,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'login') {
     $senha = $_POST['senha'];
 
     if (empty($email) || empty($senha)) {
-        $_SESSION['error_message'] = "Email e senha são obrigatórios.";
-        header("Location: ../index.php?page=login");
+        header("Location: " . base_url('index.php?page=login'));
         exit;
     }
 
@@ -33,7 +32,7 @@ if (isset($_POST['action']) && $_POST['action'] == 'login') {
         }
 
         logAction("Login bem-sucedido");
-        header("Location: ../index.php?page=dashboard");
+        header("Location: " . base_url('index.php?page=dashboard'));
         exit;
 
     } else {

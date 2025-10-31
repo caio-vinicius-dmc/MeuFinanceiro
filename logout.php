@@ -6,6 +6,6 @@ $user_nome = isset($_SESSION['user_nome']) ? $_SESSION['user_nome'] : 'Desconhec
 logAction("Logout", null, null, "Usuário: $user_nome");
 
 session_destroy();
-header("Location: index.php?page=login");
+header("Location: " . base_url('index.php?page=login'));
 exit();
 ?>

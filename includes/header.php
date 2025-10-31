@@ -16,7 +16,7 @@ global $page;
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     
-    <link rel="stylesheet" href="assets/css/style.css?v=1.9">
+    <link rel="stylesheet" href="<?php echo base_url('assets/css/style.css?v=1.9'); ?>">
 </head>
 <body class="bg-light-subtle">
 
@@ -26,7 +26,7 @@ global $page;
          data-bs-scroll="true" data-bs-backdrop="false" aria-labelledby="sidebarMenuLabel">
         
         <div class="offcanvas-header">
-            <a class="navbar-brand fw-bold text-white" href="index.php?page=dashboard">
+            <a class="navbar-brand fw-bold text-white" href="<?php echo base_url('index.php?page=dashboard'); ?>">
                 <i class="bi bi-cash-coin me-2"></i> 
                 <span class="sidebar-brand-text">MeuFinanceiro</span>
             </a>
@@ -37,13 +37,13 @@ global $page;
         <div class="offcanvas-body d-flex flex-column p-0">
             <ul class="navbar-nav flex-column fs-5 p-3">
                 <li class="nav-item">
-                    <a class="nav-link <?php echo ($page == 'dashboard') ? 'active' : ''; ?>" href="index.php?page=dashboard">
+                    <a class="nav-link <?php echo ($page == 'dashboard') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=dashboard'); ?>">
                         <i class="bi bi-grid-fill me-3"></i> 
                         <span class="sidebar-link-text">Dashboard</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo ($page == 'lancamentos') ? 'active' : ''; ?>" href="index.php?page=lancamentos">
+                    <a class="nav-link <?php echo ($page == 'lancamentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=lancamentos'); ?>">
                         <i class="bi bi-arrow-down-up me-3"></i> 
                         <span class="sidebar-link-text">Lançamentos</span>
                     </a>
@@ -53,13 +53,13 @@ global $page;
                 <?php if (isAdmin() || isContador()): ?>
                     <li class="nav-item-divider"></li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'cadastro_clientes') ? 'active' : ''; ?>" href="index.php?page=cadastro_clientes">
+                        <a class="nav-link <?php echo ($page == 'cadastro_clientes') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_clientes'); ?>">
                             <i class="bi bi-person-lines-fill me-3"></i> 
                             <span class="sidebar-link-text">Clientes</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'cadastro_empresas') ? 'active' : ''; ?>" href="index.php?page=cadastro_empresas">
+                        <a class="nav-link <?php echo ($page == 'cadastro_empresas') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_empresas'); ?>">
                             <i class="bi bi-building me-3"></i> 
                             <span class="sidebar-link-text">Empresas</span>
                         </a>
@@ -71,19 +71,19 @@ global $page;
                 <?php if (isAdmin()): ?>
                     <li class="nav-item-divider"></li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'cadastro_usuarios') ? 'active' : ''; ?>" href="index.php?page=cadastro_usuarios">
+                        <a class="nav-link <?php echo ($page == 'cadastro_usuarios') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_usuarios'); ?>">
                             <i class="bi bi-people-fill me-3"></i> 
                             <span class="sidebar-link-text">Usuários</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'logs') ? 'active' : ''; ?>" href="index.php?page=logs">
+                        <a class="nav-link <?php echo ($page == 'logs') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=logs'); ?>">
                             <i class="bi bi-file-earmark-text me-3"></i> 
                             <span class="sidebar-link-text">Logs</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'configuracoes_email') ? 'active' : ''; ?>" href="index.php?page=configuracoes_email">
+                        <a class="nav-link <?php echo ($page == 'configuracoes_email') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=configuracoes_email'); ?>">
                             <i class="bi bi-file-earmark-text me-3"></i> 
                             <span class="sidebar-link-text">Config. Email</span>
                         </a>
@@ -94,7 +94,7 @@ global $page;
             <div class="mt-auto p-3">
                 
                 <div class="text-center mb-3">
-                    <img src="assets/img/logo.png" alt="Logo" class="sidebar-logo">
+                    <img src="<?php echo base_url('assets/img/logo.png'); ?>" alt="Logo" class="sidebar-logo">
                 </div>
                 
                 <div class"text-center" id="toggle-container">
@@ -112,11 +112,11 @@ global $page;
                         <span class="sidebar-link-text"><?php echo htmlspecialchars($_SESSION['user_nome'] ?? 'Usuário'); ?></span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarDropdown">
-                        <li><a class="dropdown-item" href="index.php?page=meu_perfil">
+                        <li><a class="dropdown-item" href="<?php echo base_url('index.php?page=meu_perfil'); ?>">
                             <i class="bi bi-person-gear me-2"></i> Meu Perfil
                         </a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="logout.php">
+                        <li><a class="dropdown-item text-danger" href="<?php echo base_url('logout.php'); ?>">
                             <i class="bi bi-box-arrow-right me-2"></i> Sair
                         </a></li>
                     </ul>

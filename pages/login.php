@@ -8,9 +8,8 @@ ob_start();
 require_once 'config/functions.php';
 
 // --- DEFINIÇÃO DO CAMINHO ABSOLUTO PARA AÇÃO DO FORMULÁRIO E REDIRECIONAMENTO ---
-$subfolder_name = '127.0.0.1'; 
-$form_action_url = '/' . $subfolder_name . '/process/auth.php';
-$redirect_success_url = '/' . $subfolder_name . '/index.php?page=dashboard';
+$form_action_url = base_url('process/auth.php');
+$redirect_success_url = base_url('index.php?page=dashboard');
 // -----------------------------------------------------------
 
 
@@ -40,7 +39,7 @@ if (isset($_SESSION['error_message'])) {
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     
-    <link rel="stylesheet" href="assets/css/style.css?v=2.0"> </head>
+    <link rel="stylesheet" href="<?php echo base_url('assets/css/style.css?v=2.0'); ?>"> </head>
 <body class="login-wrapper">
 
     <div class="container-fluid vh-100 p-0 login-wrapper">
@@ -48,7 +47,7 @@ if (isset($_SESSION['error_message'])) {
         
             <div class="col-lg-7 d-none d-lg-block login-image-side">
                 <div class="login-branding-overlay">
-                    <img src="assets/img/logo.png" alt="Logo MeuFinanceiro" style="max-width: 200px; filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));">
+                    <img src="<?php echo base_url('assets/img/logo.png'); ?>" alt="Logo MeuFinanceiro" style="max-width: 200px; filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));">
                     <h1 class="text-white mt-3 display-4 fw-bold">MeuFinanceiro</h1>
                     <p class="text-white-50 lead">Sua gestão financeira, simples e moderna.</p>
                 </div>
@@ -60,7 +59,7 @@ if (isset($_SESSION['error_message'])) {
                     <div class="w-100">
                         
                         <div class="text-center mb-4 d-lg-none"> 
-                            <img src="assets/img/logo.png" alt="Logo Mobile" id="mobile-login-logo" style="max-width: 150px; margin: 0 auto 1.5rem;">
+                            <img src="<?php echo base_url('assets/img/logo.png'); ?>" alt="Logo Mobile" id="mobile-login-logo" style="max-width: 150px; margin: 0 auto 1.5rem;">
                             <h3 class="fw-bold mt-2 text-primary">MeuFinanceiro</h3>
                         </div>
                         

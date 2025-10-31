@@ -4,7 +4,7 @@ global $pdo;
 
 // 1. Apenas Admin pode ver esta página
 if (!isAdmin()) {
-    header("Location: index.php?page=dashboard");
+    header("Location: " . base_url('index.php?page=dashboard'));
     exit;
 }
 

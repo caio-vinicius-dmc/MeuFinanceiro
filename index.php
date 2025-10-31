@@ -30,7 +30,7 @@ $allowed_pages = [
 
 // Se a página não for de login E não estiver logado, força o login
 if ($page != 'login' && !isLoggedIn()) {
-    header("Location: index.php?page=login");
+    header("Location: " . base_url('index.php?page=login'));
     exit();
 }
 

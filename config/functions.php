@@ -2,7 +2,14 @@
 // config/functions.php
 session_start();
 require_once 'db.php'; // Assumindo que este arquivo contém $pdo global
-define('BASE_PATH', '/DMC-Finanças/');
+define('BASE_URL', 'http://localhost/DMC-Finan%C3%A7as/');
+//define('BASE_URL', 'https://jpconsultoriacontabil.dynamicmotioncentury.com.br/');
+
+// Função para gerar URLs absolutas
+function base_url($path = '') {
+    return BASE_URL . $path;
+}
+
 // Verifica se o usuário está logado
 function isLoggedIn() {
     return isset($_SESSION['user_id']);
@@ -11,7 +18,7 @@ function isLoggedIn() {
 // Redireciona se não estiver logado
 function requireLogin() {
     if (!isLoggedIn()) {
-        header("Location: index.php?page=login");
+        header("Location: " . base_url('index.php?page=login'));
         exit();
     }
 }

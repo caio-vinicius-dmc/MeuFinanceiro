@@ -53,7 +53,7 @@ switch ($action) {
             }
         }
         // Redireciona para a tela de Configuração
-        $pagina_redirecionar = 'index.php?page=configuracoes_email';
+        $pagina_redirecionar = base_url('index.php?page=configuracoes_email');
         header("Location: $pagina_redirecionar");
         exit;
     // --- FIM NOVO CASE ---
@@ -593,6 +593,6 @@ switch ($action) {
 }
 
 // Redireciona de volta para a página anterior
-$pagina_anterior = $_SERVER['HTTP_REFERER'] ?? 'index.php?page=dashboard';
+$pagina_anterior = $_SERVER['HTTP_REFERER'] ?? base_url('index.php?page=dashboard');
 header("Location: $pagina_anterior");
 exit;
