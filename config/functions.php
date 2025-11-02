@@ -36,6 +36,20 @@ function isClient() {
     return (isLoggedIn() && isset($_SESSION['user_tipo']) && $_SESSION['user_tipo'] == 'cliente');
 }
 
+// Função para verificar se o usuário tem acesso à tela de lançamentos
+function hasLancamentosAccess() {
+    global $pdo;
+    if (isAdmin() || isContador()) {
+        return true;
+    }
+    if (isClient() && isset($_SESSION['user_id'])) {
+        $stmt = $pdo->prepare("SELECT acesso_lancamentos FROM usuarios WHERE id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        return (bool) $stmt->fetchColumn();
+    }
+    return false;
+}
+
 // Função de Log
 function logAction($acao, $tabela = null, $id_registro = null, $detalhes = null) {
     global $pdo;

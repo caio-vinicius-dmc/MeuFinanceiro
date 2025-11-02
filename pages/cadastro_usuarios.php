@@ -9,7 +9,7 @@ if (!isAdmin()) {
 }
 
 // Buscar usuários existentes
-$stmt_users = $pdo->query("SELECT id, nome, email, telefone, tipo, ativo, id_cliente_associado FROM usuarios ORDER BY nome");
+$stmt_users = $pdo->query("SELECT id, nome, email, telefone, tipo, ativo, id_cliente_associado, acesso_lancamentos FROM usuarios ORDER BY nome");
 $usuarios = $stmt_users->fetchAll();
 
 // Buscar clientes para os selects (usado no form de 'Novo' e no 'Modal de Edição')
@@ -79,6 +79,10 @@ foreach ($all_associations_raw as $assoc) {
                                 <option value="<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nome_responsavel']); ?></option>
                             <?php endforeach; ?>
                         </select>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="acesso_lancamentos" name="acesso_lancamentos" value="1">
+                            <label class="form-check-label" for="acesso_lancamentos">Permitir acesso à tela de Lançamentos</label>
+                        </div>
                     </div>
                     
                     <div class="mb-3" id="assoc_contador_div" style="display: none;">
@@ -143,6 +147,7 @@ foreach ($all_associations_raw as $assoc) {
                                             data-telefone="<?php echo htmlspecialchars($usuario['telefone'] ?? ''); ?>"
                                             data-tipo="<?php echo $usuario['tipo']; ?>"
                                             data-id_cliente_associado="<?php echo $usuario['id_cliente_associado']; ?>"
+                                            data-acesso_lancamentos="<?php echo $usuario['acesso_lancamentos']; ?>"
                                             data-assoc_clientes='<?php echo json_encode($user_assoc_ids); ?>'
                                             title="Editar">
                                         <i class="bi bi-pencil"></i>
@@ -211,6 +216,10 @@ foreach ($all_associations_raw as $assoc) {
                                     <option value="<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nome_responsavel']); ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="edit_acesso_lancamentos" name="acesso_lancamentos" value="1">
+                                <label class="form-check-label" for="edit_acesso_lancamentos">Permitir acesso à tela de Lançamentos</label>
+                            </div>
                         </div>
                         
                         <div class="col-12" id="edit_assoc_contador_div" style="display: none;">
@@ -240,3 +249,92 @@ foreach ($all_associations_raw as $assoc) {
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tipoUsuarioSelect = document.getElementById('tipo_usuario');
+    const assocClienteDiv = document.getElementById('assoc_cliente_div');
+    const assocContadorDiv = document.getElementById('assoc_contador_div');
+    const acessoLancamentosCheckbox = document.getElementById('acesso_lancamentos');
+
+    function toggleAssocDivs() {
+        assocClienteDiv.style.display = 'none';
+        assocContadorDiv.style.display = 'none';
+        acessoLancamentosCheckbox.checked = false; // Reset checkbox when type changes
+
+        if (tipoUsuarioSelect.value === 'cliente') {
+            assocClienteDiv.style.display = 'block';
+        } else if (tipoUsuarioSelect.value === 'contador') {
+            assocContadorDiv.style.display = 'block';
+        }
+    }
+
+    tipoUsuarioSelect.addEventListener('change', toggleAssocDivs);
+    toggleAssocDivs(); // Call on load to set initial state
+
+    // Modal de Edição
+    const modalEditarUsuario = document.getElementById('modalEditarUsuario');
+    modalEditarUsuario.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        const id = button.getAttribute('data-id');
+        const nome = button.getAttribute('data-nome');
+        const email = button.getAttribute('data-email');
+        const telefone = button.getAttribute('data-telefone');
+        const tipo = button.getAttribute('data-tipo');
+        const id_cliente_associado = button.getAttribute('data-id_cliente_associado');
+        const acesso_lancamentos = button.getAttribute('data-acesso_lancamentos'); // Get the new attribute
+        const assoc_clientes_json = button.getAttribute('data-assoc_clientes');
+        const assoc_clientes = JSON.parse(assoc_clientes_json);
+
+        modalEditarUsuario.querySelector('#edit_id_usuario').value = id;
+        modalEditarUsuario.querySelector('#edit_nome').value = nome;
+        modalEditarUsuario.querySelector('#edit_email').value = email;
+        modalEditarUsuario.querySelector('#edit_telefone').value = telefone;
+        
+        const editTipoUsuarioSelect = modalEditarUsuario.querySelector('#edit_tipo_usuario');
+        editTipoUsuarioSelect.value = tipo;
+
+        const editAssocClienteDiv = modalEditarUsuario.querySelector('#edit_assoc_cliente_div');
+        const editAssocContadorDiv = modalEditarUsuario.querySelector('#edit_assoc_contador_div');
+        const editIdClienteAssociadoSelect = modalEditarUsuario.querySelector('#edit_id_cliente_associado');
+        const editAcessoLancamentosCheckbox = modalEditarUsuario.querySelector('#edit_acesso_lancamentos'); // Get the new checkbox
+        const editIdClientesAssociadosSelect = modalEditarUsuario.querySelector('#edit_id_clientes_associados');
+
+        // Reset visibility
+        editAssocClienteDiv.style.display = 'none';
+        editAssocContadorDiv.style.display = 'none';
+        editAcessoLancamentosCheckbox.checked = false; // Reset checkbox
+
+        if (tipo === 'cliente') {
+            editAssocClienteDiv.style.display = 'block';
+            editIdClienteAssociadoSelect.value = id_cliente_associado;
+            editAcessoLancamentosCheckbox.checked = (acesso_lancamentos == 1); // Set checked state
+        } else if (tipo === 'contador') {
+            editAssocContadorDiv.style.display = 'block';
+            // Clear previous selections
+            Array.from(editIdClientesAssociadosSelect.options).forEach(option => {
+                option.selected = false;
+            });
+            // Select associated clients
+            assoc_clientes.forEach(clientId => {
+                const option = editIdClientesAssociadosSelect.querySelector(`option[value="${clientId}"]`);
+                if (option) {
+                    option.selected = true;
+                }
+            });
+        }
+
+        // Event listener for type change in edit modal
+        editTipoUsuarioSelect.onchange = function() {
+            editAssocClienteDiv.style.display = 'none';
+            editAssocContadorDiv.style.display = 'none';
+            editAcessoLancamentosCheckbox.checked = false; // Reset checkbox
+            if (this.value === 'cliente') {
+                editAssocClienteDiv.style.display = 'block';
+            } else if (this.value === 'contador') {
+                editAssocContadorDiv.style.display = 'block';
+            }
+        };
+    });
+});
+</script>

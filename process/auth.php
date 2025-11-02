@@ -26,9 +26,10 @@ if (isset($_POST['action']) && $_POST['action'] == 'login') {
         $_SESSION['user_nome'] = $user['nome'];
         $_SESSION['user_tipo'] = $user['tipo'];
         
-        // Se for do tipo 'cliente', armazena o ID do cliente associado
+        // Se for do tipo 'cliente', armazena o ID do cliente associado e a permissão de lançamentos
         if ($user['tipo'] == 'cliente') {
             $_SESSION['id_cliente_associado'] = $user['id_cliente_associado'];
+            $_SESSION['user_acesso_lancamentos'] = $user['acesso_lancamentos'];
         }
 
         logAction("Login bem-sucedido");

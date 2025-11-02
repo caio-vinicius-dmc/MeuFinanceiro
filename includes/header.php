@@ -51,10 +51,12 @@ global $page;
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo ($page == 'lancamentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=lancamentos'); ?>">
-                            <i class="bi bi-arrow-down-up me-3"></i> 
-                            <span class="sidebar-link-text">Lançamentos</span>
-                        </a>
+                        <?php if (hasLancamentosAccess()): ?>
+                            <a class="nav-link <?php echo ($page == 'lancamentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=lancamentos'); ?>">
+                                <i class="bi bi-arrow-down-up me-3"></i> 
+                                <span class="sidebar-link-text">Lançamentos</span>
+                            </a>
+                        <?php endif; ?>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link <?php echo ($page == 'cobrancas') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cobrancas'); ?>">

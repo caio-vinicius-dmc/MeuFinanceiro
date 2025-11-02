@@ -160,26 +160,43 @@ document.addEventListener("DOMContentLoaded", function() {
     const modalEditarLancamento = document.getElementById('modalEditarLancamento');
     if (modalEditarLancamento) {
          modalEditarLancamento.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            
-            // 1. Pega os dados
-            const id = button.getAttribute('data-id');
-            const id_empresa = button.getAttribute('data-id_empresa');
-            const descricao = button.getAttribute('data-descricao');
-            const valor = button.getAttribute('data-valor');
-            const tipo = button.getAttribute('data-tipo');
-            const vencimento = button.getAttribute('data-vencimento'); 
+            // Acessa os atributos diretamente de event.relatedTarget
+            const id = event.relatedTarget.getAttribute('data-id');
+            const id_empresa = event.relatedTarget.getAttribute('data-id_empresa');
+            const descricao = event.relatedTarget.getAttribute('data-descricao');
+            const valor = event.relatedTarget.getAttribute('data-valor');
+            const tipo = event.relatedTarget.getAttribute('data-tipo');
+            const vencimento = event.relatedTarget.getAttribute('data-vencimento'); 
+            const data_competencia = event.relatedTarget.getAttribute('data-data_competencia');
+            const data_pagamento = event.relatedTarget.getAttribute('data-data_pagamento');
+            const metodo_pagamento = event.relatedTarget.getAttribute('data-metodo_pagamento');
+            const status = event.relatedTarget.getAttribute('data-status');
             
             const modalForm = modalEditarLancamento.querySelector('form');
 
-            // 2. Popula o formulário
             modalForm.querySelector('#edit_id_lancamento').value = id;
             modalForm.querySelector('#edit_id_empresa').value = id_empresa;
             modalForm.querySelector('#edit_descricao').value = descricao;
             modalForm.querySelector('#edit_valor').value = valor;
             modalForm.querySelector('#edit_tipo').value = tipo;
             modalForm.querySelector('#edit_data_vencimento').value = vencimento;
+            modalForm.querySelector('#edit_data_competencia').value = data_competencia;
+            modalForm.querySelector('#edit_data_pagamento').value = data_pagamento;
+            modalForm.querySelector('#edit_metodo_pagamento').value = metodo_pagamento;
+            modalForm.querySelector('#edit_status').value = status;
          });
+    }
+
+    
+
+    // Confirmar Pagamento Modal population
+    const modalConfirmarPagamento = document.getElementById('modalConfirmarPagamento');
+    if (modalConfirmarPagamento) {
+        modalConfirmarPagamento.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const id_lancamento = button.getAttribute('data-id_lancamento');
+            modalConfirmarPagamento.querySelector('#confirm_id_lancamento').value = id_lancamento;
+        });
     }
 
     // --- Lógica do Modal de Edição (Formas de Pagamento - NOVO) ---
@@ -199,8 +216,6 @@ document.addEventListener("DOMContentLoaded", function() {
             modalForm.querySelector('#edit_ativo').checked = (ativo == '1');
         });
     }
-
-});
 
 /**
  * Mostra/esconde campos de associação na tela de cadastro de usuário
@@ -445,4 +460,4 @@ function initStatusChart(canvasElement) {
     } catch (e) {
         console.error("Erro ao carregar dados do gráfico de status:", e);
     }
-}
+});

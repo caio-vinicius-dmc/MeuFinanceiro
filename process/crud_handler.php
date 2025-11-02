@@ -59,203 +59,53 @@ switch ($action) {
     // --- FIM NOVO CASE ---
 
 
-    // --- NOVO CASE: Disparar E-mail (Apenas Admin/Contador) ---
-    case 'disparar_email_lancamento':
-        if (isAdmin() || isContador()) {
-            $id = $_GET['id_lancamento'] ?? null;
-            if (!$id) {
-                $_SESSION['error_message'] = "ID do lançamento não fornecido.";
-                break;
-            }
-
-            // Consulta o lançamento, empresa e cliente associado
-            $sql = "SELECT l.*, c.email_contato, c.nome_responsavel 
-                    FROM lancamentos l
-                    JOIN empresas e ON l.id_empresa = e.id
-                    JOIN clientes c ON e.id_cliente = c.id
-                    WHERE l.id = ?";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$id]);
-            $lancamento = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($lancamento) {
-                if (sendNotificationEmail($lancamento['email_contato'], $lancamento['nome_responsavel'], $lancamento)) {
-                    $_SESSION['success_message'] = "E-mail de notificação enviado com sucesso para {$lancamento['email_contato']}!";
-                    logAction("Disparou E-mail", "lancamentos", $id, "E-mail enviado manualmente para cliente: {$lancamento['email_contato']}");
-                } else {
-                    $_SESSION['error_message'] = "Falha ao enviar e-mail. Verifique as Configurações SMTP.";
-                }
-            } else {
-                $_SESSION['error_message'] = "Lançamento não encontrado.";
-            }
-        }
-        break;
-    // --- FIM NOVO CASE ---
-
-
-    //--- AÇÕES DE LANÇAMENTO (RESTANTE DO CÓDIGO) ---
-    case 'dar_baixa_lancamento':
-        if (isAdmin() || isContador()) {
-            $id = $_POST['id_lancamento'];
-            $sql = "UPDATE lancamentos SET status = 'pago', data_pagamento = CURDATE() WHERE id = ?";
-            $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$id])) {
-                $_SESSION['success_message'] = "Lançamento baixado com sucesso! (Status: PAGO)";
-                logAction("Baixa Lançamento", "lancamentos", $id);
-            } else {
-                $_SESSION['error_message'] = "Erro ao dar baixa no lançamento.";
-            }
-        }
-        break;
-
-    case 'confirmar_pagamento_cliente':
-        if (isClient()) {
-            $id = $_POST['id_lancamento'];
-            // NOVOS CAMPOS OBRIGATÓRIOS DO MODAL
-            $data_pagamento = $_POST['data_pagamento_cliente'] ?? null;
-            $metodo = $_POST['metodo_pagamento'] ?? null;
-            
-            if (empty($data_pagamento) || empty($metodo)) {
-                 $_SESSION['error_message'] = "Erro: Data do Pagamento e Método são obrigatórios.";
-                 break;
-            }
-
-            $sql = "UPDATE lancamentos SET 
-                        status = 'confirmado_cliente', 
-                        data_pagamento_cliente = ?, 
-                        metodo_pagamento = ? 
-                    WHERE id = ?";
-            
-            $stmt = $pdo->prepare($sql);
-            
-            if ($stmt->execute([$data_pagamento, $metodo, $id])) {
-                $_SESSION['success_message'] = "Pagamento sinalizado! Data: " . date('d/m/Y', strtotime($data_pagamento)) . ", Método: $metodo. Aguardando baixa do contador.";
-                logAction("Cliente Confirmou Pagamento", "lancamentos", $id, "Lançamento ID $id sinalizado como pago pelo cliente. Data: $data_pagamento, Método: $metodo."); 
-            } else {
-                $_SESSION['error_message'] = "Erro ao confirmar pagamento. Tente novamente.";
-            }
-        }
-        break;
-
-    case 'reverter_pagamento':
-         if (isAdmin() || isContador()) {
-            $id = $_POST['id_lancamento'];
-            // Reverte status PAGO para PENDENTE (limpa data de pagamento e contestação)
-            // Também limpa os campos de confirmação do cliente para voltar ao status inicial.
-            $sql = "UPDATE lancamentos SET 
-                        status = 'pendente', 
-                        data_pagamento = NULL, 
-                        observacao_contestacao = NULL,
-                        data_pagamento_cliente = NULL, 
-                        metodo_pagamento = NULL 
-                    WHERE id = ?";
-            $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$id])) {
-                $_SESSION['success_message'] = "Lançamento revertido para Pendente! Status PAGO desfeito.";
-                logAction("Reverteu Pagamento", "lancamentos", $id, "Lançamento ID $id revertido de PAGO para PENDENTE.");
-            } else {
-                $_SESSION['error_message'] = "Erro ao reverter lançamento.";
-            }
-        }
-        break;
-        
-    case 'reverter_confirmacao_cliente':
-         if (isAdmin() || isContador()) {
-            $id = $_POST['id_lancamento'];
-            // Reverte status CONFIRMADO_CLIENTE para PENDENTE, limpando também os detalhes informados pelo cliente.
-            $sql = "UPDATE lancamentos SET status = 'pendente', data_pagamento_cliente = NULL, metodo_pagamento = NULL WHERE id = ?";
-            $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$id])) {
-                $_SESSION['success_message'] = "Confirmação do cliente revertida! Status: Pendente.";
-                logAction("Reverteu Confirmação Cliente", "lancamentos", $id, "Lançamento ID $id teve a confirmação do cliente revertida para PENDENTE.");
-            } else {
-                $_SESSION['error_message'] = "Erro ao reverter confirmação.";
-            }
-        }
-        break;
-    
-    // NOVO CASE: Reverter Contestação
-    case 'reverter_contestacao':
-         if (isAdmin() || isContador()) {
-            $id = $_POST['id_lancamento'];
-            $motivo_reversao = $_POST['motivo_reversao'] ?? 'Revertido pelo Contador/Admin.';
-
-            // Reverte status CONTESTADO para PENDENTE e limpa a observação de contestação
-            $sql = "UPDATE lancamentos SET status = 'pendente', observacao_contestacao = NULL WHERE id = ?";
-            $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$id])) {
-                $_SESSION['success_message'] = "Contestação revertida com sucesso! Lançamento voltou ao status Pendente.";
-                logAction("Reverteu Contestação", "lancamentos", $id, "Motivo da reversão: $motivo_reversao");
-            } else {
-                $_SESSION['error_message'] = "Erro ao reverter contestação.";
-            }
-        }
-        break;
-
-
-    case 'contestar_lancamento':
-        if (isClient()) {
-            $id = $_POST['id_lancamento'];
-            $motivo = $_POST['motivo_contestacao'];
-            $sql = "UPDATE lancamentos SET status = 'contestado', observacao_contestacao = ?, data_pagamento_cliente = NULL, metodo_pagamento = NULL WHERE id = ?";
-            $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$motivo, $id])) {
-                $_SESSION['success_message'] = "Lançamento contestado com sucesso!";
-                logAction("Cliente Contestou Lançamento", "lancamentos", $id, "Motivo: $motivo");
-            } else {
-                 $_SESSION['error_message'] = "Erro ao contestar lançamento.";
-            }
-        }
-        break;
-        
+    //--- AÇÕES DE LANÇAMENTO ---
     case 'cadastrar_lancamento':
-        if (isAdmin() || isContador()) {
+        if (isAdmin() || isContador() || isClient()) { // All can create
             $id_empresa = $_POST['id_empresa'];
             $descricao = $_POST['descricao'];
             $valor = $_POST['valor'];
-            $tipo = $_POST['tipo'];
+            $tipo = $_POST['tipo']; // Assuming 'tipo' is still relevant for categorization
             $data_vencimento = $_POST['data_vencimento'];
+            $data_competencia = $_POST['data_competencia'] ?? null;
+            $metodo_pagamento = $_POST['metodo_pagamento'] ?? null;
 
-            $sql = "INSERT INTO lancamentos (id_empresa, descricao, valor, tipo, data_vencimento, status) VALUES (?, ?, ?, ?, ?, 'pendente')";
-            $stmt = $pdo->prepare($sql);
-            
-            if ($stmt->execute([$id_empresa, $descricao, $valor, $tipo, $data_vencimento])) {
-                $id_novo = $pdo->lastInsertId();
-                $_SESSION['success_message'] = "Lançamento cadastrado com sucesso!";
-                logAction("Cadastro Lançamento", "lancamentos", $id_novo, "Valor: R$ $valor, Descrição: $descricao");
+            try {
+                $sql = "INSERT INTO lancamentos (id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'Em aberto')";
+                $stmt = $pdo->prepare($sql);
                 
-                // Disparo de email (Opcional, pode ser automático aqui ou manual via botão)
-                // $stmt_cliente = $pdo->prepare("SELECT l.*, c.email_contato, c.nome_responsavel FROM lancamentos l JOIN empresas e ON l.id_empresa = e.id JOIN clientes c ON e.id_cliente = c.id WHERE l.id = ?");
-                // $stmt_cliente->execute([$id_novo]);
-                // $lancamento_info = $stmt_cliente->fetch();
-                // if ($lancamento_info) {
-                //     sendNotificationEmail($lancamento_info['email_contato'], $lancamento_info['nome_responsavel'], $lancamento_info);
-                // }
-            } else {
-                $_SESSION['error_message'] = "Erro ao cadastrar lançamento.";
+                if ($stmt->execute([$id_empresa, $descricao, $valor, $tipo, $data_vencimento, $data_competencia, $metodo_pagamento])) {
+                    $id_novo = $pdo->lastInsertId();
+                    $_SESSION['success_message'] = "Lançamento cadastrado com sucesso!";
+                    logAction("Cadastro Lançamento", "lancamentos", $id_novo, "Valor: R$ $valor, Descrição: $descricao, Status: Em aberto");
+                } else {
+                    $_SESSION['error_message'] = "Erro ao cadastrar lançamento.";
+                }
+            } catch (PDOException $e) {
+                $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
             }
+            $pagina_redirecionar = base_url('index.php?page=lancamentos') . '&_t=' . time();
+            header("Location: $pagina_redirecionar");
+            exit;
         }
         break;
-    
+
     case 'editar_lancamento':
-        if (isAdmin() || isContador()) {
+        if (isAdmin() || isContador() || isClient()) { // All can edit
             $id = $_POST['id_lancamento'];
             $id_empresa_novo = $_POST['id_empresa'];
             $descricao_novo = $_POST['descricao'];
             $valor_novo = $_POST['valor'];
             $tipo_novo = $_POST['tipo'];
             $data_vencimento_novo = $_POST['data_vencimento'];
+            $data_competencia_novo = $_POST['data_competencia'] ?? null;
+            $metodo_pagamento_novo = $_POST['metodo_pagamento'] ?? null;
+            $status_novo = $_POST['status']; // New: status can be edited
 
-            // 1. AUDITORIA: Busca dados antigos e status
-            $stmt_old = $pdo->prepare("SELECT id_empresa, descricao, valor, tipo, data_vencimento, status FROM lancamentos WHERE id = ?");
+            // 1. AUDITORIA: Busca dados antigos
+            $stmt_old = $pdo->prepare("SELECT id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, status FROM lancamentos WHERE id = ?");
             $stmt_old->execute([$id]);
             $old_data = $stmt_old->fetch(PDO::FETCH_ASSOC);
-
-            // Verificação de segurança: Só edita se o status NÃO for pago
-            if ($old_data['status'] === 'pago') {
-                 $_SESSION['error_message'] = "Erro: Lançamento pago deve ser revertido antes de ser editado.";
-                 break;
-            }
             
             // 2. AUDITORIA: Compara e monta a string de detalhes
             $detalhes_log = [];
@@ -280,27 +130,156 @@ switch ($action) {
             if ($old_data['data_vencimento'] !== $data_vencimento_novo) {
                  $detalhes_log[] = "Vencimento: " . date('d/m/Y', strtotime($old_data['data_vencimento'])) . " -> " . date('d/m/Y', strtotime($data_vencimento_novo));
             }
+            if (($old_data['data_competencia'] ?? null) !== ($data_competencia_novo ?? null)) {
+                $detalhes_log[] = "Competência: " . ($old_data['data_competencia'] ? date('d/m/Y', strtotime($old_data['data_competencia'])) : 'N/D') . " -> " . ($data_competencia_novo ? date('d/m/Y', strtotime($data_competencia_novo)) : 'N/D');
+            }
+            if (($old_data['metodo_pagamento'] ?? null) !== ($metodo_pagamento_novo ?? null)) {
+                $detalhes_log[] = "Forma Pgto: " . ($old_data['metodo_pagamento'] ?? 'N/D') . " -> " . ($metodo_pagamento_novo ?? 'N/D');
+            }
+            if ($old_data['status'] !== $status_novo) {
+                 $detalhes_log[] = "Status: {$old_data['status']} -> {$status_novo}";
+            }
 
             if (empty($detalhes_log)) {
                  $_SESSION['success_message'] = "Lançamento não alterado (nenhuma mudança detectada).";
-                 break;
+                 $pagina_redirecionar = base_url('index.php?page=lancamentos') . '&_t=' . time();
+                 header("Location: $pagina_redirecionar");
+                 exit;
             }
             
             $log_details_string = "Campos alterados: " . implode('; ', $detalhes_log);
 
             // 3. Atualiza o banco de dados
-            // Resetamos campos de confirmação do cliente ou contestação, se o registro for editado
             $sql = "UPDATE lancamentos SET 
-                        id_empresa = ?, descricao = ?, valor = ?, tipo = ?, data_vencimento = ?, 
-                        status = 'pendente', observacao_contestacao = NULL, data_pagamento_cliente = NULL, metodo_pagamento = NULL
+                        id_empresa = ?, descricao = ?, valor = ?, tipo = ?, data_vencimento = ?, data_competencia = ?, metodo_pagamento = ?, status = ?
                     WHERE id = ?";
             $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$id_empresa_novo, $descricao_novo, $valor_novo, $tipo_novo, $data_vencimento_novo, $id])) {
-                $_SESSION['success_message'] = "Lançamento atualizado com sucesso! O status foi redefinido para 'Pendente'.";
+            if ($stmt->execute([$id_empresa_novo, $descricao_novo, $valor_novo, $tipo_novo, $data_vencimento_novo, $data_competencia_novo, $metodo_pagamento_novo, $status_novo, $id])) {
+                $_SESSION['success_message'] = "Lançamento atualizado com sucesso!";
                 logAction("Edição Lançamento", "lancamentos", $id, $log_details_string);
             } else {
                 $_SESSION['error_message'] = "Erro ao atualizar lançamento.";
             }
+            $pagina_redirecionar = base_url('index.php?page=lancamentos') . '&_t=' . time();
+            header("Location: $pagina_redirecionar");
+            exit;
+        }
+        break;
+
+    case 'excluir_lancamento': // Assuming this action already exists or needs to be added
+        if (isAdmin() || isContador() || isClient()) { // All can delete
+            $id = $_GET['id'] ?? null;
+            if ($id) {
+                try {
+                    $sql = "DELETE FROM lancamentos WHERE id = ?";
+                    $stmt = $pdo->prepare($sql);
+                    if ($stmt->execute([$id])) {
+                        $_SESSION['success_message'] = "Lançamento excluído com sucesso!";
+                        logAction("Excluiu Lançamento", "lancamentos", $id);
+                    } else {
+                        $_SESSION['error_message'] = "Erro ao excluir lançamento.";
+                    }
+                } catch (PDOException $e) {
+                    $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
+                }
+            }
+            $pagina_redirecionar = base_url('index.php?page=lancamentos') . '&_t=' . time();
+            header("Location: $pagina_redirecionar");
+            exit;
+        }
+        break;
+
+    case 'atualizar_status_lancamento':
+        if (isAdmin() || isContador() || isClient()) {
+            $id = $_POST['id_lancamento'];
+            $novo_status = $_POST['status']; // Expected to be 'Pago' or 'Em aberto'
+            $data_pagamento = $_POST['data_pagamento'] ?? null;
+            $metodo_pagamento = $_POST['metodo_pagamento'] ?? null;
+
+            error_log("DEBUG: atualizar_status_lancamento - ID: $id, Novo Status Recebido: $novo_status");
+
+            // Get current lancamento data for comparison and logging
+            $stmt_old_data = $pdo->prepare("SELECT status, data_vencimento, data_pagamento, metodo_pagamento FROM lancamentos WHERE id = ?");
+            $stmt_old_data->execute([$id]);
+            $old_lancamento_data = $stmt_old_data->fetch(PDO::FETCH_ASSOC);
+
+            if (!$old_lancamento_data) {
+                $_SESSION['error_message'] = "Lançamento não encontrado.";
+                error_log("DEBUG: Lançamento ID $id não encontrado.");
+                header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
+                exit;
+            }
+
+            $old_status = $old_lancamento_data['status'];
+            $old_data_pagamento = $old_lancamento_data['data_pagamento'];
+            $old_metodo_pagamento = $old_lancamento_data['metodo_pagamento'];
+
+            error_log("DEBUG: Old Status: $old_status, Old Data Pagamento: $old_data_pagamento, Old Metodo Pagamento: $old_metodo_pagamento");
+
+            $log_details = [];
+            $update_fields = [];
+            $update_params = [];
+
+            // Handle status change
+            if ($novo_status == 'Pago') {
+                if ($old_status != 'pago') {
+                    $update_fields[] = "status = ?";
+                    $update_params[] = 'pago';
+                    $log_details[] = "Status: $old_status -> pago";
+                }
+                // Only update data_pagamento and metodo_pagamento if marking as paid
+                if ($data_pagamento && $data_pagamento != $old_data_pagamento) {
+                    $update_fields[] = "data_pagamento = ?";
+                    $update_params[] = $data_pagamento;
+                    $log_details[] = "Data Pagamento: " . ($old_data_pagamento ?? 'N/D') . " -> $data_pagamento";
+                }
+                if ($metodo_pagamento && $metodo_pagamento != $old_metodo_pagamento) {
+                    $update_fields[] = "metodo_pagamento = ?";
+                    $update_params[] = $metodo_pagamento;
+                    $log_details[] = "Forma Pgto: " . ($old_metodo_pagamento ?? 'N/D') . " -> $metodo_pagamento";
+                }
+            } elseif ($novo_status == 'Em aberto') {
+                
+                // Se o status antigo era 'pago', forçamos a mudança para 'pendente' e limpamos os campos de pagamento.
+                // Adicionamos os campos de atualização diretamente aqui.
+                if (strtolower($old_status) == 'pago') {
+                    $update_fields[] = "status = ?";
+                    $update_params[] = 'pendente';
+                    $log_details[] = "Status: $old_status -> pendente";
+
+                    // Limpa data_pagamento
+                    $update_fields[] = "data_pagamento = NULL";
+                    $log_details[] = "Data Pagamento: " . ($old_data_pagamento ?? 'N/D') . " -> NULL";
+                    
+                    // Limpa metodo_pagamento
+                    $update_fields[] = "metodo_pagamento = NULL";
+                    $log_details[] = "Forma Pgto: " . ($old_metodo_pagamento ?? 'N/D') . " -> NULL";
+                }
+            }
+
+            if (empty($update_fields)) {
+                $_SESSION['success_message'] = "Nenhuma alteração necessária para o lançamento.";
+                header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
+                exit;
+            }
+
+            try {
+                $sql = "UPDATE lancamentos SET " . implode(", ", $update_fields) . " WHERE id = ?";
+                $update_params[] = $id;
+                $stmt = $pdo->prepare($sql);
+                
+                if ($stmt->execute($update_params)) {
+                    $_SESSION['success_message'] = "Lançamento atualizado com sucesso!";
+                    logAction("Atualizou Lançamento", "lancamentos", $id, implode("; ", $log_details));
+                } else {
+                    $errorInfo = $stmt->errorInfo();
+                    $_SESSION['error_message'] = "Erro ao atualizar lançamento: " . ($errorInfo[2] ?? "Erro desconhecido.");
+                }
+            } catch (PDOException $e) {
+                $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
+            }
+            header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
+            exit;
         }
         break;
 
@@ -448,11 +427,12 @@ switch ($action) {
             $senha = password_hash($_POST['senha'], PASSWORD_DEFAULT); 
             $tipo = $_POST['tipo_usuario'];
             $id_cliente_associado = ($tipo == 'cliente' && !empty($_POST['id_cliente_associado'])) ? $_POST['id_cliente_associado'] : null;
+            $acesso_lancamentos = ($tipo == 'cliente' && isset($_POST['acesso_lancamentos'])) ? 1 : 0;
             
-            $sql = "INSERT INTO usuarios (nome, email, telefone, senha, tipo, id_cliente_associado) VALUES (?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO usuarios (nome, email, telefone, senha, tipo, id_cliente_associado, acesso_lancamentos) VALUES (?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             
-            if ($stmt->execute([$nome, $email, $telefone, $senha, $tipo, $id_cliente_associado])) {
+            if ($stmt->execute([$nome, $email, $telefone, $senha, $tipo, $id_cliente_associado, $acesso_lancamentos])) {
                 $id_novo_usuario = $pdo->lastInsertId();
                 $_SESSION['success_message'] = "Usuário cadastrado com sucesso!";
                 logAction("Cadastro Usuário", "usuarios", $id_novo_usuario, "Email: $email, Tipo: $tipo");
@@ -479,14 +459,15 @@ switch ($action) {
             $telefone = $_POST['telefone'] ?? null;
             $tipo = $_POST['tipo_usuario'];
             $id_cliente_associado = ($tipo == 'cliente' && !empty($_POST['id_cliente_associado'])) ? $_POST['id_cliente_associado'] : null;
+            $acesso_lancamentos = ($tipo == 'cliente' && isset($_POST['acesso_lancamentos'])) ? 1 : 0;
 
-            $stmt_old = $pdo->prepare("SELECT nome, email, telefone, tipo, id_cliente_associado FROM usuarios WHERE id = ?");
+            $stmt_old = $pdo->prepare("SELECT nome, email, telefone, tipo, id_cliente_associado, acesso_lancamentos FROM usuarios WHERE id = ?");
             $stmt_old->execute([$id_usuario_edit]);
             $old_data = $stmt_old->fetch(PDO::FETCH_ASSOC);
 
 
             $sql_senha_part = "";
-            $params_sql = [$nome, $email, $telefone, $tipo, $id_cliente_associado];
+            $params_sql = [$nome, $email, $telefone, $tipo, $id_cliente_associado, $acesso_lancamentos];
             
             if (!empty($_POST['nova_senha'])) {
                 $novo_hash = password_hash($_POST['nova_senha'], PASSWORD_DEFAULT);
@@ -496,7 +477,7 @@ switch ($action) {
             
             $params_sql[] = $id_usuario_edit; 
 
-            $sql = "UPDATE usuarios SET nome = ?, email = ?, telefone = ?, tipo = ?, id_cliente_associado = ? $sql_senha_part WHERE id = ?";
+            $sql = "UPDATE usuarios SET nome = ?, email = ?, telefone = ?, tipo = ?, id_cliente_associado = ?, acesso_lancamentos = ? $sql_senha_part WHERE id = ?";
             $stmt = $pdo->prepare($sql);
             
             if ($stmt->execute($params_sql)) {
@@ -551,6 +532,14 @@ switch ($action) {
         if ($stmt->execute([$nome, $email, $telefone, $user_id])) {
             logAction("Atualização de Perfil", "usuarios", $user_id);
             $_SESSION['user_nome'] = $nome; 
+            
+            // Se o usuário for cliente, atualiza também a permissão de lançamentos na sessão
+            if (isClient()) {
+                $stmt_acesso = $pdo->prepare("SELECT acesso_lancamentos FROM usuarios WHERE id = ?");
+                $stmt_acesso->execute([$user_id]);
+                $_SESSION['user_acesso_lancamentos'] = $stmt_acesso->fetchColumn();
+            }
+
             $_SESSION['success_message'] = "Perfil atualizado com sucesso!";
         } else {
              $_SESSION['error_message'] = "Erro ao atualizar perfil.";

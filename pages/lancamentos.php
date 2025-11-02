@@ -2,6 +2,12 @@
 // pages/lancamentos.php
 global $pdo;
 
+// Redireciona se o usuário não tiver acesso a lançamentos
+if (!hasLancamentosAccess()) {
+    header("Location: " . base_url('index.php?page=dashboard'));
+    exit;
+}
+
 // --- 1. Capturar e Sanitizar Filtros ---
 $filtro_empresa_id = $_GET['id_empresa'] ?? null;
 $filtro_status = $_GET['status'] ?? null;
@@ -40,8 +46,13 @@ if (!empty($filtro_empresa_id)) {
     $params[] = $filtro_empresa_id;
 }
 if (!empty($filtro_status)) {
-    $where_conditions[] = "l.status = ?";
-    $params[] = $filtro_status;
+    // Se o filtro for 'Vencido', ajustamos a lógica
+    if ($filtro_status == 'Vencido') {
+        $where_conditions[] = "l.status = 'Em aberto' AND l.data_vencimento < CURDATE()";
+    } else {
+        $where_conditions[] = "l.status = ?";
+        $params[] = $filtro_status;
+    }
 }
 if (!empty($filtro_venc_inicio)) {
     $where_conditions[] = "l.data_vencimento >= ?";
@@ -103,11 +114,45 @@ $empresas_modal = $stmt_empresas_modal->fetchAll();
 
 // 5. Opções de Status
 $status_options = [
-    'pendente' => 'Pendente', 
-    'confirmado_cliente' => 'Confirmado pelo Cliente', 
-    'contestado' => 'Contestado', 
+    'pendente' => 'Em aberto',
+    'Vencido' => 'Vencido', // Este será tratado dinamicamente no display
     'pago' => 'Pago'
 ];
+
+// --- 6. Consulta para População de Dropdowns (Formas de Pagamento) ---
+$sql_formas_pagamento = "SELECT id, nome FROM formas_pagamento ORDER BY nome";
+$stmt_formas_pagamento = $pdo->prepare($sql_formas_pagamento);
+$stmt_formas_pagamento->execute();
+$formas_pagamento = $stmt_formas_pagamento->fetchAll(PDO::FETCH_ASSOC);
+// Função para determinar o status real e a cor do badge
+function getLancamentoStatusInfo($lancamento) {
+    $today = new DateTime();
+    $vencimento = new DateTime($lancamento['data_vencimento']);
+    $today->setTime(0, 0, 0);
+    $vencimento->setTime(0, 0, 0);
+
+    if ($lancamento['status'] == 'pago') {
+        if (!empty($lancamento['data_pagamento'])) {
+            $data_pagamento = new DateTime($lancamento['data_pagamento']);
+            $data_pagamento->setTime(0, 0, 0);
+            if ($data_pagamento > $vencimento) {
+                return ['text' => 'Pago em Atraso', 'class' => 'bg-warning text-dark'];
+            }
+        }
+        return ['text' => 'Pago', 'class' => 'bg-success'];
+    } elseif ($lancamento['status'] == 'pendente' && $vencimento < $today) {
+        return ['text' => 'Vencido', 'class' => 'bg-danger'];
+    } else if ($lancamento['status'] == 'pendente') {
+        return ['text' => 'Em aberto', 'class' => 'bg-info text-dark'];
+    } else if ($lancamento['status'] == 'contestado') {
+        return ['text' => 'Contestado', 'class' => 'bg-danger'];
+    } else if ($lancamento['status'] == 'confirmado_cliente') {
+        return ['text' => 'Confirmado Cliente', 'class' => 'bg-primary'];
+    } else {
+        return ['text' => ucfirst($lancamento['status']), 'class' => 'bg-secondary']; // Fallback for other statuses
+    }
+}
+
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -116,11 +161,10 @@ $status_options = [
         <button id="btn-exportar" class="btn btn-outline-success" title="Exportar dados filtrados para CSV">
             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar
         </button>
-        <?php if (isAdmin() || isContador()): ?>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoLancamento">
-                <i class="bi bi-plus-circle"></i> Novo Lançamento
-            </button>
-        <?php endif; ?>
+        <?php // Todos com acesso podem criar lançamentos ?>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoLancamento">
+            <i class="bi bi-plus-circle"></i> Novo Lançamento
+        </button>
     </div>
 </div>
 
@@ -188,6 +232,9 @@ $status_options = [
                 <thead class="table-light">
                     <tr>
                         <th>Vencimento</th>
+                        <th>Competência</th>
+                        <th>Pagamento</th>
+                        <th>Forma Pgto.</th>
                         <th>Cliente/Empresa</th>
                         <th>Descrição</th>
                         <th>Valor</th>
@@ -198,13 +245,21 @@ $status_options = [
                 <tbody>
                     <?php if (empty($lancamentos)): ?>
                         <tr>
-                            <td colspan="6" class="text-center text-muted">Nenhum lançamento encontrado.</td>
+                            <td colspan="8" class="text-center text-muted">Nenhum lançamento encontrado.</td>
                         </tr>
                     <?php endif; ?>
 
                     <?php foreach ($lancamentos as $lanc): ?>
+                        <?php 
+                        error_log("Lancamento ID: " . $lanc['id'] . ", DB Status: " . $lanc['status']);
+                        $status_info = getLancamentoStatusInfo($lanc);
+                        error_log("Lancamento ID: " . $lanc['id'] . ", Display Status: " . $status_info['text']);
+                        ?>
                         <tr>
                             <td><?php echo date('d/m/Y', strtotime($lanc['data_vencimento'])); ?></td>
+                            <td><?php echo $lanc['data_competencia'] ? date('d/m/Y', strtotime($lanc['data_competencia'])) : '-'; ?></td>
+                            <td><?php echo $lanc['data_pagamento'] ? date('d/m/Y', strtotime($lanc['data_pagamento'])) : '-'; ?></td>
+                            <td><?php echo htmlspecialchars($lanc['metodo_pagamento'] ?? '-'); ?></td>
                             <td>
                                 <div class="fw-bold"><?php echo htmlspecialchars($lanc['razao_social']); ?></div>
                                 <small class="text-muted"><?php echo htmlspecialchars($lanc['nome_responsavel']); ?></small>
@@ -215,133 +270,53 @@ $status_options = [
                                 R$ <?php echo number_format($lanc['valor'], 2, ',', '.'); ?>
                             </td>
                             <td>
-                                <?php
-                                $status_badge = '';
-                                $status_text = '';
-                                switch ($lanc['status']) {
-                                    case 'pago': 
-                                        $status_badge = 'bg-success'; 
-                                        $status_text = 'Pago';
-                                        break;
-                                    case 'contestado': 
-                                        $status_badge = 'bg-danger'; 
-                                        $status_text = 'Contestado';
-                                        break;
-                                    case 'confirmado_cliente': 
-                                        $status_badge = 'bg-info'; 
-                                        $status_text = 'Confirmado';
-                                        break;
-                                    case 'pendente': 
-                                    default:
-                                        $status_badge = 'bg-warning text-dark'; 
-                                        $status_text = 'Pendente';
-                                        break;
-                                }
-                                ?>
-                                <span class="badge <?php echo $status_badge; ?> fs-6" 
-                                      <?php if ($lanc['status'] == 'contestado' && !empty($lanc['observacao_contestacao'])): ?>
-                                          data-bs-toggle="tooltip" data-bs-placement="top" 
-                                          title="Motivo: <?php echo htmlspecialchars($lanc['observacao_contestacao']); ?>"
-                                      <?php endif; ?>>
-                                    <?php echo $status_text; ?>
+                                <span class="badge <?php echo $status_info['class']; ?> fs-6">
+                                    <?php echo $status_info['text']; ?>
                                 </span>
                             </td>
                             <td class="text-end">
-                                
-                                <?php // --- AÇÕES CONTADOR/ADMIN --- ?>
-
-                                <?php if (isAdmin() || isContador()): ?>
-                                
-                                    <a href="process/crud_handler.php?action=disparar_email_lancamento&id_lancamento=<?php echo $lanc['id']; ?>"
-                                        class="btn btn-sm btn-outline-info me-1"
-                                        title="Enviar E-mail de Notificação para o Cliente"
-                                        onclick="return confirm('Deseja enviar o e-mail de notificação para o cliente associado a este lançamento?');">
-                                        <i class="bi bi-envelope"></i>
-                                    </a>
-                                    <?php 
-                                    // Ação: Dar Baixa (se pendente, confirmado ou contestado)
-                                    $pode_baixar = in_array($lanc['status'], ['pendente', 'confirmado_cliente', 'contestado']);
-                                    ?>
-                                    <?php if ($pode_baixar): ?>
-                                        <form action="process/crud_handler.php" method="POST" class="d-inline" onsubmit="return confirm('Confirmar o recebimento (dar baixa) deste lançamento?');">
-                                            <input type="hidden" name="action" value="dar_baixa_lancamento">
-                                            <input type="hidden" name="id_lancamento" value="<?php echo $lanc['id']; ?>">
-                                            <button type="submit" class="btn btn-sm btn-success" title="Confirmar Recebimento (Dar Baixa)">
-                                                <i class="bi bi-check-circle"></i> Baixar
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
-                                    
-                                    <?php // Ação: Reverter Confirmação (APENAS se confirmado_cliente) ?>
-                                    <?php if ($lanc['status'] == 'confirmado_cliente'): ?>
-                                        <form action="process/crud_handler.php" method="POST" class="d-inline" onsubmit="return confirm('Reverter a confirmação do cliente para PENDENTE?');">
-                                            <input type="hidden" name="action" value="reverter_confirmacao_cliente">
-                                            <input type="hidden" name="id_lancamento" value="<?php echo $lanc['id']; ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-info" title="Reverter Confirmação">
-                                                <i class="bi bi-person-x-fill"></i> Reverter Conf.
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
-
-                                    <?php // Ação: Reverter Contestação (APENAS se CONTESTADO) ?>
-                                    <?php if ($lanc['status'] == 'contestado'): ?>
-                                        <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalReverterContestacao_<?php echo $lanc['id']; ?>" title="Reverter Contestação">
-                                            <i class="bi bi-arrow-return-left"></i> Reverter Contest.
-                                        </button>
-                                    <?php endif; ?>
-
-
-                                    <?php // Ação: Reverter Pagamento (APENAS se PAGO) ?>
-                                    <?php if ($lanc['status'] == 'pago'): ?>
-                                        <form action="process/crud_handler.php" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja REVERTER este lançamento para PENDENTE? O status PAGO será desfeito.');">
-                                            <input type="hidden" name="action" value="reverter_pagamento">
-                                            <input type="hidden" name="id_lancamento" value="<?php echo $lanc['id']; ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Reverter Pagamento">
-                                                <i class="bi bi-arrow-counterclockwise"></i> Reverter Baixa
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
-
-                                    <?php // Só pode editar se NÃO estiver PAGO ?>
-                                    <?php if ($lanc['status'] != 'pago'): ?>
-                                        <button class="btn btn-sm btn-outline-secondary" 
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#modalEditarLancamento"
-                                                data-id="<?php echo $lanc['id']; ?>"
-                                                data-id_empresa="<?php echo $lanc['id_empresa']; ?>"
-                                                data-descricao="<?php echo htmlspecialchars($lanc['descricao']); ?>"
-                                                data-valor="<?php echo htmlspecialchars($lanc['valor']); ?>"
-                                                data-tipo="<?php echo htmlspecialchars($lanc['tipo']); ?>"
-                                                data-vencimento="<?php echo htmlspecialchars($lanc['data_vencimento']); ?>"
-                                                title="Editar Lançamento">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                    <?php endif; ?>
-
-                                <?php endif; ?>
-
-
-                                <?php // 2. Cliente (Pode confirmar ou contestar, APENAS se pendente) ?>
-                                <?php if ( isClient() && $lanc['status'] == 'pendente' ): ?>
-                                    
-                                     <button class="btn btn-sm btn-success" 
+                                <?php // Ações para todos os usuários com acesso ?>
+                                <?php if ($lanc['status'] != 'pago'): // Só pode marcar como pago se não estiver pago ?>
+                                    <button type="button" class="btn btn-sm btn-success btn-confirmar-pagamento" 
                                             data-bs-toggle="modal" 
-                                            data-bs-target="#modalConfirmarPagamento_<?php echo $lanc['id']; ?>" 
-                                            title="Sinalizar Pagamento e Informar Detalhes">
-                                        <i class="bi bi-check-lg"></i> Confirmar
-                                     </button>
-                                     <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modalContestar_<?php echo $lanc['id']; ?>" title="Contestar Lançamento">
-                                        <i class="bi bi-exclamation-triangle"></i> Contestar
+                                            data-bs-target="#modalConfirmarPagamento"
+                                            data-id_lancamento="<?php echo $lanc['id']; ?>"
+                                            title="Marcar como Pago">
+                                        <i class="bi bi-check-circle"></i> Pagar
                                     </button>
-                                <?php endif; ?>
-                                
-                                <?php // 3. Cliente (Vê status de aguardo) ?>
-                                <?php if ( isClient() && $lanc['status'] == 'confirmado_cliente' ): ?>
-                                    <span class="badge bg-light text-dark border">
-                                        <i class="bi bi-hourglass-split me-1"></i>Aguardando baixa
-                                    </span>
+                                <?php else: // Se estiver pago, pode desfazer o pagamento ?>
+                                    <form action="process/crud_handler.php" method="POST" class="d-inline" onsubmit="return confirm('Deseja desfazer o pagamento deste lançamento? Ele retornará ao status Em aberto.');">
+                                        <input type="hidden" name="action" value="atualizar_status_lancamento">
+                                        <input type="hidden" name="id_lancamento" value="<?php echo $lanc['id']; ?>">
+                                        <input type="hidden" name="status" value="Em aberto"> <!-- Assuming 'pendente' means 'Em aberto' -->
+                                        <button type="submit" class="btn btn-sm btn-warning" title="Desfazer Pagamento">
+                                            <i class="bi bi-arrow-counterclockwise"></i> Desfazer Pagamento
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
 
+                                <button class="btn btn-sm btn-outline-secondary" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#modalEditarLancamento"
+                                        data-id="<?php echo $lanc['id']; ?>"
+                                        data-id_empresa="<?php echo $lanc['id_empresa']; ?>"
+                                        data-descricao="<?php echo htmlspecialchars($lanc['descricao']); ?>"
+                                        data-valor="<?php echo htmlspecialchars($lanc['valor']); ?>"
+                                        data-tipo="<?php echo htmlspecialchars($lanc['tipo']); ?>"
+                                                                                data-vencimento="<?php echo htmlspecialchars($lanc['data_vencimento']); ?>"
+                                                                                data-data_competencia="<?php echo htmlspecialchars($lanc['data_competencia'] ?? ''); ?>"
+                                                                                data-data_pagamento="<?php echo htmlspecialchars($lanc['data_pagamento'] ?? ''); ?>"
+                                                                                data-metodo_pagamento="<?php echo htmlspecialchars($lanc['metodo_pagamento'] ?? ''); ?>"
+                                                                                data-status="<?php echo htmlspecialchars($lanc['status']); ?>"                                        title="Editar Lançamento">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+
+                                <a href="process/crud_handler.php?action=excluir_lancamento&id=<?php echo $lanc['id']; ?>" 
+                                   class="btn btn-sm btn-danger" 
+                                   onclick="return confirm('Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.');" 
+                                   title="Excluir Lançamento">
+                                    <i class="bi bi-trash"></i>
+                                </a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -352,8 +327,7 @@ $status_options = [
 </div>
 
 
-<?php // --- Modal: Novo Lançamento (Apenas Admin/Contador) --- ?>
-<?php if (isAdmin() || isContador()): ?>
+<?php // --- Modal: Novo Lançamento (Todos com acesso) --- ?>
 <div class="modal fade" id="modalNovoLancamento" tabindex="-1" aria-labelledby="modalNovoLancamentoLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -402,208 +376,580 @@ $status_options = [
                             <label for="data_vencimento" class="form-label">Data Vencimento</label>
                             <input type="date" class="form-control" id="data_vencimento" name="data_vencimento" value="<?php echo date('Y-m-d'); ?>" required>
                         </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar Lançamento</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
-<div class="modal fade" id="modalEditarLancamento" tabindex="-1" aria-labelledby="modalEditarLancamentoLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalEditarLancamentoLabel">Editar Lançamento</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="process/crud_handler.php" method="POST">
-                <input type="hidden" name="action" value="editar_lancamento">
-                <input type="hidden" name="id_lancamento" id="edit_id_lancamento">
-                <div class="modal-body">
-                    <div class="row g-3">
-                        <div class="col-md-12">
-                            <label for="edit_id_empresa" class="form-label">Empresa</label>
-                            <select id="edit_id_empresa" name="id_empresa" class="form-select" required>
-                                <option value="" selected disabled>Selecione a empresa...</option>
-                                <?php foreach ($empresas_modal as $empresa): ?>
-                                    <option value='<?php echo $empresa['id']; ?>'>
-                                        <?php echo htmlspecialchars($empresa['nome_responsavel'] . ' / ' . $empresa['razao_social']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small class="text-danger">Atenção: Mudar a empresa afetará a visibilidade para o cliente associado.</small>
-                        </div>
-
-                        <div class="col-md-12">
-                            <label for="edit_descricao" class="form-label">Descrição</label>
-                            <input type="text" class="form-control" id="edit_descricao" name="descricao" required>
-                        </div>
-                        
                         <div class="col-md-4">
-                            <label for="edit_valor" class="form-label">Valor</label>
-                            <div class="input-group">
-                                <span class="input-group-text">R$</span>
-                                <input type="number" step="0.01" class="form-control" id="edit_valor" name="valor" required>
+                            <label for="data_competencia" class="form-label">Data Competência</label>
+                            <input type="date" class="form-control" id="data_competencia" name="data_competencia">
+                        </div>
+
+                                            <?php if (empty($lancamentos)): ?>
+
+                                                <tr>
+
+                                                    <td colspan="8" class="text-center text-muted">Nenhum lançamento encontrado.</td>
+
+                                                </tr>
+
+                                            <?php endif; ?>
+
+                        
+
+                                            <?php foreach ($lancamentos as $lanc): ?>
+
+                                                <?php 
+
+                                                error_log("Lancamento ID: " . $lanc['id'] . ", DB Status: " . $lanc['status']);
+
+                                                $status_info = getLancamentoStatusInfo($lanc);
+
+                                                error_log("Lancamento ID: " . $lanc['id'] . ", Display Status: " . $status_info['text']);
+
+                                                ?>
+
+                                                <tr>
+
+                                                    <td><?php echo date('d/m/Y', strtotime($lanc['data_vencimento'])); ?></td>
+
+                                                    <td><?php echo $lanc['data_competencia'] ? date('d/m/Y', strtotime($lanc['data_competencia'])) : '-'; ?></td>
+
+                                                    <td><?php echo $lanc['data_pagamento'] ? date('d/m/Y', strtotime($lanc['data_pagamento'])) : '-'; ?></td>
+
+                                                    <td><?php echo htmlspecialchars($lanc['metodo_pagamento'] ?? '-'); ?></td>
+
+                                                    <td>
+
+                                                        <div class="fw-bold"><?php echo htmlspecialchars($lanc['razao_social']); ?></div>
+
+                                                        <small class="text-muted"><?php echo htmlspecialchars($lanc['nome_responsavel']); ?></small>
+
+                                                    </td>
+
+                                                    <td><?php echo htmlspecialchars($lanc['descricao']); ?></td>
+
+                                                    <td class="fw-bold <?php echo ($lanc['tipo'] == 'receita') ? 'text-success' : 'text-danger'; ?>">
+
+                                                        <?php echo ($lanc['tipo'] == 'receita') ? '+' : '-'; ?>
+
+                                                        R$ <?php echo number_format($lanc['valor'], 2, ',', '.'); ?>
+
+                                                    </td>
+
+                                                    <td>
+
+                                                        <span class="badge <?php echo $status_info['class']; ?> fs-6">
+
+                                                            <?php echo $status_info['text']; ?>
+
+                                                        </span>
+
+                                                    </td>
+
+                                                    <td class="text-end">
+
+                                                        <?php // Ações para todos os usuários com acesso ?>
+
+                                                        <?php if ($lanc['status'] != 'Pago'): // Só pode marcar como pago se não estiver pago ?>
+
+                                                            <button type="button" class="btn btn-sm btn-success btn-confirmar-pagamento" 
+
+                                                                    data-bs-toggle="modal" 
+
+                                                                    data-bs-target="#modalConfirmarPagamento"
+
+                                                                    data-id_lancamento="<?php echo $lanc['id']; ?>"
+
+                                                                    title="Marcar como Pago">
+
+                                                                <i class="bi bi-check-circle"></i> Pagar
+
+                                                            </button>
+
+                                                        <?php else: // Se estiver pago, pode reverter para Em aberto ?>
+
+                                                            <form action="process/crud_handler.php" method="POST" class="d-inline" onsubmit="return confirm('Deseja reverter o status deste lançamento para EM ABERTO?');">
+
+                                                                <input type="hidden" name="action" value="atualizar_status_lancamento">
+
+                                                                <input type="hidden" name="id_lancamento" value="<?php echo $lanc['id']; ?>">
+
+                                                                <input type="hidden" name="status" value="Em aberto">
+
+                                                                                                            <button type="submit" class="btn btn-sm btn-warning" title="Desfazer Pagamento">
+
+                                                                                                                <i class="bi bi-arrow-counterclockwise"></i> Desfazer Pagamento
+
+                                                                                                            </button>
+
+                                                            </form>
+
+                                                        <?php endif; ?>
+
+                        
+
+                                                        <button class="btn btn-sm btn-outline-secondary" 
+
+                                                                data-bs-toggle="modal" 
+
+                                                                data-bs-target="#modalEditarLancamento"
+
+                                                                data-id="<?php echo $lanc['id']; ?>"
+
+                                                                data-id_empresa="<?php echo $lanc['id_empresa']; ?>"
+
+                                                                data-descricao="<?php echo htmlspecialchars($lanc['descricao']); ?>"
+
+                                                                data-valor="<?php echo htmlspecialchars($lanc['valor']); ?>"
+
+                                                                data-tipo="<?php echo htmlspecialchars($lanc['tipo']); ?>"
+
+                                                                data-vencimento="<?php echo htmlspecialchars($lanc['data_vencimento']); ?>"
+
+                                                                data-data_competencia="<?php echo htmlspecialchars($lanc['data_competencia'] ?? ''); ?>"
+
+                                                                data-metodo_pagamento="<?php echo htmlspecialchars($lanc['metodo_pagamento'] ?? ''); ?>"
+
+                                                                data-status="<?php echo htmlspecialchars($lanc['status']); ?>"
+
+                                                                title="Editar Lançamento">
+
+                                                            <i class="bi bi-pencil"></i>
+
+                                                        </button>
+
+                        
+
+                                                        <a href="process/crud_handler.php?action=excluir_lancamento&id=<?php echo $lanc['id']; ?>" 
+
+                                                           class="btn btn-sm btn-danger" 
+
+                                                           onclick="return confirm('Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.');" 
+
+                                                           title="Excluir Lançamento">
+
+                                                            <i class="bi bi-trash"></i>
+
+                                                        </a>
+
+                                                    </td>
+
+                                                </tr>
+
+                                            <?php endforeach; ?>
+
+                                        </tbody>
+
+                                    </table>
+
+                                </div>
+
                             </div>
+
                         </div>
 
-                        <div class="col-md-4">
-                             <label for="edit_tipo" class="form-label">Tipo</label>
-                            <select id="edit_tipo" name="tipo" class="form-select" required>
-                                <option value="receita">Receita (Entrada)</option>
-                                <option value="despesa">Despesa (Saída)</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label for="edit_data_vencimento" class="form-label">Data Vencimento</label>
-                            <input type="date" class="form-control" id="edit_data_vencimento" name="data_vencimento" required>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
-
-
-<?php // --- Modais: Reverter Contestação (APENAS ADMIN/CONTADOR) --- ?>
-<?php if (isAdmin() || isContador()): ?>
-    <?php foreach ($lancamentos as $lanc): ?>
-    <?php if ($lanc['status'] == 'contestado'): ?>
-    <div class="modal fade" id="modalReverterContestacao_<?php echo $lanc['id']; ?>" tabindex="-1" aria-labelledby="modalReverterContestacaoLabel_<?php echo $lanc['id']; ?>" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title" id="modalReverterContestacaoLabel_<?php echo $lanc['id']; ?>">Reverter Contestação</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form action="process/crud_handler.php" method="POST">
-                    <input type="hidden" name="action" value="reverter_contestacao">
-                    <input type="hidden" name="id_lancamento" value="<?php echo $lanc['id']; ?>">
-                    <div class="modal-body">
-                        <p class="mb-1"><strong>Lançamento:</strong> <?php echo htmlspecialchars($lanc['descricao']); ?></p>
-                        <p class="mb-3"><strong>Status Atual:</strong> <span class="badge bg-danger">Contestado</span></p>
                         
-                        <?php if (!empty($lanc['observacao_contestacao'])): ?>
-                        <div class="alert alert-info py-2">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Motivo da Contestação: **<?php echo htmlspecialchars($lanc['observacao_contestacao']); ?>**
-                        </div>
-                        <?php endif; ?>
 
-                        <hr>
-                        <p>Ao reverter, o lançamento voltará ao status **Pendente**.</p>
                         
-                        <div class="mb-3">
-                            <label for="motivo_reversao_<?php echo $lanc['id']; ?>" class="form-label">Motivo da Reversão (Opcional para Log):</label>
-                            <textarea class="form-control" id="motivo_reversao_<?php echo $lanc['id']; ?>" name="motivo_reversao" rows="3" placeholder="Ex: Cliente forneceu o comprovante posteriormente."></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-danger">Confirmar Reversão para Pendente</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-    <?php endforeach; ?>
-<?php endif; ?>
 
+                        <?php // --- Modal: Novo Lançamento (Todos com acesso) --- ?>
 
-<?php // --- Modais: Confirmação Detalhada do Cliente (CLIENTE) --- ?>
-<?php if (isClient()): ?>
-    <?php foreach ($lancamentos as $lanc): ?>
-    <?php if ($lanc['status'] == 'pendente'): // Somente para lançamentos pendentes ?>
-    <div class="modal fade" id="modalConfirmarPagamento_<?php echo $lanc['id']; ?>" tabindex="-1" aria-labelledby="modalConfirmarPagamentoLabel_<?php echo $lanc['id']; ?>" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title" id="modalConfirmarPagamentoLabel_<?php echo $lanc['id']; ?>">Detalhes da Confirmação de Pagamento</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form action="process/crud_handler.php" method="POST">
-                    <input type="hidden" name="action" value="confirmar_pagamento_cliente">
-                    <input type="hidden" name="id_lancamento" value="<?php echo $lanc['id']; ?>">
-                    <div class="modal-body">
-                        <p>Lançamento: <strong><?php echo htmlspecialchars($lanc['descricao']); ?></strong></p>
-                        <p>Valor: <span class="fw-bold text-success">R$ <?php echo number_format($lanc['valor'], 2, ',', '.'); ?></span></p>
-                        <hr>
-                        <p class="mb-3">Por favor, informe quando e como o pagamento foi realizado.</p>
+                        <div class="modal fade" id="modalNovoLancamento" tabindex="-1" aria-labelledby="modalNovoLancamentoLabel" aria-hidden="true">
 
-                        <div class="mb-3">
-                            <label for="data_pagamento_cliente_<?php echo $lanc['id']; ?>" class="form-label">Data do Pagamento:</label>
-                            <input type="date" class="form-control" id="data_pagamento_cliente_<?php echo $lanc['id']; ?>" name="data_pagamento_cliente" value="<?php echo date('Y-m-d'); ?>" required>
-                        </div>
+                            <div class="modal-dialog modal-lg">
+
+                                <div class="modal-content">
+
+                                    <div class="modal-header">
+
+                                        <h5 class="modal-title" id="modalNovoLancamentoLabel">Novo Lançamento</h5>
+
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                                    </div>
+
+                                    <form action="process/crud_handler.php" method="POST">
+
+                                        <input type="hidden" name="action" value="cadastrar_lancamento">
+
+                                        <div class="modal-body">
+
+                                            <div class="row g-3">
+
+                                                <div class="col-md-12">
+
+                                                    <label for="id_empresa" class="form-label">Empresa</label>
+
+                                                    <select id="id_empresa" name="id_empresa" class="form-select" required>
+
+                                                        <option value="" selected disabled>Selecione a empresa...</option>
+
+                                                        <?php foreach ($empresas_modal as $empresa): ?>
+
+                                                            <option value='<?php echo $empresa['id']; ?>'>
+
+                                                                <?php echo htmlspecialchars($empresa['nome_responsavel'] . ' / ' . $empresa['razao_social']); ?>
+
+                                                            </option>
+
+                                                        <?php endforeach; ?>
+
+                                                    </select>
+
+                                                </div>
+
                         
-                        <div class="mb-3">
-                            <label for="metodo_pagamento_<?php echo $lanc['id']; ?>" class="form-label">Método de Pagamento:</label>
-                            <select class="form-select" id="metodo_pagamento_<?php echo $lanc['id']; ?>" name="metodo_pagamento" required>
-                                <option value="" disabled selected>Selecione o método...</option>
-                                <option value="Pix">Pix</option>
-                                <option value="Boleto">Boleto (Compensado)</option>
-                                <option value="Transferência">Transferência Bancária (TED/DOC)</option>
-                                <option value="Cartão">Cartão de Crédito/Débito</option>
-                                <option value="Outro">Outro</option>
-                            </select>
+
+                                                <div class="col-md-12">
+
+                                                    <label for="descricao" class="form-label">Descrição</label>
+
+                                                    <input type="text" class="form-control" id="descricao" name="descricao" required>
+
+                                                </div>
+
+                                                
+
+                                                <div class="col-md-4">
+
+                                                    <label for="valor" class="form-label">Valor</label>
+
+                                                    <div class="input-group">
+
+                                                        <span class="input-group-text">R$</span>
+
+                                                        <input type="number" step="0.01" class="form-control" id="valor" name="valor" required>
+
+                                                    </div>
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-4">
+
+                                                     <label for="tipo" class="form-label">Tipo</label>
+
+                                                    <select id="tipo" name="tipo" class="form-select" required>
+
+                                                        <option value="receita">Receita (Entrada)</option>
+
+                                                        <option value="despesa">Despesa (Saída)</option>
+
+                                                    </select>
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-4">
+
+                                                    <label for="data_vencimento" class="form-label">Data Vencimento</label>
+
+                                                    <input type="date" class="form-control" id="data_vencimento" name="data_vencimento" value="<?php echo date('Y-m-d'); ?>" required>
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-4">
+
+                                                    <label for="data_competencia" class="form-label">Data Competência</label>
+
+                                                    <input type="date" class="form-control" id="data_competencia" name="data_competencia">
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-4">
+
+                                                    <label for="metodo_pagamento" class="form-label">Forma de Pagamento</label>
+
+                                                    <select id="metodo_pagamento" name="metodo_pagamento" class="form-select">
+
+                                                        <option value="">Selecione...</option>
+
+                                                        <?php foreach ($formas_pagamento as $forma): ?>
+
+                                                            <option value="<?php echo htmlspecialchars($forma['nome']); ?>"><?php echo htmlspecialchars($forma['nome']); ?></option>
+
+                                                        <?php endforeach; ?>
+
+                                                    </select>
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+                                        <div class="modal-footer">
+
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+
+                                            <button type="submit" class="btn btn-primary">Salvar Lançamento</button>
+
+                                        </div>
+
+                                    </form>
+
+                                </div>
+
+                            </div>
+
                         </div>
 
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-success">Confirmar e Enviar para Baixa</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-    <?php endforeach; ?>
-<?php endif; ?>
+                        
 
+                        <div class="modal fade" id="modalEditarLancamento" tabindex="-1" aria-labelledby="modalEditarLancamentoLabel" aria-hidden="true">
 
-<?php // --- Modais: Contestar (CLIENTE) --- ?>
-<?php if (isClient()): ?>
-    <?php foreach ($lancamentos as $lanc): // Re-looping apenas para gerar os modais ?>
-    <?php if ($lanc['status'] == 'pendente' || $lanc['status'] == 'confirmado_cliente'): // Pode contestar se estiver pendente ou confirmado ?>
-    <div class="modal fade" id="modalContestar_<?php echo $lanc['id']; ?>" tabindex="-1" aria-labelledby="modalContestarLabel_<?php echo $lanc['id']; ?>" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalContestarLabel_<?php echo $lanc['id']; ?>">Contestar Lançamento</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form action="process/crud_handler.php" method="POST">
-                    <input type="hidden" name="action" value="contestar_lancamento">
-                    <input type="hidden" name="id_lancamento" value="<?php echo $lanc['id']; ?>">
-                    <div class="modal-body">
-                        <p><strong>Descrição:</strong> <?php echo htmlspecialchars($lanc['descricao']); ?></p>
-                        <p><strong>Valor:</strong> R$ <?php echo number_format($lanc['valor'], 2, ',', '.'); ?></p>
-                        <hr>
-                        <div class="mb-3">
-                            <label for="motivo_contestacao_<?php echo $lanc['id']; ?>" class="form-label">Motivo da Contestação:</label>
-                            <textarea class="form-control" id="motivo_contestacao_<?php echo $lanc['id']; ?>" name="motivo_contestacao" rows="4" required></textarea>
+                            <div class="modal-dialog modal-lg">
+
+                                <div class="modal-content">
+
+                                    <div class="modal-header">
+
+                                        <h5 class="modal-title" id="modalEditarLancamentoLabel">Editar Lançamento</h5>
+
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                                    </div>
+
+                                    <form action="process/crud_handler.php" method="POST">
+
+                                        <input type="hidden" name="action" value="editar_lancamento">
+
+                                        <input type="hidden" name="id_lancamento" id="edit_id_lancamento">
+
+                                        <div class="modal-body">
+
+                                            <div class="row g-3">
+
+                                                <div class="col-md-12">
+
+                                                    <label for="edit_id_empresa" class="form-label">Empresa</label>
+
+                                                    <select id="edit_id_empresa" name="id_empresa" class="form-select" required>
+
+                                                        <option value="" selected disabled>Selecione a empresa...</option>
+
+                                                        <?php foreach ($empresas_modal as $empresa): ?>
+
+                                                            <option value='<?php echo $empresa['id']; ?>'>
+
+                                                                <?php echo htmlspecialchars($empresa['nome_responsavel'] . ' / ' . $empresa['razao_social']); ?>
+
+                                                            </option>
+
+                                                        <?php endforeach; ?>
+
+                                                    </select>
+
+                                                    <small class="text-danger">Atenção: Mudar a empresa afetará a visibilidade para o cliente associado.</small>
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-12">
+
+                                                    <label for="edit_descricao" class="form-label">Descrição</label>
+
+                                                    <input type="text" class="form-control" id="edit_descricao" name="descricao" required>
+
+                                                </div>
+
+                                                
+
+                                                <div class="col-md-4">
+
+                                                    <label for="edit_valor" class="form-label">Valor</label>
+
+                                                    <div class="input-group">
+
+                                                        <span class="input-group-text">R$</span>
+
+                                                        <input type="number" step="0.01" class="form-control" id="edit_valor" name="valor" required>
+
+                                                    </div>
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-4">
+
+                                                     <label for="edit_tipo" class="form-label">Tipo</label>
+
+                                                    <select id="edit_tipo" name="tipo" class="form-select" required>
+
+                                                        <option value="receita">Receita (Entrada)</option>
+
+                                                        <option value="despesa">Despesa (Saída)</option>
+
+                                                    </select>
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-4">
+
+                                                    <label for="edit_data_vencimento" class="form-label">Data Vencimento</label>
+
+                                                    <input type="date" class="form-control" id="edit_data_vencimento" name="data_vencimento" required>
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-4">
+
+                                                    <label for="edit_data_competencia" class="form-label">Data Competência</label>
+
+                                                    <input type="date" class="form-control" id="edit_data_competencia" name="data_competencia">
+
+                                                </div>
+
+                                                <div class="col-md-4">
+
+                                                    <label for="edit_data_pagamento" class="form-label">Data Pagamento</label>
+
+                                                    <input type="date" class="form-control" id="edit_data_pagamento" name="data_pagamento">
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-4">
+
+                                                    <label for="edit_metodo_pagamento" class="form-label">Forma de Pagamento</label>
+
+                                                    <select id="edit_metodo_pagamento" name="metodo_pagamento" class="form-select">
+
+                                                        <option value="">Selecione...</option>
+
+                                                        <?php foreach ($formas_pagamento as $forma): ?>
+
+                                                            <option value="<?php echo htmlspecialchars($forma['nome']); ?>"><?php echo htmlspecialchars($forma['nome']); ?></option>
+
+                                                        <?php endforeach; ?>
+
+                                                    </select>
+
+                                                </div>
+
+                        
+
+                                                <div class="col-md-12">
+
+                                                    <label for="edit_status" class="form-label">Status</label>
+
+                                                    <select id="edit_status" name="status" class="form-select" required>
+
+                                                        <option value="pendente">Em aberto</option>
+
+                                                        <option value="pago">Pago</option>
+
+                                                    </select>
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+                                        <div class="modal-footer">
+
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+
+                                            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+
+                                        </div>
+
+                                    </form>
+
+                                </div>
+
+                            </div>
+
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-danger">Confirmar Contestação</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-    <?php endforeach; ?>
-<?php endif; ?>
+
+                        
+
+                        
+
+                        <?php // --- Modal: Confirmar Pagamento --- ?>
+
+                        <div class="modal fade" id="modalConfirmarPagamento" tabindex="-1" aria-labelledby="modalConfirmarPagamentoLabel" aria-hidden="true">
+
+                            <div class="modal-dialog">
+
+                                <div class="modal-content">
+
+                                    <div class="modal-header">
+
+                                        <h5 class="modal-title" id="modalConfirmarPagamentoLabel">Confirmar Pagamento</h5>
+
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+                                    </div>
+
+                                    <form action="process/crud_handler.php" method="POST">
+
+                                        <input type="hidden" name="action" value="atualizar_status_lancamento">
+
+                                        <input type="hidden" name="id_lancamento" id="confirm_id_lancamento">
+
+                                        <input type="hidden" name="status" value="Pago">
+
+                                        <div class="modal-body">
+
+                                            <p>Você está prestes a marcar este lançamento como PAGO.</p>
+
+                                            <div class="mb-3">
+
+                                                <label for="confirm_data_pagamento" class="form-label">Data de Pagamento</label>
+
+                                                <input type="date" class="form-control" id="confirm_data_pagamento" name="data_pagamento" value="<?php echo date('Y-m-d'); ?>" required>
+
+                                            </div>
+
+                                            <div class="mb-3">
+
+                                                <label for="confirm_metodo_pagamento" class="form-label">Forma de Pagamento</label>
+
+                                                <select id="confirm_metodo_pagamento" name="metodo_pagamento" class="form-select" required>
+
+                                                    <option value="">Selecione...</option>
+
+                                                    <?php foreach ($formas_pagamento as $forma): ?>
+
+                                                        <option value="<?php echo htmlspecialchars($forma['nome']); ?>"><?php echo htmlspecialchars($forma['nome']); ?></option>
+
+                                                    <?php endforeach; ?>
+
+                                                </select>
+
+                                            </div>
+
+                                        </div>
+
+                                        <div class="modal-footer">
+
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+
+                                            <button type="submit" class="btn btn-success">Confirmar Pagamento</button>
+
+                                        </div>
+
+                                    </form>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        
+
+                        
