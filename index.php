@@ -27,7 +27,8 @@ $allowed_pages = [
     'meu_perfil',
     'configuracoes_email',
     'gerenciar_formas_pagamento',
-    'cobrancas'
+    'cobrancas',
+    'gerenciar_tipos_cobranca'
 ];
 
 // Se a página não for de login E não estiver logado, força o login

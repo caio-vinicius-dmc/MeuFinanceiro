@@ -592,14 +592,15 @@ switch ($action) {
             $data_vencimento = $_POST['data_vencimento'];
             $valor = $_POST['valor'];
             $id_forma_pagamento = $_POST['id_forma_pagamento'];
+            $id_tipo_cobranca = $_POST['id_tipo_cobranca'] ?? null;
             $descricao = $_POST['descricao'];
             $contexto_pagamento = $_POST['contexto_pagamento'] ?? null;
 
             try {
-                $sql = "INSERT INTO cobrancas (id_empresa, data_competencia, data_vencimento, valor, id_forma_pagamento, descricao, contexto_pagamento, status_pagamento) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, 'Pendente')";
+                $sql = "INSERT INTO cobrancas (id_empresa, data_competencia, data_vencimento, valor, id_forma_pagamento, id_tipo_cobranca, descricao, contexto_pagamento, status_pagamento) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pendente')";
                 $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$id_empresa, $data_competencia, $data_vencimento, $valor, $id_forma_pagamento, $descricao, $contexto_pagamento])) {
+                if ($stmt->execute([$id_empresa, $data_competencia, $data_vencimento, $valor, $id_forma_pagamento, $id_tipo_cobranca, $descricao, $contexto_pagamento])) {
                     $_SESSION['success_message'] = "Cobrança gerada com sucesso!";
                     logAction("Gerou Cobrança", "cobrancas", $pdo->lastInsertId(), "Valor: R$ $valor para empresa ID: $id_empresa");
                 } else {
@@ -639,6 +640,7 @@ switch ($action) {
             $data_vencimento = $_POST['data_vencimento'];
             $valor = $_POST['valor'];
             $id_forma_pagamento = $_POST['id_forma_pagamento'];
+            $id_tipo_cobranca = $_POST['id_tipo_cobranca'] ?? null;
             $descricao = $_POST['descricao'];
             $contexto_pagamento = $_POST['contexto_pagamento'] ?? null;
 
@@ -649,11 +651,12 @@ switch ($action) {
                             data_vencimento = ?, 
                             valor = ?, 
                             id_forma_pagamento = ?, 
+                            id_tipo_cobranca = ?, 
                             descricao = ?, 
                             contexto_pagamento = ? 
                         WHERE id = ?";
                 $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$id_empresa, $data_competencia, $data_vencimento, $valor, $id_forma_pagamento, $descricao, $contexto_pagamento, $id])) {
+                if ($stmt->execute([$id_empresa, $data_competencia, $data_vencimento, $valor, $id_forma_pagamento, $id_tipo_cobranca, $descricao, $contexto_pagamento, $id])) {
                     $_SESSION['success_message'] = "Cobrança atualizada com sucesso!";
                     logAction("Editou Cobrança", "cobrancas", $id, "Valor: R$ $valor, Descrição: $descricao");
                 } else {
@@ -695,9 +698,6 @@ switch ($action) {
                 $data_pagamento_obj = new DateTime($data_pagamento);
 
                 $status_pagamento = 'Pago';
-                if ($data_pagamento_obj > $data_vencimento) {
-                    $status_pagamento = 'Pago em atraso';
-                }
 
                 // 2. Atualizar a cobrança com a data de pagamento e o status determinado
                 $sql = "UPDATE cobrancas SET status_pagamento = ?, data_pagamento = ? WHERE id = ?";
@@ -806,6 +806,79 @@ switch ($action) {
             } catch (PDOException $e) {
                 if ($e->errorInfo[1] == 1451) {
                     $_SESSION['error_message'] = "Erro: Esta forma de pagamento não pode ser excluída pois está sendo utilizada em uma ou mais cobranças.";
+                } else {
+                    $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
+                }
+            }
+        }
+        break;
+
+    // --- AÇÕES DE TIPOS DE COBRANÇA (Admin) ---
+
+    case 'criar_tipo_cobranca':
+        if (isAdmin()) {
+            $nome = $_POST['nome'];
+            $ativo = isset($_POST['ativo']) ? 1 : 0;
+
+            try {
+                $sql = "INSERT INTO tipos_cobranca (nome, ativo) VALUES (?, ?)";
+                $stmt = $pdo->prepare($sql);
+                if ($stmt->execute([$nome, $ativo])) {
+                    $_SESSION['success_message'] = "Tipo de cobrança criado com sucesso!";
+                    logAction("Criou Tipo de Cobrança", "tipos_cobranca", $pdo->lastInsertId(), "Nome: $nome");
+                } else {
+                    $_SESSION['error_message'] = "Erro ao criar tipo de cobrança.";
+                }
+            } catch (PDOException $e) {
+                if ($e->errorInfo[1] == 1062) {
+                    $_SESSION['error_message'] = "Erro: Já existe um tipo de cobrança com este nome.";
+                } else {
+                    $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
+                }
+            }
+        }
+        break;
+
+    case 'editar_tipo_cobranca':
+        if (isAdmin()) {
+            $id = $_POST['id'];
+            $nome = $_POST['nome'];
+            $ativo = isset($_POST['ativo']) ? 1 : 0;
+
+            try {
+                $sql = "UPDATE tipos_cobranca SET nome = ?, ativo = ? WHERE id = ?";
+                $stmt = $pdo->prepare($sql);
+                if ($stmt->execute([$nome, $ativo, $id])) {
+                    $_SESSION['success_message'] = "Tipo de cobrança atualizado com sucesso!";
+                    logAction("Editou Tipo de Cobrança", "tipos_cobranca", $id, "Nome: $nome");
+                } else {
+                    $_SESSION['error_message'] = "Erro ao atualizar tipo de cobrança.";
+                }
+            } catch (PDOException $e) {
+                if ($e->errorInfo[1] == 1062) {
+                    $_SESSION['error_message'] = "Erro: Já existe um tipo de cobrança com este nome.";
+                } else {
+                    $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
+                }
+            }
+        }
+        break;
+
+    case 'excluir_tipo_cobranca':
+        if (isAdmin()) {
+            $id = $_GET['id'];
+            try {
+                $sql = "DELETE FROM tipos_cobranca WHERE id = ?";
+                $stmt = $pdo->prepare($sql);
+                if ($stmt->execute([$id])) {
+                    $_SESSION['success_message'] = "Tipo de cobrança excluído com sucesso!";
+                    logAction("Excluiu Tipo de Cobrança", "tipos_cobranca", $id);
+                } else {
+                    $_SESSION['error_message'] = "Erro ao excluir tipo de cobrança.";
+                }
+            } catch (PDOException $e) {
+                if ($e->errorInfo[1] == 1451) { // Foreign key constraint
+                    $_SESSION['error_message'] = "Erro: Este tipo de cobrança não pode ser excluído pois está sendo utilizado em uma ou mais cobranças.";
                 } else {
                     $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
                 }

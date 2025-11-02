@@ -83,9 +83,16 @@ body.sidebar-collapsed .sidebar-logo {
      */
     .sidebar-nav.offcanvas-lg .offcanvas-body {
         flex-grow: 1; /* Faz o corpo preencher o espaço vertical */
-        display: flex; 
-        overflow: hidden; /* Evita que este container tenha scroll */
+        display: flex;
+        overflow: hidden; /* Evita que este container tenha scroll, a rolagem será no filho */
         min-height: 0; /* <-- CORREÇÃO 1 */
+    }
+
+    /* * CORREÇÃO DE SCROLL (NÍVEL 2):
+     * O container dos links do menu deve ter a rolagem.
+     */
+    .sidebar-content {
+        overflow-y: auto;
     }
 
     body.sidebar-collapsed .main-content {

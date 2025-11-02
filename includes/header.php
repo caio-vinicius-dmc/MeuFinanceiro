@@ -108,6 +108,12 @@ global $page;
                                 <span class="sidebar-link-text">Formas de Pagamento</span>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?php echo ($page == 'gerenciar_tipos_cobranca') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_tipos_cobranca'); ?>">
+                                <i class="bi bi-tags-fill me-3"></i> 
+                                <span class="sidebar-link-text">Tipos de Cobrança</span>
+                            </a>
+                        </li>
                     <?php endif; ?>
                 </ul>
             </div>
