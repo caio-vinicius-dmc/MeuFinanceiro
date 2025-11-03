@@ -398,6 +398,63 @@ body.sidebar-collapsed .sidebar-logo {
     }
 }
 
+/* ==========================
+   Footer styles
+   ========================== */
+.app-footer {
+    background: linear-gradient(180deg, rgba(15,23,42,0.02), rgba(255,255,255,0.02));
+    border-top: 1px solid rgba(0,0,0,0.04);
+    margin-top: 2rem;
+    display: flex; /* garante que o footer alinhe seu conteúdo verticalmente */
+    align-items: center; /* centraliza no eixo Y */
+}
+.app-footer .footer-link {
+    color: var(--bs-secondary);
+    text-decoration: none;
+    font-weight: 600;
+}
+.app-footer .footer-link:hover {
+    text-decoration: underline;
+    color: var(--bs-primary);
+}
+.app-footer .social-btn {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 50%;
+}
+.app-footer .social-btn i { font-size: 1rem; }
+.app-footer .footer-version {
+    font-size: 0.85rem;
+}
+
+@media (max-width: 767.98px) {
+    .app-footer .footer-nav { text-align: center; }
+    .app-footer .footer-version { display: none; }
+}
+
+/* Força centralização vertical dos conteúdos do footer */
+.app-footer .container-fluid {
+    display: flex;
+    align-items: center;
+    padding-top: 0; /* remove padding extra que desloca visualmente o conteúdo */
+    padding-bottom: 0;
+}
+.app-footer .row {
+    align-items: center;
+    width: 100%;
+}
+.app-footer .col-md-4 {
+    display: flex;
+    align-items: center;
+}
+.app-footer .col-md-4.d-flex.flex-column {
+    justify-content: center; /* centraliza verticalmente quando é coluna */
+}
+
 .login-image-side {
     position: relative;
     background-image: url('../img/background.jpg');

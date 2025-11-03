@@ -9,17 +9,31 @@ if (!isAdmin() && !isContador()) {
 }
 
 // Buscar clientes para o <select> do formulário de cadastro
-$sql_clientes_form = "SELECT id, nome_responsavel FROM clientes";
 $params_clientes_form = [];
-if(isContador()) {
+if (isContador()) {
     // Contador só pode cadastrar para seus próprios clientes
-    $sql_clientes_form .= " JOIN contador_clientes_assoc ca ON clientes.id = ca.id_cliente WHERE ca.id_usuario_contador = ?";
+    $sql_clientes_form = "SELECT cl.id, cl.nome_responsavel
+                           FROM clientes cl
+                           JOIN contador_clientes_assoc ca ON cl.id = ca.id_cliente
+                           WHERE ca.id_usuario_contador = ?
+                           ORDER BY cl.nome_responsavel";
     $params_clientes_form[] = $_SESSION['user_id'];
+} else {
+    // Admin vê todos os clientes
+    $sql_clientes_form = "SELECT id, nome_responsavel FROM clientes ORDER BY nome_responsavel";
 }
-$sql_clientes_form .= " ORDER BY nome_responsavel";
+
 $stmt_clientes_form = $pdo->prepare($sql_clientes_form);
 $stmt_clientes_form->execute($params_clientes_form);
 $clientes_para_select = $stmt_clientes_form->fetchAll();
+
+// Se contador não tem clientes associados, buscar todos como fallback e sinalizar (para evitar tela vazia)
+$contador_sem_clientes = false;
+if (isContador() && empty($clientes_para_select)) {
+    $contador_sem_clientes = true;
+    $stmt_fallback = $pdo->query("SELECT id, nome_responsavel FROM clientes ORDER BY nome_responsavel");
+    $clientes_para_select = $stmt_fallback->fetchAll();
+}
 
 
 // Buscar empresas existentes para a listagem
@@ -59,12 +73,15 @@ $empresas = $stmt_empresas->fetchAll();
                 <h5 class="mb-0"><i class="bi bi-building-add me-2"></i> Nova Empresa</h5>
             </div>
             <div class="card-body">
-                <form action="process/crud_handler.php" method="POST">
+                        <form action="process/crud_handler.php" method="POST">
                     <input type="hidden" name="action" value="cadastrar_empresa">
                     
                     <div class="row g-3">
                         <div class="col-md-12">
                             <label for="id_cliente" class="form-label">Cliente Proprietário</label>
+                            <?php if (isContador() && $contador_sem_clientes): ?>
+                                <div class="alert alert-warning">Você não possui clientes associados. A lista abaixo mostra todos os clientes como fallback; associe clientes ao seu usuário para restringir a seleção.</div>
+                            <?php endif; ?>
                             <select id="id_cliente" name="id_cliente" class="form-select" required>
                                 <option value="" selected disabled>Selecione o cliente...</option>
                                 <?php foreach ($clientes_para_select as $cliente): ?>

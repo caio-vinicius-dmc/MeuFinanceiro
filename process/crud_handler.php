@@ -71,13 +71,14 @@ switch ($action) {
             $metodo_pagamento = $_POST['metodo_pagamento'] ?? null;
 
             try {
-                $sql = "INSERT INTO lancamentos (id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'Em aberto')";
+                // Armazenamos o status inicial como 'pendente' para compatibilidade com a lógica de exibição
+                $sql = "INSERT INTO lancamentos (id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente')";
                 $stmt = $pdo->prepare($sql);
                 
                 if ($stmt->execute([$id_empresa, $descricao, $valor, $tipo, $data_vencimento, $data_competencia, $metodo_pagamento])) {
                     $id_novo = $pdo->lastInsertId();
                     $_SESSION['success_message'] = "Lançamento cadastrado com sucesso!";
-                    logAction("Cadastro Lançamento", "lancamentos", $id_novo, "Valor: R$ $valor, Descrição: $descricao, Status: Em aberto");
+                    logAction("Cadastro Lançamento", "lancamentos", $id_novo, "Valor: R$ $valor, Descrição: $descricao, Status: pendente");
                 } else {
                     $_SESSION['error_message'] = "Erro ao cadastrar lançamento.";
                 }
@@ -89,6 +90,113 @@ switch ($action) {
             exit;
         }
         break;
+
+        case 'enviar_cobranca_email':
+            // Envia por email uma cobrança específica para o contato do cliente/empresa
+            $id_cobranca = $_GET['id'] ?? $_POST['id'] ?? null;
+            if (!$id_cobranca) {
+                $_SESSION['error_message'] = 'ID da cobrança ausente.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+
+            try {
+                // Busca dados da cobrança com empresa e cliente
+                $sql = "SELECT cob.*, emp.razao_social, emp.id_cliente, cli.nome_responsavel, cli.email_contato
+                        FROM cobrancas cob
+                        JOIN empresas emp ON cob.id_empresa = emp.id
+                        LEFT JOIN clientes cli ON emp.id_cliente = cli.id
+                        WHERE cob.id = ?";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$id_cobranca]);
+                $cob = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$cob) {
+                    $_SESSION['error_message'] = 'Cobrança não encontrada.';
+                    header('Location: ' . base_url('index.php?page=cobrancas'));
+                    exit;
+                }
+
+                // Permissões: admin/contador podem enviar qualquer cobrança; cliente só sua
+                if (isClient()) {
+                    $id_cliente_logado = $_SESSION['id_cliente_associado'] ?? null;
+                    if ($id_cliente_logado != $cob['id_cliente']) {
+                        $_SESSION['error_message'] = 'Você não tem permissão para enviar esta cobrança.';
+                        header('Location: ' . base_url('index.php?page=cobrancas'));
+                        exit;
+                    }
+                }
+
+                // Destinatário: email do cliente vinculado à empresa
+                $toEmail = $cob['email_contato'] ?? null;
+                $toName = $cob['nome_responsavel'] ?? ($cob['razao_social'] ?? 'Cliente');
+
+                if (empty($toEmail)) {
+                    $_SESSION['error_message'] = 'Email do cliente não encontrado. Verifique cadastro do cliente.';
+                    header('Location: ' . base_url('index.php?page=cobrancas'));
+                    exit;
+                }
+
+                // Prepara dados no formato esperado pela função de notificação
+                $lancamento_like = [
+                    'descricao' => $cob['descricao'] ?? 'Cobrança',
+                    'valor' => $cob['valor'],
+                    'data_vencimento' => $cob['data_vencimento'],
+                    'tipo' => 'receita'
+                ];
+
+                $sent = sendNotificationEmail($toEmail, $toName, $lancamento_like);
+
+                if ($sent) {
+                    $_SESSION['success_message'] = 'Email enviado com sucesso para ' . htmlspecialchars($toEmail);
+                    logAction('Enviou Cobrança por Email', 'cobrancas', $id_cobranca, 'Email para: ' . $toEmail);
+                } else {
+                    $_SESSION['error_message'] = 'Falha no envio do email. Verifique as configurações SMTP.';
+                    logAction('Falha no envio de Cobrança por Email', 'cobrancas', $id_cobranca, 'Tentativa para: ' . $toEmail);
+                }
+
+            } catch (Exception $e) {
+                $_SESSION['error_message'] = 'Erro ao tentar enviar email: ' . $e->getMessage();
+            }
+
+            header('Location: ' . base_url('index.php?page=cobrancas'));
+            exit;
+            break;
+
+        case 'test_smtp':
+            // Testar envio SMTP usando as configurações salvas
+            if (!isAdmin()) {
+                $_SESSION['error_message'] = 'Apenas administradores podem testar a conexão SMTP.';
+                header('Location: ' . base_url('index.php?page=configuracoes_email'));
+                exit;
+            }
+
+            $settings = getSmtpSettings();
+            $to = $settings['smtp_username'] ?? $settings['email_from'];
+            $toName = 'Administrador';
+
+            if (empty($to)) {
+                $_SESSION['error_message'] = 'Nenhum destinatário válido encontrado (smtp_username ou email_from). Configure antes de testar.';
+                header('Location: ' . base_url('index.php?page=configuracoes_email'));
+                exit;
+            }
+
+            $testLanc = [
+                'descricao' => 'Teste de Conexão SMTP',
+                'valor' => 0,
+                'data_vencimento' => date('Y-m-d'),
+                'tipo' => 'receita'
+            ];
+
+            $sent = sendNotificationEmail($to, $toName, $testLanc);
+            if ($sent) {
+                $_SESSION['success_message'] = 'Teste de SMTP enviado com sucesso para ' . htmlspecialchars($to);
+            } else {
+                $_SESSION['error_message'] = 'Falha ao enviar e-mail de teste. Verifique as configurações SMTP e execute composer install.';
+            }
+            header('Location: ' . base_url('index.php?page=configuracoes_email'));
+            exit;
+            break;
 
     case 'editar_lancamento':
         if (isAdmin() || isContador() || isClient()) { // All can edit

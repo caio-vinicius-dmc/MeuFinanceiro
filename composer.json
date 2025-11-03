@@ -1,0 +1,7 @@
+{
+  "name": "dmc/gestao-financeira",
+  "description": "Sistema de gestão financeira - dependências do projeto (apenas PHPMailer)",
+  "require": {
+    "phpmailer/phpmailer": "^6.8"
+  }
+}

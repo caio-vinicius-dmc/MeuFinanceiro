@@ -24,6 +24,10 @@ global $page;
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="<?php echo base_url('assets/img/favicon.png'); ?>">
+    <link rel="shortcut icon" href="<?php echo base_url('assets/img/favicon.png'); ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?php echo base_url('assets/img/favicon.png'); ?>">
 </head>
 <body class="bg-light-subtle">
 

@@ -86,13 +86,16 @@ foreach ($all_associations_raw as $assoc) {
                     </div>
                     
                     <div class="mb-3" id="assoc_contador_div" style="display: none;">
-                        <label for="id_clientes_associados" class="form-label">Associar Contador aos Clientes:</label>
-                        <select class="form-select" id="id_clientes_associados" name="id_clientes_associados[]" multiple size="5">
-                             <?php foreach ($clientes as $cliente): ?>
-                                <option value="<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nome_responsavel']); ?></option>
+                        <label class="form-label">Associar Contador aos Clientes:</label>
+                        <div class="border rounded p-2" style="max-height:200px; overflow:auto;">
+                            <?php foreach ($clientes as $cliente): ?>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="id_clientes_associados[]" id="cliente_check_<?php echo $cliente['id']; ?>" value="<?php echo $cliente['id']; ?>">
+                                    <label class="form-check-label" for="cliente_check_<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nome_responsavel']); ?></label>
+                                </div>
                             <?php endforeach; ?>
-                        </select>
-                        <small class="form-text text-muted">Segure Ctrl (ou Cmd) para selecionar vários.</small>
+                        </div>
+                        <small class="form-text text-muted">Marque os clientes que este contador deverá acessar.</small>
                     </div>
                     
                     <div class="mb-3">
@@ -231,13 +234,16 @@ foreach ($all_associations_raw as $assoc) {
                         </div>
                         
                         <div class="col-12" id="edit_assoc_contador_div" style="display: none;">
-                            <label for="edit_id_clientes_associados" class="form-label">Associar Contador aos Clientes:</label>
-                            <select class="form-select" id="edit_id_clientes_associados" name="id_clientes_associados[]" multiple size="5">
+                            <label class="form-label">Associar Contador aos Clientes:</label>
+                            <div class="border rounded p-2" style="max-height:200px; overflow:auto;">
                                 <?php foreach ($clientes as $cliente): ?>
-                                    <option value="<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nome_responsavel']); ?></option>
+                                    <div class="form-check">
+                                        <input class="form-check-input edit-cliente-checkbox" type="checkbox" name="id_clientes_associados[]" id="edit_cliente_check_<?php echo $cliente['id']; ?>" value="<?php echo $cliente['id']; ?>">
+                                        <label class="form-check-label" for="edit_cliente_check_<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nome_responsavel']); ?></label>
+                                    </div>
                                 <?php endforeach; ?>
-                            </select>
-                            <small class="form-text text-muted">Segure Ctrl (ou Cmd) para selecionar vários.</small>
+                            </div>
+                            <small class="form-text text-muted">Marque os clientes que este contador deverá acessar.</small>
                         </div>
 
                         <hr>
@@ -340,18 +346,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         
         if (tipo === 'contador') {
-        } else if (tipo === 'contador') {
             editAssocContadorDiv.style.display = 'block';
-            // Clear previous selections
-            Array.from(editIdClientesAssociadosSelect.options).forEach(option => {
-                option.selected = false;
-            });
-            // Select associated clients
+            // Clear previous checkbox selections
+            const editCheckboxes = modalEditarUsuario.querySelectorAll('.edit-cliente-checkbox');
+            editCheckboxes.forEach(cb => cb.checked = false);
+            // Check associated clients
             assoc_clientes.forEach(clientId => {
-                const option = editIdClientesAssociadosSelect.querySelector(`option[value="${clientId}"]`);
-                if (option) {
-                    option.selected = true;
-                }
+                const cb = modalEditarUsuario.querySelector(`#edit_cliente_check_${clientId}`);
+                if (cb) cb.checked = true;
             });
         }
 

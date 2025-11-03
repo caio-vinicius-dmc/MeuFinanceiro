@@ -2,6 +2,11 @@
 // config/functions.php
 session_start();
 require_once 'db.php'; // Assumindo que este arquivo contém $pdo global
+// Tentativa de carregar autoload do Composer (PHPMailer)
+$composerAutoload = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($composerAutoload)) {
+    require_once $composerAutoload;
+}
 define('BASE_URL', 'http://localhost/DMC-Finanças/');
 //define('BASE_URL', 'https://jpconsultoriacontabil.dynamicmotioncentury.com.br/');
 
@@ -133,15 +138,29 @@ function sendNotificationEmail($toEmail, $toName, $lancamento) {
     
     /*
     // EXEMPLO DE CÓDIGO PHPMailer (DESCOMENTAR E USAR O REAL)
+    // Verifica se PHPMailer está disponível
+    if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        error_log('PHPMailer não encontrado. Execute "composer install" no diretório do projeto para habilitar envio real de emails.');
+        // Retorna false para indicar que envio real não foi efetuado
+        return false;
+    }
+
     try {
-        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+        $mail = new PHPMailer\\PHPMailer\\PHPMailer(true);
         $mail->isSMTP();
         $mail->Host = $settings['smtp_host'];
         $mail->Port = $settings['smtp_port'];
         $mail->SMTPAuth = true;
         $mail->Username = $settings['smtp_username'];
         $mail->Password = $settings['smtp_password'];
-        $mail->SMTPSecure = $settings['smtp_secure'];
+        // Mapear valores amigáveis para o que o PHPMailer espera
+        $secure = strtolower(trim($settings['smtp_secure'] ?? ''));
+        if ($secure === 'starttls') {
+            $secure = 'tls';
+        }
+        if (!empty($secure)) {
+            $mail->SMTPSecure = $secure;
+        }
         $mail->setFrom($settings['email_from'], 'Sistema Financeiro');
         $mail->addAddress($toEmail, $toName);
         $mail->Subject = $subject;

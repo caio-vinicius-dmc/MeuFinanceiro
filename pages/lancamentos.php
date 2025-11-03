@@ -130,8 +130,14 @@ function getLancamentoStatusInfo($lancamento) {
     $vencimento = new DateTime($lancamento['data_vencimento']);
     $today->setTime(0, 0, 0);
     $vencimento->setTime(0, 0, 0);
+    // Normaliza status e trata NULL/empty como 'pendente' (compatibilidade com registros antigos)
+    $rawStatus = $lancamento['status'] ?? '';
+    $status = strtolower(trim($rawStatus));
+    if ($status === '') {
+        $status = 'pendente';
+    }
 
-    if ($lancamento['status'] == 'pago') {
+    if ($status === 'pago') {
         if (!empty($lancamento['data_pagamento'])) {
             $data_pagamento = new DateTime($lancamento['data_pagamento']);
             $data_pagamento->setTime(0, 0, 0);
@@ -140,16 +146,17 @@ function getLancamentoStatusInfo($lancamento) {
             }
         }
         return ['text' => 'Pago', 'class' => 'bg-success'];
-    } elseif ($lancamento['status'] == 'pendente' && $vencimento < $today) {
-        return ['text' => 'Vencido', 'class' => 'bg-danger'];
-    } else if ($lancamento['status'] == 'pendente') {
+    } elseif ($status === 'pendente') {
+        if ($vencimento < $today) {
+            return ['text' => 'Vencido', 'class' => 'bg-danger'];
+        }
         return ['text' => 'Em aberto', 'class' => 'bg-info text-dark'];
-    } else if ($lancamento['status'] == 'contestado') {
+    } elseif ($status === 'contestado') {
         return ['text' => 'Contestado', 'class' => 'bg-danger'];
-    } else if ($lancamento['status'] == 'confirmado_cliente') {
+    } elseif ($status === 'confirmado_cliente') {
         return ['text' => 'Confirmado Cliente', 'class' => 'bg-primary'];
     } else {
-        return ['text' => ucfirst($lancamento['status']), 'class' => 'bg-secondary']; // Fallback for other statuses
+        return ['text' => ucfirst($status), 'class' => 'bg-secondary']; // Fallback for other statuses
     }
 }
 

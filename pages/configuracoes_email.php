@@ -51,6 +51,7 @@ $smtp_password = '';
                     <label for="smtp_secure" class="form-label">Criptografia</label>
                     <select class="form-select" id="smtp_secure" name="smtp_secure" required>
                         <option value="tls" <?php echo ($settings['smtp_secure'] === 'tls') ? 'selected' : ''; ?>>TLS</option>
+                        <option value="starttls" <?php echo ($settings['smtp_secure'] === 'starttls') ? 'selected' : ''; ?>>STARTTLS (recomendado para Microsoft/Office365)</option>
                         <option value="ssl" <?php echo ($settings['smtp_secure'] === 'ssl') ? 'selected' : ''; ?>>SSL</option>
                         <option value="" <?php echo ($settings['smtp_secure'] === '') ? 'selected' : ''; ?>>Nenhuma</option>
                     </select>
@@ -75,9 +76,18 @@ $smtp_password = '';
             </div>
 
             <hr class="mt-4">
-            <button type="submit" class="btn btn-primary">
-                <i class="bi bi-save me-2"></i> Salvar Configurações
-            </button>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-2"></i> Salvar Configurações
+                </button>
+
+                <form action="process/crud_handler.php" method="POST" class="m-0">
+                    <input type="hidden" name="action" value="test_smtp">
+                    <button type="submit" class="btn btn-outline-secondary" title="Enviar e-mail de teste para o remetente configurado">
+                        <i class="bi bi-envelope-check me-2"></i> Testar Conexão SMTP
+                    </button>
+                </form>
+            </div>
         </form>
     </div>
 </div>

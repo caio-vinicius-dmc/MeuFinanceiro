@@ -77,8 +77,7 @@ $sql_export = "SELECT
     l.descricao,
     l.tipo,
     l.valor,
-    l.status,
-    l.observacao_contestacao
+    l.status
     FROM lancamentos l
     JOIN empresas e ON l.id_empresa = e.id
     JOIN clientes c ON e.id_cliente = c.id

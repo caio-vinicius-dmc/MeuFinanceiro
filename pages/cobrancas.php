@@ -161,7 +161,21 @@ if (isClient()) {
 
     <?php if (isClient()): ?>
         <!-- Visão do Cliente -->
-        <h1 class="h2 mb-4">Minhas Cobranças</h1>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>Minhas Cobranças</h3>
+            <div class="d-flex gap-2">
+                <form method="GET" action="process/export_cobrancas.php" class="m-0">
+                    <input type="hidden" name="page" value="cobrancas">
+                    <input type="hidden" name="tipo_data" value="<?php echo htmlspecialchars($filtro_tipo_data ?? 'vencimento'); ?>">
+                    <input type="hidden" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio ?? ''); ?>">
+                    <input type="hidden" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim ?? ''); ?>">
+                    <input type="hidden" name="id_empresa" value="<?php echo htmlspecialchars($filtro_empresa_id ?? ''); ?>">
+                    <button type="submit" class="btn btn-outline-success" title="Exportar CSV com as cobranças filtradas para suas empresas">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
+                    </button>
+                </form>
+            </div>
+        </div>
 
         <!-- Card de Filtros do Cliente -->
         <div class="card mb-4">
@@ -169,7 +183,7 @@ if (isClient()) {
                 <i class="bi bi-filter me-2"></i>Filtros
             </div>
             <div class="card-body">
-                <form method="GET" class="row g-3 align-items-end">
+            <form method="GET" class="row g-3 align-items-end">
                     <input type="hidden" name="page" value="cobrancas">
                     <div class="col-md-3">
                         <label for="tipo_data" class="form-label">Filtrar por Data de</label>
@@ -197,7 +211,10 @@ if (isClient()) {
                         </select>
                     </div>
                     <?php endif; ?>
-                    <div class="col-12 mt-3"><button type="submit" class="btn btn-primary"><i class="bi bi-search me-2"></i>Filtrar</button> <a href="index.php?page=cobrancas" class="btn btn-outline-secondary">Limpar Filtros</a></div>
+                    <div class="col-12 mt-3 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-search me-2"></i>Filtrar</button>
+                        <a href="index.php?page=cobrancas" class="btn btn-outline-secondary">Limpar Filtros</a>
+                    </div>
                 </form>
             </div>
         </div>
@@ -260,9 +277,14 @@ if (isClient()) {
                                         </div>
                                     <?php endif; ?>
                                 </div>
-                            </div>
-                            <div class="card-footer text-center small text-muted">
-                                ID da Cobrança: #<?php echo $cobranca['id']; ?>
+                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                    <small class="text-muted">ID: #<?php echo $cobranca['id']; ?></small>
+                                    <div>
+                                        <a href="process/crud_handler.php?action=enviar_cobranca_email&id=<?php echo $cobranca['id']; ?>" class="btn btn-sm btn-outline-primary" onclick="return confirm('Enviar cobrança por email para o contato cadastrado?');">
+                                            <i class="bi bi-envelope-fill"></i> Enviar por Email
+                                        </a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -272,7 +294,18 @@ if (isClient()) {
 
     <?php elseif (isAdmin() || isContador()): ?>
         <!-- Visão do Admin/Contador -->
-        <h1 class="h2 mb-4">Gerenciar Cobranças</h1>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>Gerenciar Cobranças</h3>
+            <div class="d-flex gap-2">
+                <form method="GET" action="process/export_cobrancas.php" class="m-0">
+                    <input type="hidden" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio); ?>">
+                    <input type="hidden" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>">
+                    <input type="hidden" name="cliente_id" value="<?php echo htmlspecialchars($filtro_cliente_id); ?>">
+                    <button type="submit" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV</button>
+                </form>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaCobranca"><i class="bi bi-plus-circle me-2"></i>Gerar Nova Cobrança</button>
+            </div>
+        </div>
 
         <!-- Card de Filtros -->
         <div class="card mb-4">
@@ -308,9 +341,8 @@ if (isClient()) {
             </div>
         </div>
         <div class="card mt-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header">
                 <h5 class="card-title mb-0">Histórico de Cobranças</h5>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaCobranca"><i class="bi bi-plus-circle me-2"></i>Gerar Nova Cobrança</button>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -371,6 +403,11 @@ if (isClient()) {
                                                     <i class="bi bi-trash-fill"></i>
                                                 </a>
                                             <?php endif; ?>
+                                            
+                                                <!-- Botão Enviar por Email -->
+                                                <a href="process/crud_handler.php?action=enviar_cobranca_email&id=<?php echo $cobranca['id']; ?>" class="btn btn-sm btn-outline-primary" title="Enviar por Email" onclick="return confirm('Enviar cobrança por email para o contato cadastrado?');">
+                                                    <i class="bi bi-envelope-fill"></i>
+                                                </a>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
