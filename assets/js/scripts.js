@@ -119,6 +119,15 @@ document.addEventListener("DOMContentLoaded", function() {
             modalForm.querySelector('#edit_razao_social').value = razao_social;
             modalForm.querySelector('#edit_nome_fantasia').value = nome_fantasia;
             modalForm.querySelector('#edit_data_abertura').value = data_abertura;
+            // Se o CNPJ já estiver completo, tenta popular automaticamente
+            try {
+                const digits = (cnpj || '').toString().replace(/\D/g, '');
+                if (digits.length === 14) {
+                    buscarCnpj('edit_');
+                }
+            } catch (e) {
+                console.error('Erro ao auto-buscar CNPJ no modal de edição:', e);
+            }
         });
     }
     
@@ -279,39 +288,27 @@ function toggleUsuarioCampos(prefix) {
     }
 }
 
-
-/**
- * Busca dados de um CNPJ na BrasilAPI (Existente)
- */
-async function buscarCnpj() {
-    const cnpj = document.getElementById('cnpj').value.replace(/\D/g, ''); 
-    if (cnpj.length !== 14) return;
-    const razaoSocialInput = document.getElementById('razao_social');
-    const nomeFantasiaInput = document.getElementById('nome_fantasia');
-    const dataAberturaInput = document.getElementById('data_abertura');
-    const loadingSpinner = document.getElementById('cnpj-loading');
-    if(loadingSpinner) loadingSpinner.style.display = 'inline-block';
-    try {
-        const response = await fetch(`process/api_cnpj.php?cnpj=${cnpj}`);
-        if (!response.ok) throw new Error('Falha na consulta');
-        const data = await response.json();
-        if (data.razao_social) {
-            razaoSocialInput.value = data.razao_social;
-            nomeFantasiaInput.value = data.nome_fantasia || '';
-            dataAberturaInput.value = data.data_inicio_atividade || '';
-        } else {
-            alert('CNPJ não encontrado ou API indisponível.');
-            razaoSocialInput.value = '';
-            nomeFantasiaInput.value = '';
-            dataAberturaInput.value = '';
-        }
-    } catch (error) {
-        console.error('Erro ao buscar CNPJ:', error);
-        alert('Erro ao processar a solicitação de CNPJ.');
-    } finally {
-        if(loadingSpinner) loadingSpinner.style.display = 'none';
+    // --- Auto-busca de CNPJ: adiciona listeners ao campo principal e ao campo de edição ---
+    const cnpjField = document.getElementById('cnpj');
+    if (cnpjField) {
+        // Ao perder foco, tenta buscar
+        cnpjField.addEventListener('blur', function() { buscarCnpj(); });
+        // Se digitar e completar 14 dígitos, busca automaticamente
+        cnpjField.addEventListener('input', function() {
+            const digits = this.value.replace(/\D/g, '');
+            if (digits.length === 14) buscarCnpj();
+        });
     }
-}
+
+    const editCnpjField = document.getElementById('edit_cnpj');
+    if (editCnpjField) {
+        editCnpjField.addEventListener('blur', function() { buscarCnpj('edit_'); });
+        editCnpjField.addEventListener('input', function() {
+            const digits = this.value.replace(/\D/g, '');
+            if (digits.length === 14) buscarCnpj('edit_');
+        });
+    }
+
 
 
 /**
@@ -531,15 +528,16 @@ function toggleUsuarioCampos(prefix) {
 /**
  * Busca dados de um CNPJ na BrasilAPI (Existente)
  */
-async function buscarCnpj() {
-    const el = document.getElementById('cnpj');
+async function buscarCnpj(prefix = '') {
+    // prefix: '' para form principal, 'edit_' para modal de edição
+    const el = document.getElementById(prefix + 'cnpj');
     if (!el) return;
     const cnpj = el.value.replace(/\D/g, ''); 
     if (cnpj.length !== 14) return;
-    const razaoSocialInput = document.getElementById('razao_social');
-    const nomeFantasiaInput = document.getElementById('nome_fantasia');
-    const dataAberturaInput = document.getElementById('data_abertura');
-    const loadingSpinner = document.getElementById('cnpj-loading');
+    const razaoSocialInput = document.getElementById(prefix + 'razao_social');
+    const nomeFantasiaInput = document.getElementById(prefix + 'nome_fantasia');
+    const dataAberturaInput = document.getElementById(prefix + 'data_abertura');
+    const loadingSpinner = document.getElementById(prefix + 'cnpj-loading') || document.getElementById('cnpj-loading');
     if(loadingSpinner) loadingSpinner.style.display = 'inline-block';
     try {
         const response = await fetch(`process/api_cnpj.php?cnpj=${cnpj}`);
@@ -548,7 +546,24 @@ async function buscarCnpj() {
         if (data.razao_social) {
             if (razaoSocialInput) razaoSocialInput.value = data.razao_social;
             if (nomeFantasiaInput) nomeFantasiaInput.value = data.nome_fantasia || '';
-            if (dataAberturaInput) dataAberturaInput.value = data.data_inicio_atividade || '';
+            // BrasilAPI retorna data_inicio_atividade no formato YYYY-MM-DD possivelmente com hora
+            if (dataAberturaInput) {
+                // Tenta normalizar para YYYY-MM-DD
+                const dt = data.data_inicio_atividade || data.opening_date || '';
+                if (dt) {
+                    const d = new Date(dt);
+                    if (!isNaN(d.getTime())) {
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        dataAberturaInput.value = `${yyyy}-${mm}-${dd}`;
+                    } else {
+                        dataAberturaInput.value = dt;
+                    }
+                } else {
+                    dataAberturaInput.value = '';
+                }
+            }
         } else {
             alert('CNPJ não encontrado ou API indisponível.');
             if (razaoSocialInput) razaoSocialInput.value = '';
