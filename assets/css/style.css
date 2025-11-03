@@ -299,6 +299,29 @@ body.sidebar-collapsed .sidebar-logo {
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 1rem;
+    width: 100%;
+    /* garante que o header tenha fundo e padding consistentes mesmo quando dentro de um card */
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.6rem;
+}
+
+/* Backgrounds específicos por tópico para destacar os cabeçalhos */
+.dashboard-section-lancamentos .section-header {
+    background-color: rgba(var(--bs-primary-rgb), 0.06); /* leve tom do primary */
+    padding: 0.65rem 0.9rem;
+    border-radius: 0.6rem;
+}
+.dashboard-section-cobrancas .section-header {
+    background-color: rgba(245, 158, 11, 0.06); /* leve tom do warning */
+    padding: 0.65rem 0.9rem;
+    border-radius: 0.6rem;
+}
+.dashboard-section-atividade .section-header,
+.dashboard-section-atividade-lancamentos .section-header,
+.dashboard-section-atividade-cobrancas .section-header {
+    background-color: rgba(107, 114, 128, 0.04); /* leve tom neutro */
+    padding: 0.65rem 0.9rem;
+    border-radius: 0.6rem;
 }
 .dashboard-section .section-header .title {
     font-size: 1.05rem;

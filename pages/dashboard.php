@@ -634,7 +634,9 @@ $status_chart_json = json_encode([
         }
     ?>
     <div class="section-body" style="height:0px;">
-    <div class="row g-4 mb-4">
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-4 mb-4">
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma total das receitas com data de vencimento no período, que ainda não foram pagas.">
         <div class="card card-metric">
             <i class="bi bi-arrow-down-circle card-metric-icon"></i>
@@ -808,7 +810,9 @@ $status_chart_json = json_encode([
                 </div>
             </div>
         </div>
-        </div> <!-- .section-body -->
+            </div>
+        </div>
+    </div> <!-- .section-body -->
     </section>
     <?php endif; ?>
 
@@ -826,7 +830,9 @@ $status_chart_json = json_encode([
         </button>
     </div>
     <div class="section-body" style="height:0px;">
-    <div class="row g-4 mb-4">
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-4 mb-4">
     <?php
         $label_pendentes = isClient() ? 'Cobranças a Pagar' : 'Cobranças a Receber';
         $label_recebidas = isClient() ? 'Cobranças pagas' : 'Cobranças Recebidas';
@@ -867,53 +873,64 @@ $status_chart_json = json_encode([
             </div>
         </div>
     </div>
+            </div>
+        </div>
     </div> <!-- .section-body -->
 </section>
 
-<!-- Seção: Cobranças pagas por Tipo (um card por tipo) -->
-<div class="row g-4 mb-4">
-    <div class="col-12">
-        <h5 class="mb-3">Cobranças Pagas por Tipo</h5>
+<!-- Seção: Cobranças por Tipo (agrupadas dentro de um card) -->
+<div class="card mb-4">
+    <div class="card-header">
+        <div class="d-flex align-items-center">
+            <h5 class="mb-0">Cobranças — Por Tipo</h5>
+            <small class="text-muted ms-3">Pagas e Vencidas</small>
+        </div>
     </div>
-    <?php if (!empty($cobrancas_por_tipo_pagas)): ?>
-        <?php foreach ($cobrancas_por_tipo_pagas as $tipo): ?>
-            <div class="col-sm-6 col-md-4 col-lg-3">
-                <div class="card card-metric">
-                    <i class="bi bi-tag card-metric-icon"></i>
-                    <div class="metric-title"><?php echo htmlspecialchars($tipo['nome']); ?></div>
-                    <div class="metric-value text-success-emphasis">
-                        R$ <?php echo number_format($tipo['total'] ?? 0, 2, ',', '.'); ?>
-                        <div class="small text-muted"><?php echo intval($tipo['qtd'] ?? 0); ?> itens</div>
-                    </div>
-                </div>
+    <div class="card-body">
+        <div class="row g-4 mb-4">
+            <div class="col-12">
+                <h6 class="mb-3">Cobranças Pagas por Tipo</h6>
             </div>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <div class="col-12 text-muted">Nenhuma cobrança paga encontrada para o período selecionado.</div>
-    <?php endif; ?>
-</div>
+            <?php if (!empty($cobrancas_por_tipo_pagas)): ?>
+                <?php foreach ($cobrancas_por_tipo_pagas as $tipo): ?>
+                    <div class="col-sm-6 col-md-4 col-lg-3">
+                        <div class="card card-metric">
+                            <i class="bi bi-tag card-metric-icon"></i>
+                            <div class="metric-title"><?php echo htmlspecialchars($tipo['nome']); ?></div>
+                            <div class="metric-value text-success-emphasis">
+                                R$ <?php echo number_format($tipo['total'] ?? 0, 2, ',', '.'); ?>
+                                <div class="small text-muted"><?php echo intval($tipo['qtd'] ?? 0); ?> itens</div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="col-12 text-muted">Nenhuma cobrança paga encontrada para o período selecionado.</div>
+            <?php endif; ?>
+        </div>
 
-<!-- Seção: Cobranças Vencidas por Tipo (um card por tipo) -->
-<div class="row g-4 mb-4">
-    <div class="col-12">
-        <h5 class="mb-3">Cobranças Vencidas por Tipo</h5>
-    </div>
-    <?php if (!empty($cobrancas_por_tipo_vencidas)): ?>
-        <?php foreach ($cobrancas_por_tipo_vencidas as $tipo_v): ?>
-            <div class="col-sm-6 col-md-4 col-lg-3">
-                <div class="card card-metric">
-                    <i class="bi bi-exclamation-triangle card-metric-icon"></i>
-                    <div class="metric-title"><?php echo htmlspecialchars($tipo_v['nome']); ?></div>
-                    <div class="metric-value text-danger-emphasis">
-                        R$ <?php echo number_format($tipo_v['total'] ?? 0, 2, ',', '.'); ?>
-                        <div class="small text-muted"><?php echo intval($tipo_v['qtd'] ?? 0); ?> itens</div>
-                    </div>
-                </div>
+        <div class="row g-4 mb-0">
+            <div class="col-12">
+                <h6 class="mb-3">Cobranças Vencidas por Tipo</h6>
             </div>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <div class="col-12 text-muted">Nenhuma cobrança vencida encontrada.</div>
-    <?php endif; ?>
+            <?php if (!empty($cobrancas_por_tipo_vencidas)): ?>
+                <?php foreach ($cobrancas_por_tipo_vencidas as $tipo_v): ?>
+                    <div class="col-sm-6 col-md-4 col-lg-3">
+                        <div class="card card-metric">
+                            <i class="bi bi-exclamation-triangle card-metric-icon"></i>
+                            <div class="metric-title"><?php echo htmlspecialchars($tipo_v['nome']); ?></div>
+                            <div class="metric-value text-danger-emphasis">
+                                R$ <?php echo number_format($tipo_v['total'] ?? 0, 2, ',', '.'); ?>
+                                <div class="small text-muted"><?php echo intval($tipo_v['qtd'] ?? 0); ?> itens</div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="col-12 text-muted">Nenhuma cobrança vencida encontrada.</div>
+            <?php endif; ?>
+        </div>
+    </div>
 </div>
 
 <!-- Gráficos relacionados a Cobranças -->
@@ -1123,7 +1140,12 @@ $status_chart_json = json_encode([
                         $where_recent_cob_sql = "WHERE " . implode(' AND ', $where_recent_cob);
                     }
 
-                    $sql_recent_cob = "SELECT cob.id, cob.descricao, cob.valor, cob.status_pagamento, cob.data_vencimento, e.razao_social $base_join_recent_cob $where_recent_cob_sql ORDER BY cob.id DESC LIMIT 5";
+                    // Seleciona o tipo da cobrança (se existir) — caso contrário, usa a descrição como fallback
+                    $sql_recent_cob = "SELECT cob.id, COALESCE(tc.nome, cob.descricao) AS tipo_nome, cob.valor, cob.status_pagamento, cob.data_vencimento, e.razao_social 
+                        FROM cobrancas cob
+                        JOIN empresas e ON cob.id_empresa = e.id
+                        LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id
+                        $where_recent_cob_sql ORDER BY cob.id DESC LIMIT 5";
                     $stmt_recent_cob = $pdo->prepare($sql_recent_cob);
                     $stmt_recent_cob->execute($params_recent_cob);
                     $recent_cobs = $stmt_recent_cob->fetchAll(PDO::FETCH_ASSOC);
@@ -1138,7 +1160,7 @@ $status_chart_json = json_encode([
                             <li class="list-group-item p-0">
                                 <a href="index.php?page=cobrancas#cobranca-<?php echo $cid; ?>" class="d-flex w-100 text-decoration-none text-reset py-2 px-3">
                                     <div class="flex-grow-1">
-                                        <div class="fw-bold"><?php echo htmlspecialchars($c['descricao']); ?></div>
+                                        <div class="fw-bold"><?php echo htmlspecialchars($c['tipo_nome'] ?? $c['descricao'] ?? '—'); ?></div>
                                         <small class="text-muted"><?php echo htmlspecialchars($c['razao_social']); ?> — <?php echo date('d/m/Y', strtotime($c['data_vencimento'])); ?></small>
                                     </div>
                                     <span class="fw-bold ms-3 <?php echo ($c['status_pagamento'] === 'Pago') ? 'text-success' : 'text-danger'; ?>">R$ <?php echo number_format($c['valor'], 2, ',', '.'); ?></span>

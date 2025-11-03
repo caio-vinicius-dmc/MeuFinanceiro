@@ -219,17 +219,22 @@ document.addEventListener("DOMContentLoaded", function() {
             if (!section) return;
             // initialize state from storage
             // Default behavior: sections start COLLAPSED unless user previously expanded them
-            const state = section.id ? loadState(section.id) : null;
+            let state = section.id ? loadState(section.id) : null;
+            // Force: o tópico de COBRANÇAS deve vir ocultado por padrão, a menos que o usuário
+            // explicitamente tenha salvo o estado 'expanded'. Isso garante que seus subtópicos
+            // (nós irmãos que pertencem ao tópico) também sejam escondidos na inicialização.
+            if (section.id === 'dashboard-cobrancas-section' && state !== 'expanded') {
+                try { localStorage.setItem('dashboard_section_' + section.id, 'collapsed'); } catch (e) {}
+                state = 'collapsed';
+            }
+
             if (state === 'expanded') {
-                // user explicitly expanded before
-                btn.setAttribute('aria-expanded', 'true');
-                section.classList.remove('collapsed');
+                // usuário já tinha expandido antes
+                expandSection(section, btn);
             } else {
                 // default collapsed (covers state === 'collapsed' or null)
-                section.classList.add('collapsed');
-                const body = section.querySelector('.section-body');
-                if (body) body.style.height = '0px';
-                btn.setAttribute('aria-expanded', 'false');
+                // utiliza a função collapseSection para aplicar a altura e esconder nós irmãos
+                collapseSection(section, btn);
             }
 
             btn.addEventListener('click', function() {
@@ -430,7 +435,7 @@ document.addEventListener("DOMContentLoaded", function() {
 // Move filtros para dentro do modal quando a largura for <= BREAKPOINT
 // =========================
 document.addEventListener('DOMContentLoaded', function() {
-    const BREAKPOINT = 1020;
+    const BREAKPOINT = 1367;
     const FORM_SELECTORS = ['#form-filtros', '#form-filtros-dashboard', '#form-filtros-cobrancas'];
     const modalEl = document.getElementById('mobileFiltersModal');
     const modalBody = document.getElementById('mobile-filters-modal-body');
@@ -453,7 +458,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (movedForms.has(formEl)) { try { bsModal.show(); } catch (e) {} ; return; }
         const originalParent = formEl.parentNode;
         const originalNext = formEl.nextSibling;
-        movedForms.set(formEl, { parent: originalParent, nextSibling: originalNext });
+        // capture section collapse state so we can restore it after closing modal
+        let sectionState = null;
+        try {
+            const section = formEl.closest('.dashboard-section');
+            if (section) {
+                const secId = section.id || null;
+                const expanded = !section.classList.contains('collapsed');
+                sectionState = { id: secId, expanded: expanded };
+            }
+        } catch (e) { sectionState = null; }
+
+        movedForms.set(formEl, { parent: originalParent, nextSibling: originalNext, sectionState: sectionState });
         modalBody.innerHTML = '';
         modalBody.appendChild(formEl);
         formEl.style.display = '';
@@ -465,7 +481,49 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 if (state.nextSibling) state.parent.insertBefore(form, state.nextSibling);
                 else state.parent.appendChild(form);
-                form.style.display = '';
+                // Em telas pequenas, o formulário deve permanecer oculto na página (pois está acessível via modal)
+                form.style.display = (window.innerWidth <= BREAKPOINT) ? 'none' : '';
+
+                // restore the collapse state of the related section (if we captured it)
+                try {
+                    const s = state.sectionState;
+                    let section = null;
+                    if (s && s.id) section = document.getElementById(s.id);
+                    // if id not available or element not found, try to find closest section again
+                    if (!section) section = form.closest('.dashboard-section');
+                    if (section && s) {
+                        const btn = section.querySelector('.section-toggle');
+                        // Ajusta visual e aria do botão
+                        if (s.expanded) {
+                            section.classList.remove('collapsed');
+                            if (btn) btn.setAttribute('aria-expanded', 'true');
+                            const body = section.querySelector('.section-body');
+                            if (body) body.style.height = '';
+                            // mostra os nós irmãos que pertencem a este tópico
+                            let curShow = section.nextElementSibling;
+                            while (curShow) {
+                                if (curShow.classList && curShow.classList.contains('dashboard-section')) break;
+                                curShow.style.display = '';
+                                curShow = curShow.nextElementSibling;
+                            }
+                        } else {
+                            section.classList.add('collapsed');
+                            if (btn) btn.setAttribute('aria-expanded', 'false');
+                            const body = section.querySelector('.section-body');
+                            if (body) body.style.height = '0px';
+                            // esconde os nós irmãos que pertencem a este tópico
+                            let curHide = section.nextElementSibling;
+                            while (curHide) {
+                                if (curHide.classList && curHide.classList.contains('dashboard-section')) break;
+                                curHide.style.display = 'none';
+                                curHide = curHide.nextElementSibling;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Erro ao restaurar estado da seção após mover o formulário:', e);
+                }
+
             } catch (e) {
                 console.warn('Erro ao restaurar form depois do modal:', e);
             }
