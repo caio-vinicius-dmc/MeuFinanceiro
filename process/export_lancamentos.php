@@ -114,10 +114,12 @@ $sql_export = "SELECT
     l.descricao,
     l.tipo,
     l.valor,
+    fp.nome as forma_pagamento_nome,
     l.status
     FROM lancamentos l
     JOIN empresas e ON l.id_empresa = e.id
     JOIN clientes c ON e.id_cliente = c.id
+    LEFT JOIN formas_pagamento fp ON l.id_forma_pagamento = fp.id
     $where_sql
     ORDER BY l.data_vencimento ASC";
 
@@ -147,6 +149,7 @@ $cabecalho = [
     'Empresa',
     'Descricao',
     'Tipo (receita/despesa)',
+    'Forma Pagamento',
     'Valor (R$)',
     'Status',
     'Observacao Contestacao'
@@ -164,7 +167,20 @@ foreach ($dados as $linha) {
     $linha['valor'] = number_format($linha['valor'], 2, ',', '.');
     
     // Converte a linha para CSV e escreve
-    fputcsv($output, $linha, ';');
+    // Garante que a ordem das colunas no CSV seja a do cabeçalho
+    $csvLine = [
+        $linha['data_vencimento'],
+        $linha['data_pagamento'],
+        $linha['nome_cliente'],
+        $linha['nome_empresa'],
+        $linha['descricao'],
+        $linha['tipo'],
+        $linha['forma_pagamento_nome'] ?? '',
+        $linha['valor'],
+        $linha['status'],
+        $linha['observacao_contestacao'] ?? ''
+    ];
+    fputcsv($output, $csvLine, ';');
 }
 
 fclose($output);

@@ -28,6 +28,41 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
     // -------------------------------------------------------------------------
+
+    // --- Atualiza select de empresas quando o Cliente muda (Admin/Contador) ---
+    const clienteSelect = document.getElementById('cliente_id');
+    if (clienteSelect) {
+        clienteSelect.addEventListener('change', function() {
+            const clienteId = this.value;
+            // Faz a requisição
+            fetch('process/get_empresas_por_cliente.php?cliente_id=' + encodeURIComponent(clienteId), {credentials: 'same-origin'})
+                .then(resp => resp.json())
+                .then(json => {
+                    if (!json.success) {
+                        console.warn('Não foi possível buscar empresas:', json.message);
+                        return;
+                    }
+                    // Preenche todos os selects de empresa visíveis na página
+                    const selects = document.querySelectorAll('select[name="id_empresa"]');
+                    selects.forEach(function(sel) {
+                        // Limpa opções
+                        while (sel.firstChild) sel.removeChild(sel.firstChild);
+                        // Adiciona opção padrão
+                        const optAll = document.createElement('option');
+                        optAll.value = '';
+                        optAll.textContent = (sel.dataset.allowAll === '0') ? 'Selecione...' : 'Todas as Empresas';
+                        sel.appendChild(optAll);
+                        // Adiciona opções retornadas
+                        json.data.forEach(function(emp) {
+                            const opt = document.createElement('option');
+                            opt.value = emp.id;
+                            opt.textContent = emp.razao_social;
+                            sel.appendChild(opt);
+                        });
+                    });
+                }).catch(err => console.error('Erro ao buscar empresas:', err));
+        });
+    }
     
     // --- Lógica do Sidebar Recolhível (Existente) ---
     const toggleButton = document.getElementById('desktop-sidebar-toggle');

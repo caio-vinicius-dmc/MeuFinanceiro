@@ -1,0 +1,25 @@
+# Ignorar dependências instaladas pelo Composer
+/vendor/
+
+# Ignorar backups gerados pelo script
+/backups/
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Arquivos temporários do sistema
+Thumbs.db
+.DS_Store
+
+# Composer
+vendor/
+
+# Node modules (se houver)
+node_modules/
+
+# Logs
+*.log
+
+# Arquivos de configuração local (se existir um .env)
+.env

@@ -118,15 +118,31 @@ if (isClient()) {
         $params[] = $filtro_forma_pag;
     }
 
+    // Paginação (cliente)
+    $count_sql = "SELECT COUNT(1) FROM cobrancas cob JOIN empresas emp ON cob.id_empresa = emp.id WHERE emp.id_cliente = ? " . (!empty($where_conditions_cliente) ? " AND " . implode(" AND ", $where_conditions_cliente) : "");
+    $stmt_count = $pdo->prepare($count_sql);
+    $stmt_count->execute($params);
+    $total_items = (int)$stmt_count->fetchColumn();
+
+    $per_page = 12; // cards por página
+    $page_num = max(1, intval($_GET['page_num'] ?? 1));
+    $offset = ($page_num - 1) * $per_page;
+
     $sql = "SELECT cob.*, emp.razao_social, emp.cnpj, fp.nome as forma_pagamento_nome, fp.icone_bootstrap, tc.nome as tipo_cobranca_nome
-            FROM cobrancas cob
-            JOIN empresas emp ON cob.id_empresa = emp.id
-            JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
-            LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id
-            WHERE emp.id_cliente = ? " . (!empty($where_conditions_cliente) ? " AND " . implode(" AND ", $where_conditions_cliente) : "") . "
-            ORDER BY cob.data_vencimento ASC, cob.id DESC";
+        FROM cobrancas cob
+        JOIN empresas emp ON cob.id_empresa = emp.id
+        JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
+        LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id
+        WHERE emp.id_cliente = ? " . (!empty($where_conditions_cliente) ? " AND " . implode(" AND ", $where_conditions_cliente) : "") . "
+        ORDER BY cob.data_vencimento ASC, cob.id DESC
+        LIMIT ? OFFSET ?";
+
+    $params_for_query = $params;
+    $params_for_query[] = $per_page;
+    $params_for_query[] = $offset;
+
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
+    $stmt->execute($params_for_query);
     $cobrancas = $stmt->fetchAll();
 
 } elseif (isAdmin() || isContador()) {
@@ -240,6 +256,13 @@ if (isClient()) {
     $stmt_cobrancas = $pdo->prepare($sql_cobrancas);
     $stmt_cobrancas->execute($params);
     $cobrancas_admin = $stmt_cobrancas->fetchAll();
+
+    // Se um cliente foi filtrado, recarrega a lista de empresas para que o select de empresas mostre apenas as empresas daquele cliente
+    if (!empty($filtro_cliente_id)) {
+        $stmt_empresas = $pdo->prepare("SELECT e.id, e.razao_social, c.nome_responsavel FROM empresas e JOIN clientes c ON e.id_cliente = c.id WHERE e.id_cliente = ? ORDER BY e.razao_social");
+        $stmt_empresas->execute([$filtro_cliente_id]);
+        $empresas = $stmt_empresas->fetchAll();
+    }
 }
 
 ?>
@@ -268,6 +291,22 @@ if (isClient()) {
                 </form>
             </div>
         </div>
+        <!-- Filtros ativos (admin/contador) -->
+        <?php
+        $activeFiltersAdmin = [];
+        if (!empty($filtro_cliente_id)) $activeFiltersAdmin[] = 'Cliente: ' . htmlspecialchars(array_column($clientes_filtro, 'nome_responsavel', 'id')[$filtro_cliente_id] ?? $filtro_cliente_id);
+        if (!empty($filtro_empresa_id)) $activeFiltersAdmin[] = 'Empresa: ' . htmlspecialchars(array_column($empresas, 'razao_social', 'id')[$filtro_empresa_id] ?? $filtro_empresa_id);
+        if (!empty($filtro_data_inicio) || !empty($filtro_data_fim)) $activeFiltersAdmin[] = 'Vencimento: ' . htmlspecialchars($filtro_data_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_data_fim ?? '-');
+        if (!empty($filtro_pag_inicio) || !empty($filtro_pag_fim)) $activeFiltersAdmin[] = 'Pagamento: ' . htmlspecialchars($filtro_pag_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_pag_fim ?? '-');
+        if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFiltersAdmin[] = 'Competência: ' . htmlspecialchars($filtro_comp_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_comp_fim ?? '-');
+        if (!empty($filtro_forma_pag)) $activeFiltersAdmin[] = 'Forma: ' . htmlspecialchars(array_column($formas_pagamento, 'nome', 'id')[$filtro_forma_pag] ?? $filtro_forma_pag);
+        if (!empty($activeFiltersAdmin)): ?>
+            <div class="mb-3">
+                <?php foreach ($activeFiltersAdmin as $f): ?>
+                    <span class="badge bg-secondary me-1"><?php echo $f; ?></span>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
 
         <!-- Card de Filtros do Cliente -->
         <div class="card mb-4">
@@ -333,6 +372,22 @@ if (isClient()) {
                 </form>
             </div>
         </div>
+        <!-- Filtros ativos (cliente) -->
+        <?php
+        $activeFilters = [];
+        if (!empty($filtro_tipo_data)) $activeFilters[] = 'Tipo Data: ' . htmlspecialchars($filtro_tipo_data);
+        if (!empty($filtro_data_inicio) || !empty($filtro_data_fim)) $activeFilters[] = 'Vencimento: ' . htmlspecialchars($filtro_data_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_data_fim ?? '-');
+        if (!empty($filtro_empresa_id)) $activeFilters[] = 'Empresa: ' . htmlspecialchars(array_column($empresas_cliente, 'razao_social', 'id')[$filtro_empresa_id] ?? $filtro_empresa_id);
+        if (!empty($filtro_pag_inicio) || !empty($filtro_pag_fim)) $activeFilters[] = 'Pagamento: ' . htmlspecialchars($filtro_pag_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_pag_fim ?? '-');
+        if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFilters[] = 'Competência: ' . htmlspecialchars($filtro_comp_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_comp_fim ?? '-');
+        if (!empty($filtro_forma_pag)) $activeFilters[] = 'Forma: ' . htmlspecialchars(array_column($formas_pagamento, 'nome', 'id')[$filtro_forma_pag] ?? $filtro_forma_pag);
+        if (!empty($activeFilters)): ?>
+            <div class="mb-3">
+                <?php foreach ($activeFilters as $f): ?>
+                    <span class="badge bg-secondary me-1"><?php echo $f; ?></span>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
 
         <div class="row gy-4">
             <?php if (empty($cobrancas)): ?>

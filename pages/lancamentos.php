@@ -8,6 +8,23 @@ if (!hasLancamentosAccess()) {
     exit;
 }
 
+// Helpers locais para nomes usados nos filtros (reduz chamadas JS/ajax)
+function getEmpresaNome($id) {
+    global $pdo;
+    if (empty($id)) return null;
+    $stmt = $pdo->prepare("SELECT razao_social FROM empresas WHERE id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetchColumn();
+}
+
+function getFormaPagamentoNome($id) {
+    global $pdo;
+    if (empty($id)) return null;
+    $stmt = $pdo->prepare("SELECT nome FROM formas_pagamento WHERE id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetchColumn();
+}
+
 // --- 1. Capturar e Sanitizar Filtros ---
 $filtro_empresa_id = $_GET['id_empresa'] ?? null;
 $filtro_status = $_GET['status'] ?? null;
@@ -115,15 +132,29 @@ if (!empty($where_conditions)) {
 }
 
 // --- 3. Consulta Principal de Lançamentos ---
+$count_sql = "SELECT COUNT(1) FROM lancamentos l JOIN empresas e ON l.id_empresa = e.id JOIN clientes c ON e.id_cliente = c.id " . $where_sql;
+$stmt_count = $pdo->prepare($count_sql);
+$stmt_count->execute($params);
+$total_items = (int)$stmt_count->fetchColumn();
+
+$per_page = 25;
+$page_num = max(1, intval($_GET['page_num'] ?? 1));
+$offset = ($page_num - 1) * $per_page;
+
 $sql = "SELECT l.*, e.razao_social, e.id_cliente, c.nome_responsavel 
-        FROM lancamentos l
-        JOIN empresas e ON l.id_empresa = e.id
-        JOIN clientes c ON e.id_cliente = c.id
-        $where_sql
-        ORDER BY l.data_vencimento DESC";
+    FROM lancamentos l
+    JOIN empresas e ON l.id_empresa = e.id
+    JOIN clientes c ON e.id_cliente = c.id
+    $where_sql
+    ORDER BY l.data_vencimento DESC
+    LIMIT ? OFFSET ?";
+
+$params_for_query = $params;
+$params_for_query[] = $per_page;
+$params_for_query[] = $offset;
 
 $stmt = $pdo->prepare($sql);
-$stmt->execute($params);
+$stmt->execute($params_for_query);
 $lancamentos = $stmt->fetchAll();
 
 // --- 4. Consulta para População de Dropdowns (Empresas) ---
@@ -296,6 +327,23 @@ function getLancamentoStatusInfo($lancamento) {
         </form>
     </div>
 </div>
+<!-- Filtros ativos (pills) -->
+<?php
+$activeFilters = [];
+if (!empty($filtro_empresa_id)) $activeFilters[] = 'Empresa: ' . htmlspecialchars(getEmpresaNome($filtro_empresa_id) ?? $filtro_empresa_id);
+if (!empty($filtro_status)) $activeFilters[] = 'Status: ' . htmlspecialchars($filtro_status);
+if (!empty($filtro_venc_inicio) || !empty($filtro_venc_fim)) $activeFilters[] = 'Vencimento: ' . htmlspecialchars($filtro_venc_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_venc_fim ?? '-');
+if (!empty($filtro_pag_inicio) || !empty($filtro_pag_fim)) $activeFilters[] = 'Pagamento: ' . htmlspecialchars($filtro_pag_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_pag_fim ?? '-');
+if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFilters[] = 'Competência: ' . htmlspecialchars($filtro_comp_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_comp_fim ?? '-');
+if (!empty($filtro_forma_pag)) $activeFilters[] = 'Forma: ' . htmlspecialchars(getFormaPagamentoNome($filtro_forma_pag) ?? $filtro_forma_pag);
+if (!empty($filtro_valor_min) || !empty($filtro_valor_max)) $activeFilters[] = 'Valor: ' . htmlspecialchars($filtro_valor_min ?? '-') . ' → ' . htmlspecialchars($filtro_valor_max ?? '-');
+if (!empty($activeFilters)): ?>
+    <div class="mb-3">
+        <?php foreach ($activeFilters as $f): ?>
+            <span class="badge bg-secondary me-1"><?php echo $f; ?></span>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
 <div class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
@@ -397,6 +445,28 @@ function getLancamentoStatusInfo($lancamento) {
         </div>
     </div>
 </div>
+
+<!-- Paginação -->
+<?php if (!empty($total_items)): ?>
+    <?php $total_pages = (int)ceil($total_items / $per_page); ?>
+    <?php if ($total_pages > 1): ?>
+        <nav aria-label="Paginacao Lancamentos" class="mt-3">
+            <ul class="pagination">
+                <?php for ($p = 1; $p <= $total_pages; $p++): ?>
+                    <li class="page-item <?php echo ($p == $page_num) ? 'active' : ''; ?>">
+                        <?php
+                        // Mantém os filtros atuais na querystring
+                        $qs = $_GET;
+                        $qs['page_num'] = $p;
+                        $link = 'index.php?page=lancamentos&' . http_build_query($qs);
+                        ?>
+                        <a class="page-link" href="<?php echo $link; ?>"><?php echo $p; ?></a>
+                    </li>
+                <?php endfor; ?>
+            </ul>
+        </nav>
+    <?php endif; ?>
+<?php endif; ?>
 
                         <div class="modal fade" id="modalNovoLancamento" tabindex="-1" aria-labelledby="modalNovoLancamentoLabel" aria-hidden="true">
 
