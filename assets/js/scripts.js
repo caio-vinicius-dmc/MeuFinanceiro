@@ -82,6 +82,13 @@ document.addEventListener("DOMContentLoaded", function() {
         initStatusChart(statusChartCanvas);
     }
 
+    // --- Inicializadores dos Gráficos de Cobranças ---
+    const cobStatusCanvas = document.getElementById('cobStatusChart');
+    if (cobStatusCanvas) initCobStatusChart(cobStatusCanvas);
+
+    const cobTipoCanvas = document.getElementById('cobTipoChart');
+    if (cobTipoCanvas) initCobTipoChart(cobTipoCanvas);
+
     // --- Lógica do Modal de Edição (Clientes - Existente) ---
     const modalEditarCliente = document.getElementById('modalEditarCliente');
     if (modalEditarCliente) {
@@ -426,13 +433,11 @@ function initStatusChart(canvasElement) {
         // Cores personalizadas (Baseado nas classes do Dashboard)
         const backgroundColors = [
             'rgba(16, 185, 129, 0.9)',  // Pago (Success)
-            'rgba(245, 158, 11, 0.9)',  // A Receber (Warning/Pending)
-            'rgba(239, 68, 68, 0.9)'    // Contestado (Danger)
+            'rgba(245, 158, 11, 0.9)'   // A Receber (Warning/Pending)
         ];
         const borderColors = [
             'rgba(16, 185, 129, 1)',
-            'rgba(245, 158, 11, 1)',
-            'rgba(239, 68, 68, 1)'
+            'rgba(245, 158, 11, 1)'
         ];
 
         // Se todos os valores forem zero, exibe uma mensagem no console e não tenta renderizar.
@@ -677,4 +682,71 @@ function initFluxoCaixaChart(canvasElement) {
             canvasElement.getContext('2d').fillText("Erro ao carregar dados do gráfico.", 10, 50);
          }
      }
+}
+
+/**
+ * Inicializa gráfico de status de cobranças (doughnut)
+ */
+function initCobStatusChart(canvasElement) {
+    try {
+        const script = document.getElementById('cobStatusChartData');
+        if (!script) return;
+        const data = JSON.parse(script.textContent);
+        const total = data.values.reduce((s, v) => s + v, 0);
+        const ctx = canvasElement.getContext('2d');
+        if (total === 0) {
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#6c757d';
+            ctx.textAlign = 'center';
+            ctx.fillText('Sem dados de cobranças no período.', canvasElement.width/2, canvasElement.height/2);
+            return;
+        }
+        const backgroundColors = ['rgba(239,68,68,0.9)', 'rgba(245,158,11,0.9)', 'rgba(16,185,129,0.9)', 'rgba(99,102,241,0.9)'];
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: data.labels,
+                datasets: [{ data: data.values, backgroundColor: backgroundColors.slice(0, data.labels.length) }]
+            },
+            options: { maintainAspectRatio: false }
+        });
+    } catch (e) {
+        console.error('Erro initCobStatusChart', e);
+    }
+}
+
+/**
+ * Inicializa gráfico de total por tipo de cobranças (bar)
+ */
+function initCobTipoChart(canvasElement) {
+    try {
+        const script = document.getElementById('cobTipoChartData');
+        if (!script) return;
+        const data = JSON.parse(script.textContent);
+        const ctx = canvasElement.getContext('2d');
+        const total = data.values.reduce((s, v) => s + v, 0);
+        if (total === 0) {
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#6c757d';
+            ctx.textAlign = 'center';
+            ctx.fillText('Sem valores por tipo no período.', canvasElement.width/2, canvasElement.height/2);
+            return;
+        }
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{ label: 'Total (R$)', data: data.values, backgroundColor: 'rgba(16,185,129,0.8)' }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: {
+                    y: { ticks: { callback: (v)=> 'R$ ' + v.toLocaleString('pt-BR') } }
+                },
+                plugins: { tooltip: { callbacks: { label: function(ctx){ return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(ctx.parsed.y); } } } }
+            }
+        });
+    } catch (e) {
+        console.error('Erro initCobTipoChart', e);
+    }
 }

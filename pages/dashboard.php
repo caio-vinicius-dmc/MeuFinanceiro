@@ -90,17 +90,7 @@ $stmt_pago = $pdo->prepare($sql_pago);
 $stmt_pago->execute($params);
 $total_pago = $stmt_pago->fetch()['total'] ?? 0;
 
-// 3d. Indicador: Valor Total Contestados (NOVO)
-$sql_valor_contest = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.status = 'contestado'";
-$stmt_valor_contest = $pdo->prepare($sql_valor_contest);
-$stmt_valor_contest->execute($params);
-$total_valor_contestado = $stmt_valor_contest->fetch()['total'] ?? 0;
-
-// 3e. Indicador: Quantidade Contestados (MANTIDO)
-$sql_contest_count = "SELECT COUNT(l.id) AS total $base_join $where_sql_com_prefixo AND l.status = 'contestado'";
-$stmt_contest_count = $pdo->prepare($sql_contest_count);
-$stmt_contest_count->execute($params);
-$total_contestado = $stmt_contest_count->fetch()['total'] ?? 0;
+// NOTE: 'contestado' status removed from application; não calculamos mais contestados aqui.
 
 // 3f. Indicador: Total de Lançamentos Vencidos no Período (Inclui PAGO e PENDENTE)
 $sql_total_vencido = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo";
@@ -124,6 +114,79 @@ $stmt_total_receita_periodo->execute($params);
 $total_receita_periodo = $stmt_total_receita_periodo->fetch()['total'] ?? 0;
 
 $percent_pago = ($total_receita_periodo > 0) ? ($valor_receita_paga / $total_receita_periodo) * 100 : 0;
+
+// --- 3j. Métricas adicionais para visão do cliente (contagens e médias)
+// Quantidade de receitas e despesas no período
+$sql_qtd_receitas = "SELECT COUNT(l.id) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'receita'";
+$stmt_qtd_receitas = $pdo->prepare($sql_qtd_receitas);
+$stmt_qtd_receitas->execute($params);
+$qtd_receitas = intval($stmt_qtd_receitas->fetch()['total'] ?? 0);
+
+$sql_qtd_despesas = "SELECT COUNT(l.id) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'despesa'";
+$stmt_qtd_despesas = $pdo->prepare($sql_qtd_despesas);
+$stmt_qtd_despesas->execute($params);
+$qtd_despesas = intval($stmt_qtd_despesas->fetch()['total'] ?? 0);
+
+// Médias por lançamento
+$sql_avg_receita = "SELECT AVG(valor) AS media $base_join $where_sql_com_prefixo AND l.tipo = 'receita'";
+$stmt_avg_receita = $pdo->prepare($sql_avg_receita);
+$stmt_avg_receita->execute($params);
+$media_receita = $stmt_avg_receita->fetch()['media'] ?? 0;
+
+$sql_avg_despesa = "SELECT AVG(valor) AS media $base_join $where_sql_com_prefixo AND l.tipo = 'despesa'";
+$stmt_avg_despesa = $pdo->prepare($sql_avg_despesa);
+$stmt_avg_despesa->execute($params);
+$media_despesa = $stmt_avg_despesa->fetch()['media'] ?? 0;
+
+// Total de despesas marcadas como 'pago' (realizado despesa)
+$sql_despesa_paga = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'despesa' AND l.status = 'pago'";
+$stmt_despesa_paga = $pdo->prepare($sql_despesa_paga);
+$stmt_despesa_paga->execute($params);
+$valor_despesa_paga = $stmt_despesa_paga->fetch()['total'] ?? 0;
+
+// --- 3k. Breakdown por tipo para Lançamentos (opcional, só se tabela/types existir)
+$lancamentos_por_tipo_receita = [];
+$lancamentos_por_tipo_despesa = [];
+try {
+    $stmt_check = $pdo->query("SHOW TABLES LIKE 'tipos_lancamento'");
+    $has_table = (bool) $stmt_check->fetchColumn();
+    if ($has_table) {
+        // Verifica se a coluna id_tipo_lancamento existe em lancamentos
+        $stmt_col = $pdo->query("SHOW COLUMNS FROM lancamentos LIKE 'id_tipo_lancamento'");
+        $has_col = (bool) $stmt_col->fetchColumn();
+        if ($has_col) {
+            // Receitas pagas por tipo
+            $sql_tipo_rec = "SELECT tl.id, tl.nome, COALESCE(tp.total,0) AS total, COALESCE(tp.qtd,0) AS qtd
+                FROM tipos_lancamento tl
+                LEFT JOIN (
+                    SELECT l.id_tipo_lancamento AS tipo_id, SUM(l.valor) AS total, COUNT(l.id) AS qtd
+                    $base_join
+                    $where_sql_com_prefixo AND l.tipo = 'receita' AND l.status = 'pago'
+                    GROUP BY l.id_tipo_lancamento
+                ) tp ON tl.id = tp.tipo_id
+                ORDER BY tp.total DESC";
+            $stmt_tipo_rec = $pdo->prepare($sql_tipo_rec);
+            $stmt_tipo_rec->execute($params);
+            $lancamentos_por_tipo_receita = $stmt_tipo_rec->fetchAll(PDO::FETCH_ASSOC);
+
+            // Despesas pagas por tipo
+            $sql_tipo_desp = "SELECT tl.id, tl.nome, COALESCE(tp.total,0) AS total, COALESCE(tp.qtd,0) AS qtd
+                FROM tipos_lancamento tl
+                LEFT JOIN (
+                    SELECT l.id_tipo_lancamento AS tipo_id, SUM(l.valor) AS total, COUNT(l.id) AS qtd
+                    $base_join
+                    $where_sql_com_prefixo AND l.tipo = 'despesa' AND l.status = 'pago'
+                    GROUP BY l.id_tipo_lancamento
+                ) tp ON tl.id = tp.tipo_id
+                ORDER BY tp.total DESC";
+            $stmt_tipo_desp = $pdo->prepare($sql_tipo_desp);
+            $stmt_tipo_desp->execute($params);
+            $lancamentos_por_tipo_despesa = $stmt_tipo_desp->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
+} catch (Exception $e) {
+    // Silenciar; não impacta dashboard se não existir tabela/coluna
+}
 
 // --- 3i. Indicadores para COBRANÇAS (separados de Lançamentos)
 // Constrói WHERE e PARAMS para cobranças respeitando o filtro de data (data_vencimento) e permissões
@@ -193,6 +256,107 @@ $sql_cob_vencido = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_cob
 $stmt_cob_vencido = $pdo->prepare($sql_cob_vencido);
 $stmt_cob_vencido->execute($params_cob);
 $total_cobrancas_vencido = $stmt_cob_vencido->fetch()['total'] ?? 0;
+
+// Consulta: Total de Cobranças Vencidas (Ainda não pagas e com data de vencimento passada)
+$where_vencidas = [];
+$params_vencidas = [];
+$where_vencidas[] = "cob.data_vencimento < CURDATE()";
+
+if ($filtro_empresa_id) {
+    $where_vencidas[] = "cob.id_empresa = ?";
+    $params_vencidas[] = $filtro_empresa_id;
+    if (isContador() && !empty($clientes_permitidos_ids)) {
+        $placeholders = implode(',', array_fill(0, count($clientes_permitidos_ids), '?'));
+        $where_vencidas[] = "e.id_cliente IN ($placeholders)";
+        $params_vencidas = array_merge($params_vencidas, $clientes_permitidos_ids);
+    } elseif (isClient()) {
+        $where_vencidas[] = "e.id_cliente = ?";
+        $params_vencidas[] = $_SESSION['id_cliente_associado'];
+    }
+
+} elseif ($filtro_cliente_id) {
+    $where_vencidas[] = "e.id_cliente = ?";
+    $params_vencidas[] = $filtro_cliente_id;
+
+} else {
+    if (isContador()) {
+        if (empty($clientes_permitidos_ids)) {
+            $where_vencidas[] = "1=0";
+        } else {
+            $placeholders = implode(',', array_fill(0, count($clientes_permitidos_ids), '?'));
+            $where_vencidas[] = "e.id_cliente IN ($placeholders)";
+            $params_vencidas = array_merge($params_vencidas, $clientes_permitidos_ids);
+        }
+    } elseif (isClient()) {
+        $where_vencidas[] = "e.id_cliente = ?";
+        $params_vencidas[] = $_SESSION['id_cliente_associado'];
+    }
+}
+
+$where_sql_vencidas = "WHERE " . implode(' AND ', $where_vencidas);
+$sql_cob_vencidas_nao_pagas = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_vencidas AND cob.status_pagamento != 'Pago'";
+$stmt_cob_vencidas = $pdo->prepare($sql_cob_vencidas_nao_pagas);
+$stmt_cob_vencidas->execute($params_vencidas);
+$total_cobrancas_vencidas = $stmt_cob_vencidas->fetch()['total'] ?? 0;
+
+// Consulta: Total de cobranças por tipo (soma de valores por tipo) dentro do período filtrado
+$sql_cob_por_tipo = "SELECT COALESCE(tc.nome, 'Sem Tipo') as tipo, SUM(cob.valor) as total $base_join_cob LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id $where_sql_cob GROUP BY tc.nome ORDER BY total DESC";
+$stmt_cob_por_tipo = $pdo->prepare($sql_cob_por_tipo);
+$stmt_cob_por_tipo->execute($params_cob);
+$cobrancas_por_tipo = $stmt_cob_por_tipo->fetchAll(PDO::FETCH_ASSOC);
+$top_tipo_cob = $cobrancas_por_tipo[0] ?? null;
+
+// Consulta: Buscar TODOS os tipos cadastrados e agregar total de cobranças PAGAS por tipo (LEFT JOIN)
+$sql_tipos_com_valor = "SELECT tc.id, tc.nome, COALESCE(tp.total, 0) as total, COALESCE(tp.qtd, 0) as qtd
+FROM tipos_cobranca tc
+LEFT JOIN (
+    SELECT cob.id_tipo_cobranca as id_tipo_cobranca, SUM(cob.valor) as total, COUNT(cob.id) as qtd
+    $base_join_cob
+    $where_sql_cob AND cob.status_pagamento = 'Pago'
+    GROUP BY cob.id_tipo_cobranca
+) tp ON tc.id = tp.id_tipo_cobranca
+ORDER BY tc.nome";
+$stmt_tipos_com_valor = $pdo->prepare($sql_tipos_com_valor);
+$stmt_tipos_com_valor->execute($params_cob);
+$cobrancas_por_tipo_pagas = $stmt_tipos_com_valor->fetchAll(PDO::FETCH_ASSOC);
+
+// Consulta: Total de cobranças VENCIDAS por tipo (respeitando filtros/permissões)
+$sql_tipos_com_vencidas = "SELECT tc.id, tc.nome, COALESCE(tp.total, 0) as total, COALESCE(tp.qtd,0) as qtd
+FROM tipos_cobranca tc
+LEFT JOIN (
+    SELECT cob.id_tipo_cobranca as id_tipo_cobranca, SUM(cob.valor) as total, COUNT(cob.id) as qtd
+    $base_join_cob
+    $where_sql_vencidas
+    AND cob.status_pagamento != 'Pago'
+    GROUP BY cob.id_tipo_cobranca
+) tp ON tc.id = tp.id_tipo_cobranca
+ORDER BY tc.nome";
+$stmt_tipos_com_vencidas = $pdo->prepare($sql_tipos_com_vencidas);
+$stmt_tipos_com_vencidas->execute($params_vencidas);
+$cobrancas_por_tipo_vencidas = $stmt_tipos_com_vencidas->fetchAll(PDO::FETCH_ASSOC);
+
+// Dados para gráficos de cobranças: status e por tipo
+$sql_cob_status = "SELECT cob.status_pagamento as status, SUM(cob.valor) as total $base_join_cob $where_sql_cob GROUP BY cob.status_pagamento";
+$stmt_cob_status = $pdo->prepare($sql_cob_status);
+$stmt_cob_status->execute($params_cob);
+$cob_status_raw = $stmt_cob_status->fetchAll(PDO::FETCH_ASSOC);
+
+$cob_status_labels = [];
+$cob_status_values = [];
+foreach ($cob_status_raw as $r) {
+    $cob_status_labels[] = $r['status'];
+    $cob_status_values[] = (float)$r['total'];
+}
+
+$cob_por_tipo_labels = [];
+$cob_por_tipo_values = [];
+foreach ($cobrancas_por_tipo as $r) {
+    $cob_por_tipo_labels[] = $r['tipo'];
+    $cob_por_tipo_values[] = (float)$r['total'];
+}
+
+$cob_chart_status_json = json_encode(['labels' => $cob_status_labels, 'values' => $cob_status_values]);
+$cob_chart_tipo_json = json_encode(['labels' => $cob_por_tipo_labels, 'values' => $cob_por_tipo_values]);
 
 
 // --- 4. Lógica para o Dropdown de Empresas (MANTIDA) ---
@@ -342,10 +506,8 @@ $status_data = [];
 foreach ($status_data_raw as $item) {
     if ($item['status'] == 'pago') {
         $status_data['Pago'] = ($status_data['Pago'] ?? 0) + $item['total'];
-    } elseif ($item['status'] == 'contestado') {
-        $status_data['Contestado'] = ($status_data['Contestado'] ?? 0) + $item['total'];
     } else {
-        // Agrupa 'pendente' e 'confirmado_cliente' como 'A Receber'
+        // Agrupa 'pendente' e 'confirmado_cliente' e qualquer outro status não-pago como 'A Receber'
         $status_data['A Receber'] = ($status_data['A Receber'] ?? 0) + $item['total'];
     }
 }
@@ -442,11 +604,40 @@ $status_chart_json = json_encode([
     </div>
 </div>
 
-<div class="row g-4 mb-4">
+<?php if (hasLancamentosAccess()): ?>
+<section class="dashboard-section dashboard-section-lancamentos">
+    <div class="section-header">
+        <span class="badge bg-primary badge-topic"><i class="bi bi-arrow-left-right"></i></span>
+        <div>
+            <div class="title">Lançamentos</div>
+            <div class="subtitle">Indicadores e projeções dos lançamentos financeiros</div>
+        </div>
+    </div>
+    <?php
+        // Títulos dos cards (ajustados para a visão do cliente)
+        if (isClient()) {
+            // títulos mais diretos para clientes
+            $card_title_receita = 'Total a Receber';
+            $card_title_despesa = 'Total a Pagar';
+            $card_title_saldo_realizado = 'Saldo Realizado';
+            $card_title_projecao = 'Projeção Total';
+            $card_title_percent = '% Receitas Pagas';
+            $card_title_total_vencido_periodo = 'Total Vencido (Período)';
+        } else {
+            $card_title_receita = 'A Receber (Proj.)';
+            $card_title_despesa = 'A Pagar (Proj.)';
+            $card_title_saldo_realizado = 'Saldo Realizado';
+            $card_title_projecao = 'Projeção Total';
+            $card_title_percent = '% Receita Paga';
+            $card_title_total_vencido_periodo = 'Total Vencido (Período)';
+        }
+    ?>
+    <div class="section-body">
+    <div class="row g-4 mb-4">
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma total das receitas com data de vencimento no período, que ainda não foram pagas.">
         <div class="card card-metric">
             <i class="bi bi-arrow-down-circle card-metric-icon"></i>
-            <div class="metric-title">A Receber (Proj.)</div>
+            <div class="metric-title"><?php echo $card_title_receita; ?></div>
             <div class="metric-value text-warning-emphasis">
                 R$ <?php echo number_format($total_a_receber, 2, ',', '.'); ?>
             </div>
@@ -455,7 +646,7 @@ $status_chart_json = json_encode([
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma total das despesas com data de vencimento no período, que ainda não foram pagas.">
         <div class="card card-metric">
             <i class="bi bi-arrow-up-circle card-metric-icon"></i>
-            <div class="metric-title">A Pagar (Proj.)</div>
+            <div class="metric-title"><?php echo $card_title_despesa; ?></div>
             <div class="metric-value text-danger-emphasis">
                 R$ <?php echo number_format($total_a_pagar, 2, ',', '.'); ?>
             </div>
@@ -464,72 +655,182 @@ $status_chart_json = json_encode([
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Saldo líquido dos lançamentos que foram efetivamente pagos (Receitas Pagas - Despesas Pagas) no período.">
         <div class="card card-metric">
              <i class="bi bi-check-circle card-metric-icon"></i>
-            <div class="metric-title">Saldo Realizado</div>
+            <div class="metric-title"><?php echo $card_title_saldo_realizado; ?></div>
             <div class="metric-value <?php echo ($total_pago >= 0) ? 'text-success-emphasis' : 'text-danger-emphasis'; ?>">
                 R$ <?php echo number_format($total_pago, 2, ',', '.'); ?>
             </div>
         </div>
     </div>
+    <?php if (!isClient()): ?>
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Saldo projetado, somando o Saldo Realizado com o saldo futuro (A Receber - A Pagar) no período.">
         <div class="card card-metric">
              <i class="bi bi-graph-up-arrow card-metric-icon"></i>
-            <div class="metric-title">Projeção Total</div>
+            <div class="metric-title"><?php echo $card_title_projecao; ?></div>
             <div class="metric-value <?php echo ($projecao_saldo >= 0) ? 'text-success-emphasis' : 'text-danger-emphasis'; ?>">
                 R$ <?php echo number_format($projecao_saldo, 2, ',', '.'); ?>
             </div>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <div class="row g-4 mb-4">
-    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Percentual de Receitas que foram pagas em relação ao total de Receitas (Pagos + A Receber + Contestados) no período.">
-        <div class="card card-metric">
-             <i class="bi bi-percent card-metric-icon"></i>
-            <div class="metric-title">% Receita Paga</div>
-            <div class="metric-value">
-                <?php echo number_format($percent_pago, 1, ',', '.'); ?>%
+            <?php if (!isClient()): ?>
+            <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Percentual de Receitas que foram pagas em relação ao total de Receitas (Pagos + A Receber) no período.">
+                <div class="card card-metric">
+                     <i class="bi bi-percent card-metric-icon"></i>
+                    <div class="metric-title"><?php echo $card_title_percent; ?></div>
+                    <div class="metric-value">
+                        <?php echo number_format($percent_pago, 1, ',', '.'); ?>%
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma do valor de todos os lançamentos que foram marcados como 'Contestados' no período.">
-        <div class="card card-metric">
-             <i class="bi bi-exclamation-octagon card-metric-icon"></i>
-            <div class="metric-title">Valor Contestados</div>
-            <div class="metric-value text-danger-emphasis">
-                R$ <?php echo number_format($total_valor_contestado, 2, ',', '.'); ?>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Contagem de quantos lançamentos foram marcados como 'Contestados' no período.">
-        <div class="card card-metric">
-            <i class="bi bi-files card-metric-icon"></i>
-            <div class="metric-title">Qtd. Contestados</div>
-            <div class="metric-value">
-                <?php echo $total_contestado; ?>
-            </div>
-        </div>
-    </div>
-     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma total de Receitas e Despesas (Pagos e Pendentes) com data de vencimento dentro do período filtrado.">
+            <?php endif; ?>
+    <!-- blocos relacionados a 'contestado' removidos -->
+    <?php if (!isClient()): ?>
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma total de Receitas e Despesas (Pagos e Pendentes) com data de vencimento dentro do período filtrado.">
         <div class="card card-metric">
             <i class="bi bi-calendar-x card-metric-icon"></i>
-            <div class="metric-title">Total Vencido (Período)</div>
+            <div class="metric-title"><?php echo $card_title_total_vencido_periodo; ?></div>
             <div class="metric-value">
                 R$ <?php echo number_format($total_vencido_periodo, 2, ',', '.'); ?>
             </div>
         </div>
     </div>
+    <?php endif; ?>
 </div>
+
+<!-- Nova linha: cards adicionais para clientes (Receitas/Despesas realizadas, contagens e médias) -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total de Receitas realizadas (pagas) no período.">
+        <div class="card card-metric">
+            <i class="bi bi-cash-stack card-metric-icon"></i>
+            <div class="metric-title">Receitas Realizadas</div>
+            <div class="metric-value text-success-emphasis">
+                R$ <?php echo number_format($valor_receita_paga, 2, ',', '.'); ?>
+            </div>
+            <div class="metric-sub">Qtd: <?php echo $qtd_receitas; ?> — Média: R$ <?php echo number_format($media_receita, 2, ',', '.'); ?></div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total de Despesas realizadas (pagas) no período.">
+        <div class="card card-metric">
+            <i class="bi bi-wallet2 card-metric-icon"></i>
+            <div class="metric-title">Despesas Realizadas</div>
+            <div class="metric-value text-danger-emphasis">
+                R$ <?php echo number_format($valor_despesa_paga, 2, ',', '.'); ?>
+            </div>
+            <div class="metric-sub">Qtd: <?php echo $qtd_despesas; ?> — Média: R$ <?php echo number_format($media_despesa, 2, ',', '.'); ?></div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total projetado a receber no período (pendente + confirmado).">
+        <div class="card card-metric">
+            <i class="bi bi-list-columns card-metric-icon"></i>
+            <div class="metric-title">A Receber (Qtd)</div>
+            <div class="metric-value">
+                <?php echo $qtd_receitas; ?>
+            </div>
+            <div class="metric-sub">Valor total: R$ <?php echo number_format($total_a_receber, 2, ',', '.'); ?></div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total projetado a pagar no período (pendente + confirmado).">
+        <div class="card card-metric">
+            <i class="bi bi-list-columns-reverse card-metric-icon"></i>
+            <div class="metric-title">A Pagar (Qtd)</div>
+            <div class="metric-value">
+                <?php echo $qtd_despesas; ?>
+            </div>
+            <div class="metric-sub">Valor total: R$ <?php echo number_format($total_a_pagar, 2, ',', '.'); ?></div>
+        </div>
+    </div>
+</div>
+
+<?php if (!empty($lancamentos_por_tipo_receita) || !empty($lancamentos_por_tipo_despesa)): ?>
+    <div class="row g-4 mb-4">
+        <?php if (!empty($lancamentos_por_tipo_receita)): ?>
+        <div class="col-12">
+            <h5>Receitas por Tipo (Pagas)</h5>
+            <div class="row g-3">
+                <?php foreach ($lancamentos_por_tipo_receita as $tipo): ?>
+                    <div class="col-sm-6 col-md-4 col-lg-3">
+                        <div class="card card-metric">
+                            <div class="metric-title"><?php echo htmlspecialchars($tipo['nome']); ?></div>
+                            <div class="metric-value text-success-emphasis">R$ <?php echo number_format($tipo['total'], 2, ',', '.'); ?></div>
+                            <div class="metric-sub">Qtd: <?php echo intval($tipo['qtd']); ?></div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($lancamentos_por_tipo_despesa)): ?>
+        <div class="col-12 mt-3">
+            <h5>Despesas por Tipo (Pagas)</h5>
+            <div class="row g-3">
+                <?php foreach ($lancamentos_por_tipo_despesa as $tipo): ?>
+                    <div class="col-sm-6 col-md-4 col-lg-3">
+                        <div class="card card-metric">
+                            <div class="metric-title"><?php echo htmlspecialchars($tipo['nome']); ?></div>
+                            <div class="metric-value text-danger-emphasis">R$ <?php echo number_format($tipo['total'], 2, ',', '.'); ?></div>
+                            <div class="metric-sub">Qtd: <?php echo intval($tipo['qtd']); ?></div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+    <!-- Gráficos relacionados a Lançamentos (apenas para quem tem acesso) -->
+    <div class="row g-4 mb-4 mt-3">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    Fluxo de Caixa (Realizado de <?php echo date('d/m/Y', strtotime($filtro_data_inicio)); ?> a <?php echo date('d/m/Y', strtotime($filtro_data_fim)); ?>)
+                </div>
+                <div class="card-body">
+                    <canvas id="fluxoCaixaChart" height="150"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    Comparação de Status (Receitas de <?php echo date('d/m/Y', strtotime($filtro_data_inicio)); ?> a <?php echo date('d/m/Y', strtotime($filtro_data_fim)); ?>)
+                </div>
+                <div class="card-body d-flex justify-content-center align-items-center">
+                    <canvas id="statusChart" height="150"></canvas>
+                </div>
+            </div>
+        </div>
+        </div> <!-- .section-body -->
+    </section>
+    <?php endif; ?>
 
 
 <!-- Seção: Indicadores de Cobranças (separado de Lançamentos) -->
-<div class="row g-4 mb-4">
-    <div class="col-12">
-        <h5 class="mb-3">Cobranças</h5>
+<section class="dashboard-section dashboard-section-cobrancas">
+    <div class="section-header">
+        <span class="badge bg-warning text-dark badge-topic"><i class="bi bi-receipt-cutoff"></i></span>
+        <div>
+            <div class="title">Cobranças</div>
+            <div class="subtitle">Resumo e cartões relacionados às cobranças</div>
+        </div>
     </div>
+    <div class="section-body">
+    <div class="row g-4 mb-4">
+    <?php
+        $label_pendentes = isClient() ? 'Cobranças a Pagar' : 'Cobranças a Receber';
+        $label_recebidas = isClient() ? 'Cobranças pagas' : 'Cobranças Recebidas';
+    ?>
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total de cobranças com vencimento no período que estão pendentes.">
         <div class="card card-metric">
             <i class="bi bi-wallet2 card-metric-icon"></i>
-            <div class="metric-title">Cobranças a Receber</div>
+            <div class="metric-title"><?php echo $label_pendentes; ?></div>
             <div class="metric-value text-warning-emphasis">
                 R$ <?php echo number_format($total_cobrancas_pendentes, 2, ',', '.'); ?>
             </div>
@@ -538,7 +839,7 @@ $status_chart_json = json_encode([
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total de cobranças marcadas como pagas no período filtrado.">
         <div class="card card-metric">
             <i class="bi bi-cash-stack card-metric-icon"></i>
-            <div class="metric-title">Cobranças Recebidas</div>
+            <div class="metric-title"><?php echo $label_recebidas; ?></div>
             <div class="metric-value text-success-emphasis">
                 R$ <?php echo number_format($total_cobrancas_recebidas, 2, ',', '.'); ?>
             </div>
@@ -553,40 +854,85 @@ $status_chart_json = json_encode([
             </div>
         </div>
     </div>
-    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma total de cobranças com vencimento no período filtrado.">
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total de cobranças ainda não pagas com vencimento anterior à hoje (vencidas).">
         <div class="card card-metric">
-            <i class="bi bi-calendar3 card-metric-icon"></i>
-            <div class="metric-title">Total Vencido (Cobranças)</div>
-            <div class="metric-value">
-                R$ <?php echo number_format($total_cobrancas_vencido, 2, ',', '.'); ?>
+            <i class="bi bi-exclamation-triangle card-metric-icon"></i>
+            <div class="metric-title">Cobranças Vencidas</div>
+            <div class="metric-value text-danger-emphasis">
+                R$ <?php echo number_format($total_cobrancas_vencidas, 2, ',', '.'); ?>
+            </div>
+        </div>
+    </div>
+    </div> <!-- .section-body -->
+</section>
+
+<!-- Seção: Cobranças pagas por Tipo (um card por tipo) -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <h5 class="mb-3">Cobranças Pagas por Tipo</h5>
+    </div>
+    <?php if (!empty($cobrancas_por_tipo_pagas)): ?>
+        <?php foreach ($cobrancas_por_tipo_pagas as $tipo): ?>
+            <div class="col-sm-6 col-md-4 col-lg-3">
+                <div class="card card-metric">
+                    <i class="bi bi-tag card-metric-icon"></i>
+                    <div class="metric-title"><?php echo htmlspecialchars($tipo['nome']); ?></div>
+                    <div class="metric-value text-success-emphasis">
+                        R$ <?php echo number_format($tipo['total'] ?? 0, 2, ',', '.'); ?>
+                        <div class="small text-muted"><?php echo intval($tipo['qtd'] ?? 0); ?> itens</div>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <div class="col-12 text-muted">Nenhuma cobrança paga encontrada para o período selecionado.</div>
+    <?php endif; ?>
+</div>
+
+<!-- Seção: Cobranças Vencidas por Tipo (um card por tipo) -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <h5 class="mb-3">Cobranças Vencidas por Tipo</h5>
+    </div>
+    <?php if (!empty($cobrancas_por_tipo_vencidas)): ?>
+        <?php foreach ($cobrancas_por_tipo_vencidas as $tipo_v): ?>
+            <div class="col-sm-6 col-md-4 col-lg-3">
+                <div class="card card-metric">
+                    <i class="bi bi-exclamation-triangle card-metric-icon"></i>
+                    <div class="metric-title"><?php echo htmlspecialchars($tipo_v['nome']); ?></div>
+                    <div class="metric-value text-danger-emphasis">
+                        R$ <?php echo number_format($tipo_v['total'] ?? 0, 2, ',', '.'); ?>
+                        <div class="small text-muted"><?php echo intval($tipo_v['qtd'] ?? 0); ?> itens</div>
+                    </div>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <div class="col-12 text-muted">Nenhuma cobrança vencida encontrada.</div>
+    <?php endif; ?>
+</div>
+
+<!-- Gráficos relacionados a Cobranças -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Distribuição por Status (Cobranças)</div>
+            <div class="card-body">
+                <canvas id="cobStatusChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Total por Tipo (Cobranças)</div>
+            <div class="card-body">
+                <canvas id="cobTipoChart" height="200"></canvas>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row g-4">
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                Fluxo de Caixa (Realizado de <?php echo date('d/m/Y', strtotime($filtro_data_inicio)); ?> a <?php echo date('d/m/Y', strtotime($filtro_data_fim)); ?>)
-            </div>
-            <div class="card-body">
-                <canvas id="fluxoCaixaChart" height="150"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                Comparação de Status (Receitas de <?php echo date('d/m/Y', strtotime($filtro_data_inicio)); ?> a <?php echo date('d/m/Y', strtotime($filtro_data_fim)); ?>)
-            </div>
-            <div class="card-body d-flex justify-content-center align-items-center">
-                <canvas id="statusChart" height="150"></canvas>
-            </div>
-        </div>
-    </div>
-    
+    <?php if (isAdmin()): ?>
     <div class="col-12 mt-4">
         <div class="card">
             <div class="card-header">
@@ -672,6 +1018,7 @@ $status_chart_json = json_encode([
             </div>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <script id="chartData" type="application/json">
@@ -680,4 +1027,12 @@ $status_chart_json = json_encode([
 
 <script id="statusChartData" type="application/json">
     <?php echo $status_chart_json; ?>
+</script>
+
+<script id="cobStatusChartData" type="application/json">
+    <?php echo $cob_chart_status_json ?? json_encode(['labels'=>[], 'values'=>[]]); ?>
+</script>
+
+<script id="cobTipoChartData" type="application/json">
+    <?php echo $cob_chart_tipo_json ?? json_encode(['labels'=>[], 'values'=>[]]); ?>
 </script>

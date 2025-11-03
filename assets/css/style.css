@@ -290,6 +290,39 @@ body.sidebar-collapsed .sidebar-logo {
     color: #212529;
 }
 
+/* 6. Dashboard Sections: tópicos separados para Lançamentos e Cobranças */
+.dashboard-section {
+    margin-bottom: 1.5rem;
+}
+.dashboard-section .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.dashboard-section .section-header .title {
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+.dashboard-section .section-header .subtitle {
+    color: var(--bs-secondary);
+    font-size: 0.9rem;
+}
+.dashboard-section-lancamentos .card-metric .metric-title {
+    color: var(--bs-primary);
+}
+.dashboard-section-cobrancas .card-metric .metric-title {
+    color: var(--bs-warning);
+}
+.dashboard-section .section-body {
+    padding: 0.25rem 0;
+}
+.dashboard-section .section-header .badge-topic {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+}
+
 /* Estilos para a Tabela de Atividade Recente */
 .list-group-item {
     border-left: 3px solid transparent;
