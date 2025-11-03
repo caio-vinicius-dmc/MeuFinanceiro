@@ -12,6 +12,12 @@ $filtro_id_empresa = $_GET['id_empresa'] ?? null; // usado na visão cliente
 
 $where_conditions = [];
 $params = [];
+// novos filtros para export: pagamento, competencia, forma de pagamento
+$filtro_pag_inicio = $_GET['pag_inicio'] ?? null;
+$filtro_pag_fim = $_GET['pag_fim'] ?? null;
+$filtro_comp_inicio = $_GET['comp_inicio'] ?? null;
+$filtro_comp_fim = $_GET['comp_fim'] ?? null;
+$filtro_forma_pag = $_GET['forma_pagamento'] ?? null;
 
 // Permissões: clientes só exportam suas empresas; contadores limitados aos clientes associados
 if (isClient()) {
@@ -36,6 +42,12 @@ if (isClient()) {
         $where_conditions[] = '1=0';
     }
 } // isAdmin não tem restrição adicional
+
+// Aplicar filtro por empresa também para admin/contador quando fornecido
+if (!empty($filtro_id_empresa) && !isClient()) {
+    $where_conditions[] = 'cob.id_empresa = ?';
+    $params[] = $filtro_id_empresa;
+}
 
 // Filtros de data (aplica somente se houver ambos)
 if ($filtro_data_inicio && $filtro_data_fim) {

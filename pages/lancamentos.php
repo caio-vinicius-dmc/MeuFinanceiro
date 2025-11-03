@@ -13,6 +13,11 @@ $filtro_empresa_id = $_GET['id_empresa'] ?? null;
 $filtro_status = $_GET['status'] ?? null;
 $filtro_venc_inicio = $_GET['venc_inicio'] ?? null;
 $filtro_venc_fim = $_GET['venc_fim'] ?? null;
+$filtro_pag_inicio = $_GET['pag_inicio'] ?? null; // novo filtro: data de pagamento inicio
+$filtro_pag_fim = $_GET['pag_fim'] ?? null;     // novo filtro: data de pagamento fim
+$filtro_comp_inicio = $_GET['comp_inicio'] ?? null; // novo filtro: data de competência inicio
+$filtro_comp_fim = $_GET['comp_fim'] ?? null;       // novo filtro: data de competência fim
+$filtro_forma_pag = $_GET['forma_pagamento'] ?? null; // novo filtro: forma de pagamento
 $filtro_valor_min = $_GET['valor_min'] ?? null;
 $filtro_valor_max = $_GET['valor_max'] ?? null;
 
@@ -46,12 +51,14 @@ if (!empty($filtro_empresa_id)) {
     $params[] = $filtro_empresa_id;
 }
 if (!empty($filtro_status)) {
-    // Se o filtro for 'Vencido', ajustamos a lógica
+    // Se o filtro for 'Vencido', ajustamos a lógica para cobrir registros que estão em aberto
+    // Observação: o DB pode registrar status como 'pendente', 'Pendente', 'Em aberto' ou até NULL em registros antigos.
+    // Aqui usamos LOWER(TRIM(...)) para comparar de forma case-insensitive e também aceitamos NULL como 'em aberto'.
     if ($filtro_status == 'Vencido') {
-        $where_conditions[] = "l.status = 'Em aberto' AND l.data_vencimento < CURDATE()";
+        $where_conditions[] = "(l.status IS NULL OR LOWER(TRIM(l.status)) IN ('pendente','em aberto')) AND l.data_vencimento < CURDATE()";
     } else {
-        $where_conditions[] = "l.status = ?";
-        $params[] = $filtro_status;
+        $where_conditions[] = "LOWER(TRIM(l.status)) = ?";
+        $params[] = strtolower($filtro_status);
     }
 }
 if (!empty($filtro_venc_inicio)) {
@@ -61,6 +68,37 @@ if (!empty($filtro_venc_inicio)) {
 if (!empty($filtro_venc_fim)) {
     $where_conditions[] = "l.data_vencimento <= ?";
     $params[] = $filtro_venc_fim;
+}
+// filtro por data de pagamento
+if (!empty($filtro_pag_inicio) && !empty($filtro_pag_fim)) {
+    $where_conditions[] = "l.data_pagamento BETWEEN ? AND ?";
+    $params[] = $filtro_pag_inicio;
+    $params[] = $filtro_pag_fim;
+} elseif (!empty($filtro_pag_inicio)) {
+    $where_conditions[] = "l.data_pagamento >= ?";
+    $params[] = $filtro_pag_inicio;
+} elseif (!empty($filtro_pag_fim)) {
+    $where_conditions[] = "l.data_pagamento <= ?";
+    $params[] = $filtro_pag_fim;
+}
+
+// filtro por data de competencia
+if (!empty($filtro_comp_inicio) && !empty($filtro_comp_fim)) {
+    $where_conditions[] = "l.data_competencia BETWEEN ? AND ?";
+    $params[] = $filtro_comp_inicio;
+    $params[] = $filtro_comp_fim;
+} elseif (!empty($filtro_comp_inicio)) {
+    $where_conditions[] = "l.data_competencia >= ?";
+    $params[] = $filtro_comp_inicio;
+} elseif (!empty($filtro_comp_fim)) {
+    $where_conditions[] = "l.data_competencia <= ?";
+    $params[] = $filtro_comp_fim;
+}
+
+// filtro por forma de pagamento
+if (!empty($filtro_forma_pag)) {
+    $where_conditions[] = "l.id_forma_pagamento = ?";
+    $params[] = $filtro_forma_pag;
 }
 if (is_numeric($filtro_valor_min)) {
     $where_conditions[] = "l.valor >= ?";
@@ -215,6 +253,32 @@ function getLancamentoStatusInfo($lancamento) {
                 </div>
             </div>
             
+            <div class="col-md-3">
+                <label class="form-label">Pagamento (entre)</label>
+                <div class="input-group">
+                    <input type="date" class="form-control" name="pag_inicio" value="<?php echo htmlspecialchars($filtro_pag_inicio ?? ''); ?>" title="Pagamento Início">
+                    <input type="date" class="form-control" name="pag_fim" value="<?php echo htmlspecialchars($filtro_pag_fim ?? ''); ?>" title="Pagamento Fim">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Competência (entre)</label>
+                <div class="input-group">
+                    <input type="date" class="form-control" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>" title="Competência Início">
+                    <input type="date" class="form-control" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>" title="Competência Fim">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Forma de Pagamento</label>
+                <select id="forma_pagamento" name="forma_pagamento" class="form-select">
+                    <option value="">Todas as Formas</option>
+                    <?php foreach ($formas_pagamento as $fp): ?>
+                        <option value="<?php echo $fp['id']; ?>" <?php echo ($filtro_forma_pag == $fp['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($fp['nome']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
             <div class="col-md-3">
                 <label class="form-label">Valor Entre (R$)</label>
                 <div class="input-group">

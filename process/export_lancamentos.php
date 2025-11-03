@@ -11,6 +11,12 @@ $filtro_venc_inicio = $_GET['venc_inicio'] ?? null;
 $filtro_venc_fim = $_GET['venc_fim'] ?? null;
 $filtro_valor_min = $_GET['valor_min'] ?? null;
 $filtro_valor_max = $_GET['valor_max'] ?? null;
+// novos filtros: pagamento, competencia, forma de pagamento
+$filtro_pag_inicio = $_GET['pag_inicio'] ?? null;
+$filtro_pag_fim = $_GET['pag_fim'] ?? null;
+$filtro_comp_inicio = $_GET['comp_inicio'] ?? null;
+$filtro_comp_fim = $_GET['comp_fim'] ?? null;
+$filtro_forma_pag = $_GET['forma_pagamento'] ?? null;
 
 // --- 2. Lógica de Permissão e Construção WHERE/PARAMS (REPLICADA) ---
 $where_conditions = [];
@@ -61,6 +67,37 @@ if (is_numeric($filtro_valor_min)) {
 if (is_numeric($filtro_valor_max)) {
     $where_conditions[] = "l.valor <= ?";
     $params[] = $filtro_valor_max;
+}
+// pagamento
+if (!empty($filtro_pag_inicio) && !empty($filtro_pag_fim)) {
+    $where_conditions[] = "l.data_pagamento BETWEEN ? AND ?";
+    $params[] = $filtro_pag_inicio;
+    $params[] = $filtro_pag_fim;
+} elseif (!empty($filtro_pag_inicio)) {
+    $where_conditions[] = "l.data_pagamento >= ?";
+    $params[] = $filtro_pag_inicio;
+} elseif (!empty($filtro_pag_fim)) {
+    $where_conditions[] = "l.data_pagamento <= ?";
+    $params[] = $filtro_pag_fim;
+}
+
+// competencia
+if (!empty($filtro_comp_inicio) && !empty($filtro_comp_fim)) {
+    $where_conditions[] = "l.data_competencia BETWEEN ? AND ?";
+    $params[] = $filtro_comp_inicio;
+    $params[] = $filtro_comp_fim;
+} elseif (!empty($filtro_comp_inicio)) {
+    $where_conditions[] = "l.data_competencia >= ?";
+    $params[] = $filtro_comp_inicio;
+} elseif (!empty($filtro_comp_fim)) {
+    $where_conditions[] = "l.data_competencia <= ?";
+    $params[] = $filtro_comp_fim;
+}
+
+// forma de pagamento
+if (!empty($filtro_forma_pag)) {
+    $where_conditions[] = "l.id_forma_pagamento = ?";
+    $params[] = $filtro_forma_pag;
 }
 
 $where_sql = "";

@@ -59,11 +59,20 @@ if (isClient()) {
     $stmt_empresas_cliente->execute([$id_cliente_logado]);
     $empresas_cliente = $stmt_empresas_cliente->fetchAll();
 
+    // Carrega formas de pagamento para o select (visão cliente)
+    $stmt_formas_cliente = $pdo->query("SELECT id, nome FROM formas_pagamento WHERE ativo = 1 ORDER BY nome");
+    $formas_pagamento = $stmt_formas_cliente->fetchAll();
+
     // Captura os filtros da URL
     $filtro_tipo_data = $_GET['tipo_data'] ?? 'vencimento';
     $filtro_data_inicio = $_GET['data_inicio'] ?? null;
     $filtro_data_fim = $_GET['data_fim'] ?? null;
     $filtro_empresa_id = $_GET['id_empresa'] ?? null;
+    $filtro_pag_inicio = $_GET['pag_inicio'] ?? null; // data de pagamento inicio
+    $filtro_pag_fim = $_GET['pag_fim'] ?? null;       // data de pagamento fim
+    $filtro_comp_inicio = $_GET['comp_inicio'] ?? null; // data de competencia inicio
+    $filtro_comp_fim = $_GET['comp_fim'] ?? null;       // data de competencia fim
+    $filtro_forma_pag = $_GET['forma_pagamento'] ?? null; // forma de pagamento
 
     // Constrói a query dinâmica
     $params = [$id_cliente_logado];
@@ -78,6 +87,35 @@ if (isClient()) {
     if ($filtro_empresa_id) {
         $where_conditions_cliente[] = "cob.id_empresa = ?";
         $params[] = $filtro_empresa_id;
+    }
+    // filtro por data de pagamento
+    if (!empty($filtro_pag_inicio) && !empty($filtro_pag_fim)) {
+        $where_conditions_cliente[] = "cob.data_pagamento BETWEEN ? AND ?";
+        $params[] = $filtro_pag_inicio;
+        $params[] = $filtro_pag_fim;
+    } elseif (!empty($filtro_pag_inicio)) {
+        $where_conditions_cliente[] = "cob.data_pagamento >= ?";
+        $params[] = $filtro_pag_inicio;
+    } elseif (!empty($filtro_pag_fim)) {
+        $where_conditions_cliente[] = "cob.data_pagamento <= ?";
+        $params[] = $filtro_pag_fim;
+    }
+    // filtro por competencia
+    if (!empty($filtro_comp_inicio) && !empty($filtro_comp_fim)) {
+        $where_conditions_cliente[] = "cob.data_competencia BETWEEN ? AND ?";
+        $params[] = $filtro_comp_inicio;
+        $params[] = $filtro_comp_fim;
+    } elseif (!empty($filtro_comp_inicio)) {
+        $where_conditions_cliente[] = "cob.data_competencia >= ?";
+        $params[] = $filtro_comp_inicio;
+    } elseif (!empty($filtro_comp_fim)) {
+        $where_conditions_cliente[] = "cob.data_competencia <= ?";
+        $params[] = $filtro_comp_fim;
+    }
+    // filtro por forma de pagamento
+    if (!empty($filtro_forma_pag)) {
+        $where_conditions_cliente[] = "cob.id_forma_pagamento = ?";
+        $params[] = $filtro_forma_pag;
     }
 
     $sql = "SELECT cob.*, emp.razao_social, emp.cnpj, fp.nome as forma_pagamento_nome, fp.icone_bootstrap, tc.nome as tipo_cobranca_nome
@@ -107,6 +145,12 @@ if (isClient()) {
     $filtro_data_inicio = $_GET['data_inicio'] ?? null;
     $filtro_data_fim = $_GET['data_fim'] ?? null;
     $filtro_cliente_id = $_GET['cliente_id'] ?? null;
+    $filtro_pag_inicio = $_GET['pag_inicio'] ?? null;
+    $filtro_pag_fim = $_GET['pag_fim'] ?? null;
+    $filtro_comp_inicio = $_GET['comp_inicio'] ?? null;
+    $filtro_comp_fim = $_GET['comp_fim'] ?? null;
+    $filtro_forma_pag = $_GET['forma_pagamento'] ?? null;
+    $filtro_empresa_id = $_GET['id_empresa'] ?? null; // novo filtro por empresa
 
     $where_conditions = [];
     $params = [];
@@ -121,6 +165,48 @@ if (isClient()) {
     if ($filtro_cliente_id) {
         $where_conditions[] = "emp.id_cliente = ?";
         $params[] = $filtro_cliente_id;
+    }
+
+    if ($filtro_empresa_id) {
+        $where_conditions[] = "cob.id_empresa = ?";
+        $params[] = $filtro_empresa_id;
+    }
+
+    // pagamento
+    if (!empty($filtro_pag_inicio) && !empty($filtro_pag_fim)) {
+        $where_conditions[] = "cob.data_pagamento BETWEEN ? AND ?";
+        $params[] = $filtro_pag_inicio;
+        $params[] = $filtro_pag_fim;
+    } elseif (!empty($filtro_pag_inicio)) {
+        $where_conditions[] = "cob.data_pagamento >= ?";
+        $params[] = $filtro_pag_inicio;
+    } elseif (!empty($filtro_pag_fim)) {
+        $where_conditions[] = "cob.data_pagamento <= ?";
+        $params[] = $filtro_pag_fim;
+    }
+
+    // competencia
+    if (!empty($filtro_comp_inicio) && !empty($filtro_comp_fim)) {
+        $where_conditions[] = "cob.data_competencia BETWEEN ? AND ?";
+        $params[] = $filtro_comp_inicio;
+        $params[] = $filtro_comp_fim;
+    } elseif (!empty($filtro_comp_inicio)) {
+        $where_conditions[] = "cob.data_competencia >= ?";
+        $params[] = $filtro_comp_inicio;
+    } elseif (!empty($filtro_comp_fim)) {
+        $where_conditions[] = "cob.data_competencia <= ?";
+        $params[] = $filtro_comp_fim;
+    }
+
+    // forma de pagamento
+    if (!empty($filtro_forma_pag)) {
+        $where_conditions[] = "cob.id_forma_pagamento = ?";
+        $params[] = $filtro_forma_pag;
+    }
+
+    if ($filtro_empresa_id) {
+        $where_conditions[] = "cob.id_empresa = ?";
+        $params[] = $filtro_empresa_id;
     }
 
     // Lógica de permissão para Contador
@@ -143,9 +229,10 @@ if (isClient()) {
         $where_sql = "WHERE " . implode(' AND ', $where_conditions);
     }
 
-    $sql_cobrancas = "SELECT cob.*, emp.razao_social, fp.nome as forma_pagamento_nome, fp.icone_bootstrap, tc.nome as tipo_cobranca_nome 
+    $sql_cobrancas = "SELECT cob.*, emp.razao_social, emp.id_cliente, fp.nome as forma_pagamento_nome, fp.icone_bootstrap, tc.nome as tipo_cobranca_nome, cli.nome_responsavel as cliente_nome
                       FROM cobrancas cob
                       JOIN empresas emp ON cob.id_empresa = emp.id
+                      JOIN clientes cli ON emp.id_cliente = cli.id
                       JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
                       LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id
                       $where_sql
@@ -170,6 +257,11 @@ if (isClient()) {
                     <input type="hidden" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio ?? ''); ?>">
                     <input type="hidden" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim ?? ''); ?>">
                     <input type="hidden" name="id_empresa" value="<?php echo htmlspecialchars($filtro_empresa_id ?? ''); ?>">
+                    <input type="hidden" name="pag_inicio" value="<?php echo htmlspecialchars($filtro_pag_inicio ?? ''); ?>">
+                    <input type="hidden" name="pag_fim" value="<?php echo htmlspecialchars($filtro_pag_fim ?? ''); ?>">
+                    <input type="hidden" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>">
+                    <input type="hidden" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>">
+                    <input type="hidden" name="forma_pagamento" value="<?php echo htmlspecialchars($filtro_forma_pag ?? ''); ?>">
                     <button type="submit" class="btn btn-outline-success" title="Exportar CSV com as cobranças filtradas para suas empresas">
                         <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
                     </button>
@@ -211,6 +303,29 @@ if (isClient()) {
                         </select>
                     </div>
                     <?php endif; ?>
+                    <div class="col-md-3">
+                        <label class="form-label">Pagamento (entre)</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control" name="pag_inicio" value="<?php echo htmlspecialchars($filtro_pag_inicio ?? ''); ?>">
+                            <input type="date" class="form-control" name="pag_fim" value="<?php echo htmlspecialchars($filtro_pag_fim ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Competência (entre)</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>">
+                            <input type="date" class="form-control" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Forma de Pagamento</label>
+                        <select class="form-select" name="forma_pagamento">
+                            <option value="">Todas</option>
+                            <?php foreach ($formas_pagamento as $fp): ?>
+                                <option value="<?php echo $fp['id']; ?>" <?php echo ($filtro_forma_pag == $fp['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($fp['nome']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                     <div class="col-12 mt-3 d-flex gap-2">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-search me-2"></i>Filtrar</button>
                         <a href="index.php?page=cobrancas" class="btn btn-outline-secondary">Limpar Filtros</a>
@@ -301,6 +416,12 @@ if (isClient()) {
                     <input type="hidden" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio); ?>">
                     <input type="hidden" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>">
                     <input type="hidden" name="cliente_id" value="<?php echo htmlspecialchars($filtro_cliente_id); ?>">
+                    <input type="hidden" name="id_empresa" value="<?php echo htmlspecialchars($filtro_empresa_id ?? ''); ?>">
+                    <input type="hidden" name="pag_inicio" value="<?php echo htmlspecialchars($filtro_pag_inicio ?? ''); ?>">
+                    <input type="hidden" name="pag_fim" value="<?php echo htmlspecialchars($filtro_pag_fim ?? ''); ?>">
+                    <input type="hidden" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>">
+                    <input type="hidden" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>">
+                    <input type="hidden" name="forma_pagamento" value="<?php echo htmlspecialchars($filtro_forma_pag ?? ''); ?>">
                     <button type="submit" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV</button>
                 </form>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaCobranca"><i class="bi bi-plus-circle me-2"></i>Gerar Nova Cobrança</button>
@@ -323,18 +444,48 @@ if (isClient()) {
                         <label for="data_fim" class="form-label">Vencimento Fim</label>
                         <input type="date" class="form-control" id="data_fim" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label for="cliente_id" class="form-label">Cliente</label>
                         <select class="form-select" id="cliente_id" name="cliente_id">
                             <option value="">Todos os Clientes</option>
                             <?php foreach ($clientes_filtro as $cliente): ?>
-                                <option value="<?php echo $cliente['id']; ?>" <?php echo ($filtro_cliente_id == $cliente['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($cliente['nome_responsavel']); ?>
-                                </option>
-                                <?php endforeach; ?>
+                                <option value="<?php echo $cliente['id']; ?>" <?php echo ($filtro_cliente_id == $cliente['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($cliente['nome_responsavel']); ?></option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-md-2">
+                        <label for="id_empresa" class="form-label">Empresa</label>
+                        <select class="form-select" id="id_empresa" name="id_empresa">
+                            <option value="">Todas as Empresas</option>
+                            <?php foreach ($empresas as $empresa): ?>
+                                <option value="<?php echo $empresa['id']; ?>" <?php echo ($filtro_empresa_id == $empresa['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($empresa['razao_social']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Pagamento (entre)</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control" name="pag_inicio" value="<?php echo htmlspecialchars($filtro_pag_inicio ?? ''); ?>">
+                            <input type="date" class="form-control" name="pag_fim" value="<?php echo htmlspecialchars($filtro_pag_fim ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Competência (entre)</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>">
+                            <input type="date" class="form-control" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Forma de Pagamento</label>
+                        <select class="form-select" name="forma_pagamento">
+                            <option value="">Todas</option>
+                            <?php foreach ($formas_pagamento as $fp): ?>
+                                <option value="<?php echo $fp['id']; ?>" <?php echo ($filtro_forma_pag == $fp['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($fp['nome']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-1 d-grid">
                         <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-2"></i>Filtrar</button>
                     </div>
                 </form>
@@ -347,14 +498,25 @@ if (isClient()) {
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover">
-                        <thead><tr><th>Empresa</th><th>Tipo</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Empresa</th>
+                                <th>Cliente</th>
+                                <th>Tipo</th>
+                                <th>Vencimento</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             <?php if (empty($cobrancas_admin)): ?>
-                                <tr><td colspan="5" class="text-center">Nenhuma cobrança gerada ainda.</td></tr>
+                                <tr><td colspan="7" class="text-center">Nenhuma cobrança gerada ainda.</td></tr>
                             <?php else: ?>
                                 <?php foreach ($cobrancas_admin as $cobranca): ?>
                                     <tr>
                                         <td><?php echo htmlspecialchars($cobranca['razao_social']); ?></td>
+                                        <td><?php echo htmlspecialchars($cobranca['cliente_nome'] ?? ($cobranca['id_cliente'] ?? '')); ?></td>
                                         <td><?php echo htmlspecialchars($cobranca['tipo_cobranca_nome'] ?? 'N/A'); ?></td>
                                         <td><?php echo date('d/m/Y', strtotime($cobranca['data_vencimento'])); ?></td>
                                         <td>R$ <?php echo number_format($cobranca['valor'], 2, ',', '.'); ?></td>
