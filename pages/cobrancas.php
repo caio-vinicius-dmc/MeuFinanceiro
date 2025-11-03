@@ -323,13 +323,12 @@ if (isClient()) {
                             <option value="competencia" <?php echo ($filtro_tipo_data == 'competencia') ? 'selected' : ''; ?>>Competência</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label for="data_inicio" class="form-label">Período Início</label>
-                        <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio ?? ''); ?>">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="data_fim" class="form-label">Período Fim</label>
-                        <input type="date" class="form-control" id="data_fim" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim ?? ''); ?>">
+                    <div class="col-md-6">
+                        <label class="form-label">Vencimento (entre)</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio ?? ''); ?>" title="Data Início">
+                            <input type="date" class="form-control" id="data_fim" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim ?? ''); ?>" title="Data Fim">
+                        </div>
                     </div>
                     <?php if (count($empresas_cliente) > 1): ?>
                     <div class="col-md-3">
@@ -491,13 +490,12 @@ if (isClient()) {
             <div class="card-body">
                 <form method="GET" class="row g-3 align-items-end">
                     <input type="hidden" name="page" value="cobrancas">
-                    <div class="col-md-3">
-                        <label for="data_inicio" class="form-label">Vencimento Início</label>
-                        <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio); ?>">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="data_fim" class="form-label">Vencimento Fim</label>
-                        <input type="date" class="form-control" id="data_fim" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>">
+                    <div class="col-md-6">
+                        <label class="form-label">Vencimento (entre)</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio); ?>" title="Data Início">
+                            <input type="date" class="form-control" id="data_fim" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>" title="Data Fim">
+                        </div>
                     </div>
                     <div class="col-md-3">
                         <label for="cliente_id" class="form-label">Cliente</label>

@@ -17,13 +17,10 @@ function getEmpresaNome($id) {
     return $stmt->fetchColumn();
 }
 
-function getFormaPagamentoNome($id) {
-    global $pdo;
-    if (empty($id)) return null;
-    $stmt = $pdo->prepare("SELECT nome FROM formas_pagamento WHERE id = ?");
-    $stmt->execute([$id]);
-    return $stmt->fetchColumn();
-}
+// NOTE: `lancamentos` armazena a forma de pagamento em `metodo_pagamento` (string).
+// Não existe a coluna `id_forma_pagamento` na tabela `lancamentos` no esquema atual.
+// Por isso o filtro e o select abaixo usam o nome da forma (campo `nome` de formas_pagamento)
+// e comparam com `l.metodo_pagamento`.
 
 // --- 1. Capturar e Sanitizar Filtros ---
 $filtro_empresa_id = $_GET['id_empresa'] ?? null;
@@ -34,7 +31,7 @@ $filtro_pag_inicio = $_GET['pag_inicio'] ?? null; // novo filtro: data de pagame
 $filtro_pag_fim = $_GET['pag_fim'] ?? null;     // novo filtro: data de pagamento fim
 $filtro_comp_inicio = $_GET['comp_inicio'] ?? null; // novo filtro: data de competência inicio
 $filtro_comp_fim = $_GET['comp_fim'] ?? null;       // novo filtro: data de competência fim
-$filtro_forma_pag = $_GET['forma_pagamento'] ?? null; // novo filtro: forma de pagamento
+$filtro_forma_pag = $_GET['forma_pagamento'] ?? null; // novo filtro: forma de pagamento (nome)
 $filtro_valor_min = $_GET['valor_min'] ?? null;
 $filtro_valor_max = $_GET['valor_max'] ?? null;
 
@@ -112,9 +109,9 @@ if (!empty($filtro_comp_inicio) && !empty($filtro_comp_fim)) {
     $params[] = $filtro_comp_fim;
 }
 
-// filtro por forma de pagamento
+// filtro por forma de pagamento (compara com o campo texto metodo_pagamento)
 if (!empty($filtro_forma_pag)) {
-    $where_conditions[] = "l.id_forma_pagamento = ?";
+    $where_conditions[] = "l.metodo_pagamento = ?";
     $params[] = $filtro_forma_pag;
 }
 if (is_numeric($filtro_valor_min)) {
@@ -302,12 +299,13 @@ function getLancamentoStatusInfo($lancamento) {
 
             <div class="col-md-3">
                 <label class="form-label">Forma de Pagamento</label>
-                <select id="forma_pagamento" name="forma_pagamento" class="form-select">
-                    <option value="">Todas as Formas</option>
-                    <?php foreach ($formas_pagamento as $fp): ?>
-                        <option value="<?php echo $fp['id']; ?>" <?php echo ($filtro_forma_pag == $fp['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($fp['nome']); ?></option>
-                    <?php endforeach; ?>
-                </select>
+                    <select id="forma_pagamento" name="forma_pagamento" class="form-select">
+                        <option value="">Todas as Formas</option>
+                        <?php foreach ($formas_pagamento as $fp): ?>
+                            <?php $fp_name = $fp['nome']; ?>
+                            <option value="<?php echo htmlspecialchars($fp_name); ?>" <?php echo ($filtro_forma_pag == $fp_name) ? 'selected' : ''; ?>><?php echo htmlspecialchars($fp_name); ?></option>
+                        <?php endforeach; ?>
+                    </select>
             </div>
 
             <div class="col-md-3">

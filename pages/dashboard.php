@@ -540,14 +540,12 @@ $status_chart_json = json_encode([
         <form method="GET" class="row g-3 align-items-end">
             <input type="hidden" name="page" value="dashboard">
             
-            <div class="col-md-3">
-                <label for="data_inicio" class="form-label">Data Vencimento Início</label>
-                <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio); ?>">
-            </div>
-            
-            <div class="col-md-3">
-                <label for="data_fim" class="form-label">Data Vencimento Fim</label>
-                <input type="date" class="form-control" id="data_fim" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>">
+            <div class="col-md-6">
+                <label class="form-label">Vencimento (entre)</label>
+                <div class="input-group">
+                    <input type="date" class="form-control" id="data_inicio" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio); ?>" title="Data Início">
+                    <input type="date" class="form-control" id="data_fim" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>" title="Data Fim">
+                </div>
             </div>
 
             <?php if (isAdmin() || isContador()): ?>

@@ -16,7 +16,13 @@ $filtro_pag_inicio = $_GET['pag_inicio'] ?? null;
 $filtro_pag_fim = $_GET['pag_fim'] ?? null;
 $filtro_comp_inicio = $_GET['comp_inicio'] ?? null;
 $filtro_comp_fim = $_GET['comp_fim'] ?? null;
+// Recebe forma de pagamento (pode ser nome ou id dependendo do schema).
 $filtro_forma_pag = $_GET['forma_pagamento'] ?? null;
+
+// Detecta se a coluna id_forma_pagamento existe em `lancamentos` no schema atual
+$colStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_forma_pagamento'");
+$colStmt->execute();
+$has_forma_id_col = (bool)$colStmt->fetchColumn();
 
 // --- 2. Lógica de Permissão e Construção WHERE/PARAMS (REPLICADA) ---
 $where_conditions = [];
@@ -96,8 +102,14 @@ if (!empty($filtro_comp_inicio) && !empty($filtro_comp_fim)) {
 
 // forma de pagamento
 if (!empty($filtro_forma_pag)) {
-    $where_conditions[] = "l.id_forma_pagamento = ?";
-    $params[] = $filtro_forma_pag;
+    if ($has_forma_id_col) {
+        $where_conditions[] = "l.id_forma_pagamento = ?";
+        $params[] = $filtro_forma_pag;
+    } else {
+        // compara com o campo texto metodo_pagamento
+        $where_conditions[] = "l.metodo_pagamento = ?";
+        $params[] = $filtro_forma_pag;
+    }
 }
 
 $where_sql = "";
@@ -106,6 +118,9 @@ if (!empty($where_conditions)) {
 }
 
 // --- 3. Consulta de Exportação (Corrigida a sintaxe e espaçamento) ---
+$select_forma = $has_forma_id_col ? 'fp.nome as forma_pagamento_nome' : "l.metodo_pagamento as forma_pagamento_nome";
+$join_forma = $has_forma_id_col ? 'LEFT JOIN formas_pagamento fp ON l.id_forma_pagamento = fp.id' : '';
+
 $sql_export = "SELECT 
     l.data_vencimento,
     l.data_pagamento,
@@ -114,12 +129,12 @@ $sql_export = "SELECT
     l.descricao,
     l.tipo,
     l.valor,
-    fp.nome as forma_pagamento_nome,
+    $select_forma,
     l.status
     FROM lancamentos l
     JOIN empresas e ON l.id_empresa = e.id
     JOIN clientes c ON e.id_cliente = c.id
-    LEFT JOIN formas_pagamento fp ON l.id_forma_pagamento = fp.id
+    $join_forma
     $where_sql
     ORDER BY l.data_vencimento ASC";
 
