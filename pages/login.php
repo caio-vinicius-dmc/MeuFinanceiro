@@ -42,7 +42,7 @@ if (isset($_SESSION['error_message'])) {
     <link rel="stylesheet" href="<?php echo base_url('assets/css/style.css?v=2.0'); ?>"> </head>
 <body class="login-wrapper">
 
-    <div class="container-fluid vh-100 p-0 login-wrapper">
+    <div class="container-fluid min-vh-100 p-0 login-wrapper">
         <div class="row g-0 h-100">
         
             <div class="col-lg-7 d-none d-lg-block login-image-side">
@@ -91,10 +91,6 @@ if (isset($_SESSION['error_message'])) {
                                     </span>
                                     <input type="password" class="form-control bg-light border-start-0" id="senha" name="senha" placeholder="Sua senha" required>
                                 </div>
-                            </div>
-
-                            <div class="d-flex justify-content-end mb-4">
-                                <a href="#" class="text-decoration-none text-primary fw-medium">Esqueceu a senha?</a>
                             </div>
                             
                             <div class="d-grid">

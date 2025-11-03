@@ -304,7 +304,16 @@ body.sidebar-collapsed .sidebar-logo {
 /* 5. Tela de Login (Split-Screen)
 --------------------------------- */
 .login-wrapper {
-    overflow: hidden; 
+    /* Por padrão, escondemos overflow em desktop para o layout split-screen ficar limpo */
+    overflow: hidden;
+}
+
+/* Em telas pequenas, permitir rolagem caso o conteúdo exceda a altura da viewport */
+@media (max-width: 991.98px) {
+    .login-wrapper {
+        overflow: auto; /* permite scroll vertical em celulares */
+        -webkit-overflow-scrolling: touch; /* suaviza o scroll em iOS */
+    }
 }
 
 .login-form-side {
@@ -313,7 +322,47 @@ body.sidebar-collapsed .sidebar-logo {
     justify-content: center;
     background-color: #f8f9fa;
     padding: 2rem;
-    min-height: 100vh; 
+    min-height: auto; /* permite que o conteúdo cresça em telas pequenas */
+}
+
+@media (min-width: 992px) {
+    .login-form-side {
+        min-height: 100vh; /* mantém o split-screen alto em desktop */
+    }
+}
+
+/* Ajustes adicionais para melhorar legibilidade em telas pequenas */
+@media (max-width: 575.98px) {
+    .login-form-side {
+        padding: 1rem; /* reduz padding para caber mais conteúdo */
+    }
+    .login-card {
+        box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+        border-radius: 0.6rem;
+        padding: 0.5rem;
+    }
+    .login-card .card-body {
+        padding: 1rem;
+    }
+    /* reduz altura dos input-group-lg para mobile */
+    .input-group.input-group-lg .form-control,
+    .input-group.input-group-lg .input-group-text {
+        padding-top: 0.55rem;
+        padding-bottom: 0.55rem;
+        font-size: 0.95rem;
+    }
+    /* mobile logo menor */
+    #mobile-login-logo {
+        max-width: 120px;
+        margin-bottom: 1rem;
+        display: block !important;
+    }
+    /* garantir botão visível e não ocupar espaço demais */
+    .login-card .d-grid .btn {
+        padding-top: 0.65rem;
+        padding-bottom: 0.65rem;
+        font-size: 1rem;
+    }
 }
 
 .login-image-side {
@@ -400,6 +449,48 @@ body.sidebar-collapsed .sidebar-logo {
         padding: 1.5rem; 
     }
     
+
+/* Botão Desfazer Pagamento - versão compacta e alinhada */
+.btn-desfazer {
+    padding: 0.28rem 0.4rem; /* menor padding para botão compacto */
+    font-size: 0.9rem; /* ligeiramente menor */
+    line-height: 1; 
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+}
+.btn-desfazer i {
+    font-size: 1rem; /* ícone visível e proporcional */
+    margin: 0; /* remove gap que amplia o botão */
+}
+.btn-desfazer:hover {
+    transform: translateY(-1px);
+}
+
+/* Em telas muito pequenas, reduz um pouco o tamanho do ícone */
+@media (max-width: 576px) {
+    .btn-desfazer { padding: 0.2rem 0.36rem; }
+    .btn-desfazer i { font-size: 0.95rem; }
+}
+
+/* Classe genérica para botões compactos (ícone-only) */
+.btn-compact {
+    padding: 0.28rem 0.4rem;
+    font-size: 0.9rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+}
+.btn-compact i { font-size: 1rem; margin: 0; }
+.btn-compact:hover { transform: translateY(-1px); }
+
+@media (max-width: 576px) {
+    .btn-compact { padding: 0.2rem 0.36rem; }
+    .btn-compact i { font-size: 0.95rem; }
+}
      #mobile-login-logo {
          display: block !important;
          max-width: 150px;

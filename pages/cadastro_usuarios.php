@@ -94,6 +94,13 @@ foreach ($all_associations_raw as $assoc) {
                         </select>
                         <small class="form-text text-muted">Segure Ctrl (ou Cmd) para selecionar vários.</small>
                     </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="ativo" name="ativo" value="1" checked>
+                            <label class="form-check-label" for="ativo">Usuário ativo (permite login)</label>
+                        </div>
+                    </div>
 
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">Salvar Usuário</button>
@@ -146,6 +153,7 @@ foreach ($all_associations_raw as $assoc) {
                                             data-email="<?php echo htmlspecialchars($usuario['email']); ?>"
                                             data-telefone="<?php echo htmlspecialchars($usuario['telefone'] ?? ''); ?>"
                                             data-tipo="<?php echo $usuario['tipo']; ?>"
+                                            data-ativo="<?php echo $usuario['ativo']; ?>"
                                             data-id_cliente_associado="<?php echo $usuario['id_cliente_associado']; ?>"
                                             data-acesso_lancamentos="<?php echo $usuario['acesso_lancamentos']; ?>"
                                             data-assoc_clientes='<?php echo json_encode($user_assoc_ids); ?>'
@@ -239,6 +247,13 @@ foreach ($all_associations_raw as $assoc) {
                              <input type="password" class="form-control" id="nova_senha" name="nova_senha">
                              <small class="form-text text-muted">Deixe em branco para não alterar a senha.</small>
                         </div>
+
+                        <div class="col-12 mt-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="edit_ativo" name="ativo" value="1">
+                                <label class="form-check-label" for="edit_ativo">Usuário ativo (permite login)</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -283,6 +298,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const tipo = button.getAttribute('data-tipo');
         const id_cliente_associado = button.getAttribute('data-id_cliente_associado');
         const acesso_lancamentos = button.getAttribute('data-acesso_lancamentos'); // Get the new attribute
+    const ativo = button.getAttribute('data-ativo');
         const assoc_clientes_json = button.getAttribute('data-assoc_clientes');
         const assoc_clientes = JSON.parse(assoc_clientes_json);
 
@@ -299,16 +315,31 @@ document.addEventListener('DOMContentLoaded', function () {
         const editIdClienteAssociadoSelect = modalEditarUsuario.querySelector('#edit_id_cliente_associado');
         const editAcessoLancamentosCheckbox = modalEditarUsuario.querySelector('#edit_acesso_lancamentos'); // Get the new checkbox
         const editIdClientesAssociadosSelect = modalEditarUsuario.querySelector('#edit_id_clientes_associados');
+    const editAtivoCheckbox = modalEditarUsuario.querySelector('#edit_ativo');
 
         // Reset visibility
         editAssocClienteDiv.style.display = 'none';
         editAssocContadorDiv.style.display = 'none';
         editAcessoLancamentosCheckbox.checked = false; // Reset checkbox
+    editAtivoCheckbox.checked = false; // Reset ativo checkbox
 
         if (tipo === 'cliente') {
             editAssocClienteDiv.style.display = 'block';
             editIdClienteAssociadoSelect.value = id_cliente_associado;
             editAcessoLancamentosCheckbox.checked = (acesso_lancamentos == 1); // Set checked state
+        }
+
+        // Set ativo state (aplica para qualquer tipo)
+        editAtivoCheckbox.checked = (ativo == 1);
+        // Evita desativar o próprio usuário logado para não travar o acesso
+        if (id == '<?php echo $_SESSION['user_id']; ?>') {
+            editAtivoCheckbox.checked = true;
+            editAtivoCheckbox.disabled = true;
+        } else {
+            editAtivoCheckbox.disabled = false;
+        }
+        
+        if (tipo === 'contador') {
         } else if (tipo === 'contador') {
             editAssocContadorDiv.style.display = 'block';
             // Clear previous selections

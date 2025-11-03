@@ -187,6 +187,42 @@ document.addEventListener("DOMContentLoaded", function() {
          });
     }
 
+    // Fallback: também popula o modal de edição quando o botão é clicado diretamente.
+    // Isso evita problemas quando `show.bs.modal` não fornece `relatedTarget` (variações de trigger)
+    document.querySelectorAll('[data-bs-target="#modalEditarLancamento"]').forEach(function(btn) {
+        btn.addEventListener('click', function () {
+            const id = btn.getAttribute('data-id');
+            const id_empresa = btn.getAttribute('data-id_empresa');
+            const descricao = btn.getAttribute('data-descricao');
+            const valor = btn.getAttribute('data-valor');
+            const tipo = btn.getAttribute('data-tipo');
+            const vencimento = btn.getAttribute('data-vencimento');
+            const data_competencia = btn.getAttribute('data-data_competencia');
+            const data_pagamento = btn.getAttribute('data-data_pagamento');
+            const metodo_pagamento = btn.getAttribute('data-metodo_pagamento');
+            const status = btn.getAttribute('data-status');
+
+            const modal = document.getElementById('modalEditarLancamento');
+            if (!modal) return;
+            const modalForm = modal.querySelector('form');
+            if (!modalForm) return;
+            try {
+                modalForm.querySelector('#edit_id_lancamento').value = id || '';
+                modalForm.querySelector('#edit_id_empresa').value = id_empresa || '';
+                modalForm.querySelector('#edit_descricao').value = descricao || '';
+                modalForm.querySelector('#edit_valor').value = valor || '';
+                modalForm.querySelector('#edit_tipo').value = tipo || '';
+                modalForm.querySelector('#edit_data_vencimento').value = vencimento || '';
+                modalForm.querySelector('#edit_data_competencia').value = data_competencia || '';
+                modalForm.querySelector('#edit_data_pagamento').value = data_pagamento || '';
+                modalForm.querySelector('#edit_metodo_pagamento').value = metodo_pagamento || '';
+                modalForm.querySelector('#edit_status').value = status || '';
+            } catch (e) {
+                console.error('Erro ao popular modalEditarLancamento via click fallback:', e);
+            }
+        });
+    });
+
     
 
     // Confirmar Pagamento Modal population
@@ -216,6 +252,8 @@ document.addEventListener("DOMContentLoaded", function() {
             modalForm.querySelector('#edit_ativo').checked = (ativo == '1');
         });
     }
+
+}); // Fecha o listener DOMContentLoaded
 
 /**
  * Mostra/esconde campos de associação na tela de cadastro de usuário
@@ -460,4 +498,168 @@ function initStatusChart(canvasElement) {
     } catch (e) {
         console.error("Erro ao carregar dados do gráfico de status:", e);
     }
-});
+};
+
+
+/**
+ * Mostra/esconde campos de associação na tela de cadastro de usuário
+ * baseado no tipo (Cliente ou Contador).
+ * @param {string} prefix Prefixo dos IDs dos campos ('', 'edit_', etc.)
+ */
+function toggleUsuarioCampos(prefix) {
+    const tipoEl = document.getElementById(prefix + 'tipo_usuario');
+    if (!tipoEl) return; // Se o select não existir, sai cedo
+    const tipo = tipoEl.value;
+    const divCliente = document.getElementById(prefix + 'assoc_cliente_div');
+    const divContador = document.getElementById(prefix + 'assoc_contador_div');
+
+    if (!divCliente || !divContador) return; 
+
+    if (tipo === 'cliente') {
+        divCliente.style.display = 'block';
+        divContador.style.display = 'none';
+    } else if (tipo === 'contador') {
+        divCliente.style.display = 'none';
+        divContador.style.display = 'block';
+    } else {
+        divCliente.style.display = 'none';
+        divContador.style.display = 'none';
+    }
+}
+
+
+/**
+ * Busca dados de um CNPJ na BrasilAPI (Existente)
+ */
+async function buscarCnpj() {
+    const el = document.getElementById('cnpj');
+    if (!el) return;
+    const cnpj = el.value.replace(/\D/g, ''); 
+    if (cnpj.length !== 14) return;
+    const razaoSocialInput = document.getElementById('razao_social');
+    const nomeFantasiaInput = document.getElementById('nome_fantasia');
+    const dataAberturaInput = document.getElementById('data_abertura');
+    const loadingSpinner = document.getElementById('cnpj-loading');
+    if(loadingSpinner) loadingSpinner.style.display = 'inline-block';
+    try {
+        const response = await fetch(`process/api_cnpj.php?cnpj=${cnpj}`);
+        if (!response.ok) throw new Error('Falha na consulta');
+        const data = await response.json();
+        if (data.razao_social) {
+            if (razaoSocialInput) razaoSocialInput.value = data.razao_social;
+            if (nomeFantasiaInput) nomeFantasiaInput.value = data.nome_fantasia || '';
+            if (dataAberturaInput) dataAberturaInput.value = data.data_inicio_atividade || '';
+        } else {
+            alert('CNPJ não encontrado ou API indisponível.');
+            if (razaoSocialInput) razaoSocialInput.value = '';
+            if (nomeFantasiaInput) nomeFantasiaInput.value = '';
+            if (dataAberturaInput) dataAberturaInput.value = '';
+        }
+    } catch (error) {
+        console.error('Erro ao buscar CNPJ:', error);
+        alert('Erro ao processar a solicitação de CNPJ.');
+    } finally {
+        if(loadingSpinner) loadingSpinner.style.display = 'none';
+    }
+}
+
+
+/**
+ * Inicializa o gráfico de Fluxo de Caixa (Linhas)
+ */
+function initFluxoCaixaChart(canvasElement) {
+     try {
+         const chartDataScript = document.getElementById('chartData');
+         if (!chartDataScript) {
+             console.error("Elemento #chartData não encontrado. O gráfico não pode ser renderizado.");
+             return;
+         }
+         const chartData = JSON.parse(chartDataScript.textContent);
+         const ctx = canvasElement.getContext('2d');
+         const corReceita = 'rgba(16, 185, 129, 1)'; 
+         const corDespesa = 'rgba(239, 68, 68, 1)'; 
+         const corGrid = 'rgba(200, 200, 200, 0.1)';
+         new Chart(ctx, {
+             type: 'line',
+             data: {
+                 labels: chartData.labels,
+                 datasets: [
+                     {
+                         label: 'Receitas',
+                         data: chartData.receitas,
+                         borderColor: corReceita,
+                         backgroundColor: corReceita,
+                         tension: 0.3, 
+                         fill: false,
+                         pointBackgroundColor: corReceita,
+                         pointBorderWidth: 2
+                     },
+                     {
+                         label: 'Despesas',
+                         data: chartData.despesas,
+                         borderColor: corDespesa,
+                         backgroundColor: corDespesa,
+                         tension: 0.3,
+                         fill: false,
+                         pointBackgroundColor: corDespesa,
+                         pointBorderWidth: 2
+                     }
+                 ]
+             },
+             options: {
+                 responsive: true,
+                 maintainAspectRatio: false,
+                 scales: {
+                     y: {
+                         beginAtZero: true,
+                         ticks: {
+                             callback: function(value, index, values) {
+                                 return 'R$ ' + value.toLocaleString('pt-BR');
+                             }
+                         },
+                         grid: {
+                             color: corGrid
+                         }
+                     },
+                     x: {
+                          grid: {
+                             display: false
+                         }
+                     }
+                 },
+                 plugins: {
+                     tooltip: {
+                         mode: 'index',
+                         intersect: false,
+                         callbacks: {
+                             label: function(context) {
+                                 let label = context.dataset.label || '';
+                                 if (label) {
+                                     label += ': ';
+                                 }
+                                 if (context.parsed.y !== null) {
+                                     label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
+                                 }
+                                 return label;
+                             }
+                         }
+                     },
+                     legend: {
+                         position: 'top',
+                         align: 'end',
+                         labels: {
+                             usePointStyle: true,
+                             boxWidth: 8
+                         }
+                     }
+                 }
+             }
+         });
+     } catch (e) {
+         console.error("Erro ao carregar dados do gráfico de fluxo:", e);
+         // Exibe mensagem de erro na tela do canvas
+         if (canvasElement && canvasElement.getContext) {
+            canvasElement.getContext('2d').fillText("Erro ao carregar dados do gráfico.", 10, 50);
+         }
+     }
+}

@@ -125,6 +125,75 @@ $total_receita_periodo = $stmt_total_receita_periodo->fetch()['total'] ?? 0;
 
 $percent_pago = ($total_receita_periodo > 0) ? ($valor_receita_paga / $total_receita_periodo) * 100 : 0;
 
+// --- 3i. Indicadores para COBRANÇAS (separados de Lançamentos)
+// Constrói WHERE e PARAMS para cobranças respeitando o filtro de data (data_vencimento) e permissões
+$where_conditions_cob = [];
+$params_cob = [];
+$base_join_cob = "FROM cobrancas cob JOIN empresas e ON cob.id_empresa = e.id";
+
+$where_conditions_cob[] = "cob.data_vencimento BETWEEN ? AND ?";
+$params_cob[] = $filtro_data_inicio;
+$params_cob[] = $filtro_data_fim;
+
+// Aplica hierarquia de filtros (Empresa > Cliente > Permissão) para cobrancas
+if ($filtro_empresa_id) {
+    $where_conditions_cob[] = "cob.id_empresa = ?";
+    $params_cob[] = $filtro_empresa_id;
+
+    if (isContador() && !empty($clientes_permitidos_ids)) {
+        $placeholders = implode(',', array_fill(0, count($clientes_permitidos_ids), '?'));
+        $where_conditions_cob[] = "e.id_cliente IN ($placeholders)";
+        $params_cob = array_merge($params_cob, $clientes_permitidos_ids);
+    } elseif (isClient()) {
+        $where_conditions_cob[] = "e.id_cliente = ?";
+        $params_cob[] = $_SESSION['id_cliente_associado'];
+    }
+
+} elseif ($filtro_cliente_id) {
+    $where_conditions_cob[] = "e.id_cliente = ?";
+    $params_cob[] = $filtro_cliente_id;
+
+} else {
+    if (isContador()) {
+        if (empty($clientes_permitidos_ids)) {
+            $where_conditions_cob[] = "1=0";
+        } else {
+            $placeholders = implode(',', array_fill(0, count($clientes_permitidos_ids), '?'));
+            $where_conditions_cob[] = "e.id_cliente IN ($placeholders)";
+            $params_cob = array_merge($params_cob, $clientes_permitidos_ids);
+        }
+    } elseif (isClient()) {
+        $where_conditions_cob[] = "e.id_cliente = ?";
+        $params_cob[] = $_SESSION['id_cliente_associado'];
+    }
+}
+
+$where_sql_cob = "WHERE " . implode(' AND ', $where_conditions_cob);
+
+// Consulta: Total a Receber (Cobranças pendentes)
+$sql_cob_pendente = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_cob AND cob.status_pagamento = 'Pendente'";
+$stmt_cob_pendente = $pdo->prepare($sql_cob_pendente);
+$stmt_cob_pendente->execute($params_cob);
+$total_cobrancas_pendentes = $stmt_cob_pendente->fetch()['total'] ?? 0;
+
+// Consulta: Total Recebido (Cobranças pagas)
+$sql_cob_pago = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_cob AND cob.status_pagamento = 'Pago'";
+$stmt_cob_pago = $pdo->prepare($sql_cob_pago);
+$stmt_cob_pago->execute($params_cob);
+$total_cobrancas_recebidas = $stmt_cob_pago->fetch()['total'] ?? 0;
+
+// Consulta: Quantidade de Cobranças no Período
+$sql_cob_count = "SELECT COUNT(cob.id) AS total $base_join_cob $where_sql_cob";
+$stmt_cob_count = $pdo->prepare($sql_cob_count);
+$stmt_cob_count->execute($params_cob);
+$qtd_cobrancas_periodo = $stmt_cob_count->fetch()['total'] ?? 0;
+
+// Consulta: Total Vencido (Cobranças no período)
+$sql_cob_vencido = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_cob";
+$stmt_cob_vencido = $pdo->prepare($sql_cob_vencido);
+$stmt_cob_vencido->execute($params_cob);
+$total_cobrancas_vencido = $stmt_cob_vencido->fetch()['total'] ?? 0;
+
 
 // --- 4. Lógica para o Dropdown de Empresas (MANTIDA) ---
 $sql_empresas_dropdown = "SELECT e.id, e.razao_social, c.nome_responsavel 
@@ -451,6 +520,49 @@ $status_chart_json = json_encode([
     </div>
 </div>
 
+
+<!-- Seção: Indicadores de Cobranças (separado de Lançamentos) -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <h5 class="mb-3">Cobranças</h5>
+    </div>
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total de cobranças com vencimento no período que estão pendentes.">
+        <div class="card card-metric">
+            <i class="bi bi-wallet2 card-metric-icon"></i>
+            <div class="metric-title">Cobranças a Receber</div>
+            <div class="metric-value text-warning-emphasis">
+                R$ <?php echo number_format($total_cobrancas_pendentes, 2, ',', '.'); ?>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total de cobranças marcadas como pagas no período filtrado.">
+        <div class="card card-metric">
+            <i class="bi bi-cash-stack card-metric-icon"></i>
+            <div class="metric-title">Cobranças Recebidas</div>
+            <div class="metric-value text-success-emphasis">
+                R$ <?php echo number_format($total_cobrancas_recebidas, 2, ',', '.'); ?>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Quantidade de cobranças no período considerado.">
+        <div class="card card-metric">
+            <i class="bi bi-list-columns card-metric-icon"></i>
+            <div class="metric-title">Qtd. Cobranças</div>
+            <div class="metric-value">
+                <?php echo intval($qtd_cobrancas_periodo); ?>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma total de cobranças com vencimento no período filtrado.">
+        <div class="card card-metric">
+            <i class="bi bi-calendar3 card-metric-icon"></i>
+            <div class="metric-title">Total Vencido (Cobranças)</div>
+            <div class="metric-value">
+                R$ <?php echo number_format($total_cobrancas_vencido, 2, ',', '.'); ?>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="row g-4">
     <div class="col-lg-6">

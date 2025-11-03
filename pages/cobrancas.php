@@ -103,12 +103,20 @@ if (isClient()) {
     $tipos_cobranca = $stmt_tipos->fetchAll();
 
     // Lógica de Filtros
-    $filtro_data_inicio = $_GET['data_inicio'] ?? date('Y-m-01');
-    $filtro_data_fim = $_GET['data_fim'] ?? date('Y-m-t');
+    // Por padrão não pré-preenche as datas — quando vazias, carrega todas as cobranças
+    $filtro_data_inicio = $_GET['data_inicio'] ?? null;
+    $filtro_data_fim = $_GET['data_fim'] ?? null;
     $filtro_cliente_id = $_GET['cliente_id'] ?? null;
 
-    $where_conditions = ["cob.data_vencimento BETWEEN ? AND ?"];
-    $params = [$filtro_data_inicio, $filtro_data_fim];
+    $where_conditions = [];
+    $params = [];
+
+    // Aplica filtro de data apenas se ambas as datas forem fornecidas
+    if ($filtro_data_inicio && $filtro_data_fim) {
+        $where_conditions[] = "cob.data_vencimento BETWEEN ? AND ?";
+        $params[] = $filtro_data_inicio;
+        $params[] = $filtro_data_fim;
+    }
 
     if ($filtro_cliente_id) {
         $where_conditions[] = "emp.id_cliente = ?";
@@ -130,8 +138,11 @@ if (isClient()) {
         }
     }
 
-    $where_sql = "WHERE " . implode(' AND ', $where_conditions);
-    
+    $where_sql = '';
+    if (!empty($where_conditions)) {
+        $where_sql = "WHERE " . implode(' AND ', $where_conditions);
+    }
+
     $sql_cobrancas = "SELECT cob.*, emp.razao_social, fp.nome as forma_pagamento_nome, fp.icone_bootstrap, tc.nome as tipo_cobranca_nome 
                       FROM cobrancas cob
                       JOIN empresas emp ON cob.id_empresa = emp.id

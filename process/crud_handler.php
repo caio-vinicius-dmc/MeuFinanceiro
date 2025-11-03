@@ -428,11 +428,12 @@ switch ($action) {
             $tipo = $_POST['tipo_usuario'];
             $id_cliente_associado = ($tipo == 'cliente' && !empty($_POST['id_cliente_associado'])) ? $_POST['id_cliente_associado'] : null;
             $acesso_lancamentos = ($tipo == 'cliente' && isset($_POST['acesso_lancamentos'])) ? 1 : 0;
+            $ativo = isset($_POST['ativo']) ? 1 : 0;
             
-            $sql = "INSERT INTO usuarios (nome, email, telefone, senha, tipo, id_cliente_associado, acesso_lancamentos) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO usuarios (nome, email, telefone, senha, tipo, id_cliente_associado, acesso_lancamentos, ativo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             
-            if ($stmt->execute([$nome, $email, $telefone, $senha, $tipo, $id_cliente_associado, $acesso_lancamentos])) {
+            if ($stmt->execute([$nome, $email, $telefone, $senha, $tipo, $id_cliente_associado, $acesso_lancamentos, $ativo])) {
                 $id_novo_usuario = $pdo->lastInsertId();
                 $_SESSION['success_message'] = "Usuário cadastrado com sucesso!";
                 logAction("Cadastro Usuário", "usuarios", $id_novo_usuario, "Email: $email, Tipo: $tipo");
@@ -460,14 +461,21 @@ switch ($action) {
             $tipo = $_POST['tipo_usuario'];
             $id_cliente_associado = ($tipo == 'cliente' && !empty($_POST['id_cliente_associado'])) ? $_POST['id_cliente_associado'] : null;
             $acesso_lancamentos = ($tipo == 'cliente' && isset($_POST['acesso_lancamentos'])) ? 1 : 0;
+            $ativo = isset($_POST['ativo']) ? 1 : 0;
 
             $stmt_old = $pdo->prepare("SELECT nome, email, telefone, tipo, id_cliente_associado, acesso_lancamentos FROM usuarios WHERE id = ?");
             $stmt_old->execute([$id_usuario_edit]);
             $old_data = $stmt_old->fetch(PDO::FETCH_ASSOC);
 
+            // Segurança: não permitir que um usuário desative a si próprio via formulário (evita lockout)
+            if ($id_usuario_edit == $user_id && $ativo == 0) {
+                $ativo = 1;
+                $_SESSION['error_message'] = "Ação não permitida: você não pode desativar seu próprio usuário. Mantendo ativo.";
+            }
+
 
             $sql_senha_part = "";
-            $params_sql = [$nome, $email, $telefone, $tipo, $id_cliente_associado, $acesso_lancamentos];
+            $params_sql = [$nome, $email, $telefone, $tipo, $id_cliente_associado, $acesso_lancamentos, $ativo];
             
             if (!empty($_POST['nova_senha'])) {
                 $novo_hash = password_hash($_POST['nova_senha'], PASSWORD_DEFAULT);
@@ -477,7 +485,7 @@ switch ($action) {
             
             $params_sql[] = $id_usuario_edit; 
 
-            $sql = "UPDATE usuarios SET nome = ?, email = ?, telefone = ?, tipo = ?, id_cliente_associado = ?, acesso_lancamentos = ? $sql_senha_part WHERE id = ?";
+            $sql = "UPDATE usuarios SET nome = ?, email = ?, telefone = ?, tipo = ?, id_cliente_associado = ?, acesso_lancamentos = ?, ativo = ? $sql_senha_part WHERE id = ?";
             $stmt = $pdo->prepare($sql);
             
             if ($stmt->execute($params_sql)) {
