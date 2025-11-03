@@ -12,81 +12,117 @@ $user_id = $_SESSION['user_id'];
 unset($_SESSION['success_message'], $_SESSION['error_message']);
 
 switch ($action) {
-    
-    // --- NOVO CASE: Salvar Configurações SMTP (Apenas Admin) ---
-    case 'salvar_config_smtp':
-        if (isAdmin()) {
-            $data = $_POST;
-            $updated = false;
-            
-            $settings_to_update = [
-                'smtp_host', 'smtp_port', 'smtp_username', 'smtp_secure', 'email_from'
-            ];
 
-            try {
-                // Prepara a query para INSERT OR UPDATE (UPSERT)
-                $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) 
-                                      ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+    case 'atualizar_status_lancamento':
+        if (isAdmin() || isContador() || isClient()) {
+            $id = $_POST['id_lancamento'];
+            $novo_status = $_POST['status']; // Expected to be 'Pago' or 'Em aberto'
+            $data_pagamento = $_POST['data_pagamento'] ?? null;
+            $metodo_pagamento = $_POST['metodo_pagamento'] ?? null;
+            $id_forma_pagamento = isset($_POST['id_forma_pagamento']) ? ($_POST['id_forma_pagamento'] !== '' ? $_POST['id_forma_pagamento'] : null) : null;
 
-                foreach ($settings_to_update as $key) {
-                    if (isset($data[$key])) {
-                        $stmt->execute([$key, $data[$key]]);
-                        $updated = true;
+            error_log("DEBUG: atualizar_status_lancamento - ID: $id, Novo Status Recebido: $novo_status");
+
+            // Detecta se a coluna id_forma_pagamento existe
+            $colStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_forma_pagamento'");
+            $colStmt->execute();
+            $has_forma_col = $colStmt->fetchColumn() > 0;
+
+            // Get current lancamento data for comparison and logging
+            if ($has_forma_col) {
+                $stmt_old_data = $pdo->prepare("SELECT status, data_vencimento, data_pagamento, metodo_pagamento, id_forma_pagamento FROM lancamentos WHERE id = ?");
+            } else {
+                $stmt_old_data = $pdo->prepare("SELECT status, data_vencimento, data_pagamento, metodo_pagamento FROM lancamentos WHERE id = ?");
+            }
+            $stmt_old_data->execute([$id]);
+            $old_lancamento_data = $stmt_old_data->fetch(PDO::FETCH_ASSOC);
+
+            if (!$old_lancamento_data) {
+                $_SESSION['error_message'] = "Lançamento não encontrado.";
+                error_log("DEBUG: Lançamento ID $id não encontrado.");
+                header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
+                exit;
+            }
+
+            $old_status = $old_lancamento_data['status'];
+            $old_data_pagamento = $old_lancamento_data['data_pagamento'];
+            $old_metodo_pagamento = $old_lancamento_data['metodo_pagamento'] ?? null;
+            $old_id_forma = $old_lancamento_data['id_forma_pagamento'] ?? null;
+
+            error_log("DEBUG: Old Status: $old_status, Old Data Pagamento: $old_data_pagamento, Old Metodo Pagamento: $old_metodo_pagamento");
+
+            $log_details = [];
+            $update_fields = [];
+            $update_params = [];
+
+            // Handle status change
+            if ($novo_status == 'Pago') {
+                if ($old_status != 'pago') {
+                    $update_fields[] = "status = ?";
+                    $update_params[] = 'pago';
+                    $log_details[] = "Status: $old_status -> pago";
+                }
+                // Only update data_pagamento and metodo_pagamento if marking as paid
+                if ($data_pagamento && $data_pagamento != $old_data_pagamento) {
+                    $update_fields[] = "data_pagamento = ?";
+                    $update_params[] = $data_pagamento;
+                    $log_details[] = "Data Pagamento: " . ($old_data_pagamento ?? 'N/D') . " -> $data_pagamento";
+                }
+                if ($metodo_pagamento && $metodo_pagamento != $old_metodo_pagamento) {
+                    $update_fields[] = "metodo_pagamento = ?";
+                    $update_params[] = $metodo_pagamento;
+                    $log_details[] = "Forma Pgto: " . ($old_metodo_pagamento ?? 'N/D') . " -> " . $metodo_pagamento;
+                }
+                if ($has_forma_col && $id_forma_pagamento !== null && $id_forma_pagamento != $old_id_forma) {
+                    $update_fields[] = "id_forma_pagamento = ?";
+                    $update_params[] = $id_forma_pagamento;
+                    $log_details[] = "Forma Pgto (id): " . ($old_id_forma ?? 'N/D') . " -> " . $id_forma_pagamento;
+                }
+            } elseif ($novo_status == 'Em aberto') {
+                // Se o status antigo era 'pago', forçamos a mudança para 'pendente' e limpamos os campos de pagamento.
+                if (strtolower($old_status) == 'pago') {
+                    $update_fields[] = "status = ?";
+                    $update_params[] = 'pendente';
+                    $log_details[] = "Status: $old_status -> pendente";
+
+                    // Limpa data_pagamento
+                    $update_fields[] = "data_pagamento = NULL";
+                    $log_details[] = "Data Pagamento: " . ($old_data_pagamento ?? 'N/D') . " -> NULL";
+
+                    // Limpa metodo_pagamento
+                    $update_fields[] = "metodo_pagamento = NULL";
+                    $log_details[] = "Forma Pgto: " . ($old_metodo_pagamento ?? 'N/D') . " -> NULL";
+
+                    // Limpa id_forma_pagamento também se existir
+                    if ($has_forma_col) {
+                        $update_fields[] = "id_forma_pagamento = NULL";
+                        $log_details[] = "Forma Pgto (id): " . ($old_id_forma ?? 'N/D') . " -> NULL";
                     }
                 }
-                
-                // Se a senha foi fornecida, atualiza-a separadamente
-                if (!empty($data['smtp_password'])) {
-                    $stmt->execute(['smtp_password', $data['smtp_password']]);
-                    $updated = true;
-                }
-
-                if ($updated) {
-                    $_SESSION['success_message'] = "Configurações SMTP salvas com sucesso!";
-                    logAction("Configurações SMTP salvas", "system_settings");
-                } else {
-                    $_SESSION['error_message'] = "Nenhuma alteração detectada.";
-                }
-
-            } catch (PDOException $e) {
-                $_SESSION['error_message'] = "Erro ao salvar configurações: " . $e->getMessage();
             }
-        }
-        // Redireciona para a tela de Configuração
-        $pagina_redirecionar = base_url('index.php?page=configuracoes_email');
-        header("Location: $pagina_redirecionar");
-        exit;
-    // --- FIM NOVO CASE ---
 
-
-    //--- AÇÕES DE LANÇAMENTO ---
-    case 'cadastrar_lancamento':
-        if (isAdmin() || isContador() || isClient()) { // All can create
-            $id_empresa = $_POST['id_empresa'];
-            $descricao = $_POST['descricao'];
-            $valor = $_POST['valor'];
-            $tipo = $_POST['tipo']; // Assuming 'tipo' is still relevant for categorization
-            $data_vencimento = $_POST['data_vencimento'];
-            $data_competencia = $_POST['data_competencia'] ?? null;
-            $metodo_pagamento = $_POST['metodo_pagamento'] ?? null;
+            if (empty($update_fields)) {
+                $_SESSION['success_message'] = "Nenhuma alteração necessária para o lançamento.";
+                header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
+                exit;
+            }
 
             try {
-                // Armazenamos o status inicial como 'pendente' para compatibilidade com a lógica de exibição
-                $sql = "INSERT INTO lancamentos (id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendente')";
+                $sql = "UPDATE lancamentos SET " . implode(", ", $update_fields) . " WHERE id = ?";
+                $update_params[] = $id;
                 $stmt = $pdo->prepare($sql);
-                
-                if ($stmt->execute([$id_empresa, $descricao, $valor, $tipo, $data_vencimento, $data_competencia, $metodo_pagamento])) {
-                    $id_novo = $pdo->lastInsertId();
-                    $_SESSION['success_message'] = "Lançamento cadastrado com sucesso!";
-                    logAction("Cadastro Lançamento", "lancamentos", $id_novo, "Valor: R$ $valor, Descrição: $descricao, Status: pendente");
+
+                if ($stmt->execute($update_params)) {
+                    $_SESSION['success_message'] = "Lançamento atualizado com sucesso!";
+                    logAction("Atualizou Lançamento", "lancamentos", $id, implode("; ", $log_details));
                 } else {
-                    $_SESSION['error_message'] = "Erro ao cadastrar lançamento.";
+                    $errorInfo = $stmt->errorInfo();
+                    $_SESSION['error_message'] = "Erro ao atualizar lançamento: " . ($errorInfo[2] ?? "Erro desconhecido.");
                 }
             } catch (PDOException $e) {
                 $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
             }
-            $pagina_redirecionar = base_url('index.php?page=lancamentos') . '&_t=' . time();
-            header("Location: $pagina_redirecionar");
+            header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
             exit;
         }
         break;
@@ -208,10 +244,19 @@ switch ($action) {
             $data_vencimento_novo = $_POST['data_vencimento'];
             $data_competencia_novo = $_POST['data_competencia'] ?? null;
             $metodo_pagamento_novo = $_POST['metodo_pagamento'] ?? null;
+            $id_forma_pagamento_novo = isset($_POST['id_forma_pagamento']) ? ($_POST['id_forma_pagamento'] !== '' ? $_POST['id_forma_pagamento'] : null) : null;
+            // Detecta se a coluna id_forma_pagamento existe
+            $colStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_forma_pagamento'");
+            $colStmt->execute();
+            $has_forma_col = $colStmt->fetchColumn() > 0;
             $status_novo = $_POST['status']; // New: status can be edited
 
             // 1. AUDITORIA: Busca dados antigos
-            $stmt_old = $pdo->prepare("SELECT id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, status FROM lancamentos WHERE id = ?");
+            if ($has_forma_col) {
+                $stmt_old = $pdo->prepare("SELECT id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, id_forma_pagamento, status FROM lancamentos WHERE id = ?");
+            } else {
+                $stmt_old = $pdo->prepare("SELECT id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, status FROM lancamentos WHERE id = ?");
+            }
             $stmt_old->execute([$id]);
             $old_data = $stmt_old->fetch(PDO::FETCH_ASSOC);
             
@@ -241,8 +286,10 @@ switch ($action) {
             if (($old_data['data_competencia'] ?? null) !== ($data_competencia_novo ?? null)) {
                 $detalhes_log[] = "Competência: " . ($old_data['data_competencia'] ? date('d/m/Y', strtotime($old_data['data_competencia'])) : 'N/D') . " -> " . ($data_competencia_novo ? date('d/m/Y', strtotime($data_competencia_novo)) : 'N/D');
             }
-            if (($old_data['metodo_pagamento'] ?? null) !== ($metodo_pagamento_novo ?? null)) {
-                $detalhes_log[] = "Forma Pgto: " . ($old_data['metodo_pagamento'] ?? 'N/D') . " -> " . ($metodo_pagamento_novo ?? 'N/D');
+            if (($old_data['metodo_pagamento'] ?? null) !== ($metodo_pagamento_novo ?? null) || ($has_forma_col && (($old_data['id_forma_pagamento'] ?? null) !== ($id_forma_pagamento_novo ?? null)))) {
+                $det_old = ($old_data['metodo_pagamento'] ?? 'N/D') . ($has_forma_col ? (' (id: ' . ($old_data['id_forma_pagamento'] ?? 'N/D') . ')') : '');
+                $det_new = ($metodo_pagamento_novo ?? 'N/D') . ($has_forma_col ? (' (id: ' . ($id_forma_pagamento_novo ?? 'N/D') . ')') : '');
+                $detalhes_log[] = "Forma Pgto: " . $det_old . " -> " . $det_new;
             }
             if ($old_data['status'] !== $status_novo) {
                  $detalhes_log[] = "Status: {$old_data['status']} -> {$status_novo}";
@@ -258,11 +305,19 @@ switch ($action) {
             $log_details_string = "Campos alterados: " . implode('; ', $detalhes_log);
 
             // 3. Atualiza o banco de dados
-            $sql = "UPDATE lancamentos SET 
-                        id_empresa = ?, descricao = ?, valor = ?, tipo = ?, data_vencimento = ?, data_competencia = ?, metodo_pagamento = ?, status = ?
-                    WHERE id = ?";
+            if ($has_forma_col) {
+                $sql = "UPDATE lancamentos SET 
+                            id_empresa = ?, descricao = ?, valor = ?, tipo = ?, data_vencimento = ?, data_competencia = ?, metodo_pagamento = ?, id_forma_pagamento = ?, status = ?
+                        WHERE id = ?";
+                $params = [$id_empresa_novo, $descricao_novo, $valor_novo, $tipo_novo, $data_vencimento_novo, $data_competencia_novo, $metodo_pagamento_novo, $id_forma_pagamento_novo, $status_novo, $id];
+            } else {
+                $sql = "UPDATE lancamentos SET 
+                            id_empresa = ?, descricao = ?, valor = ?, tipo = ?, data_vencimento = ?, data_competencia = ?, metodo_pagamento = ?, status = ?
+                        WHERE id = ?";
+                $params = [$id_empresa_novo, $descricao_novo, $valor_novo, $tipo_novo, $data_vencimento_novo, $data_competencia_novo, $metodo_pagamento_novo, $status_novo, $id];
+            }
             $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$id_empresa_novo, $descricao_novo, $valor_novo, $tipo_novo, $data_vencimento_novo, $data_competencia_novo, $metodo_pagamento_novo, $status_novo, $id])) {
+            if ($stmt->execute($params)) {
                 $_SESSION['success_message'] = "Lançamento atualizado com sucesso!";
                 logAction("Edição Lançamento", "lancamentos", $id, $log_details_string);
             } else {
@@ -320,8 +375,9 @@ switch ($action) {
 
             $old_status = $old_lancamento_data['status'];
             $old_data_pagamento = $old_lancamento_data['data_pagamento'];
-            $old_metodo_pagamento = $old_lancamento_data['metodo_pagamento'];
-
+                $data_pagamento = $_POST['data_pagamento'] ?? null;
+                $metodo_pagamento = $_POST['metodo_pagamento'] ?? null;
+                $id_forma_pagamento = isset($_POST['id_forma_pagamento']) ? ($_POST['id_forma_pagamento'] !== '' ? $_POST['id_forma_pagamento'] : null) : null;
             error_log("DEBUG: Old Status: $old_status, Old Data Pagamento: $old_data_pagamento, Old Metodo Pagamento: $old_metodo_pagamento");
 
             $log_details = [];
@@ -329,6 +385,12 @@ switch ($action) {
             $update_params = [];
 
             // Handle status change
+                if (!$old_lancamento_data) {
+                    $_SESSION['error_message'] = "Lançamento não encontrado.";
+                    error_log("DEBUG: Lançamento ID $id não encontrado.");
+                    header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
+                    exit;
+                }
             if ($novo_status == 'Pago') {
                 if ($old_status != 'pago') {
                     $update_fields[] = "status = ?";
@@ -358,6 +420,11 @@ switch ($action) {
                     // Limpa data_pagamento
                     $update_fields[] = "data_pagamento = NULL";
                     $log_details[] = "Data Pagamento: " . ($old_data_pagamento ?? 'N/D') . " -> NULL";
+                    if ($id_forma_pagamento !== null && $id_forma_pagamento != ($old_lancamento_data['id_forma_pagamento'] ?? null)) {
+                        $update_fields[] = "id_forma_pagamento = ?";
+                        $update_params[] = $id_forma_pagamento;
+                        $log_details[] = "Forma Pgto (id): " . (($old_lancamento_data['id_forma_pagamento'] ?? 'N/D')) . " -> " . $id_forma_pagamento;
+                    }
                     
                     // Limpa metodo_pagamento
                     $update_fields[] = "metodo_pagamento = NULL";
@@ -374,6 +441,11 @@ switch ($action) {
             try {
                 $sql = "UPDATE lancamentos SET " . implode(", ", $update_fields) . " WHERE id = ?";
                 $update_params[] = $id;
+                        // Limpa id_forma_pagamento também se existir
+                        if ($has_forma_col) {
+                            $update_fields[] = "id_forma_pagamento = NULL";
+                            $log_details[] = "Forma Pgto (id): " . (($old_lancamento_data['id_forma_pagamento'] ?? 'N/D')) . " -> NULL";
+                        }
                 $stmt = $pdo->prepare($sql);
                 
                 if ($stmt->execute($update_params)) {

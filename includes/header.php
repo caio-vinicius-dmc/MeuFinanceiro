@@ -156,7 +156,7 @@ global $page;
 </div>
 
 
-    <header class="navbar navbar-dark bg-primary-dark-grad sticky-top d-lg-none flex-md-nowrap p-0 shadow">
+    <header class="navbar navbar-dark bg-primary sticky-top d-lg-none flex-md-nowrap p-0">
         <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6 text-white" href="#">
             <i class="bi bi-cash-coin me-2"></i> MeuFinanceiro
         </a>

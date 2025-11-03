@@ -124,6 +124,122 @@ document.addEventListener("DOMContentLoaded", function() {
     const cobTipoCanvas = document.getElementById('cobTipoChart');
     if (cobTipoCanvas) initCobTipoChart(cobTipoCanvas);
 
+    // --- Dashboard section collapse toggles (Lançamentos & Cobranças) ---
+    (function() {
+        const toggles = Array.from(document.querySelectorAll('.section-toggle'));
+
+        function saveState(sectionId, collapsed) {
+            try { localStorage.setItem('dashboard_section_' + sectionId, collapsed ? 'collapsed' : 'expanded'); } catch (e) {}
+        }
+
+        function loadState(sectionId) {
+            try { return localStorage.getItem('dashboard_section_' + sectionId); } catch (e) { return null; }
+        }
+
+        // Map to keep track of sibling nodes hidden when collapsing a section so we can restore them
+        const hiddenSiblingsMap = new Map();
+
+        function collectFollowingSiblings(section) {
+            const siblings = [];
+            let cur = section.nextElementSibling;
+            while (cur) {
+                if (cur.classList && cur.classList.contains('dashboard-section')) break;
+                siblings.push(cur);
+                cur = cur.nextElementSibling;
+            }
+            return siblings;
+        }
+
+        function collapseSection(section, btn) {
+            const body = section.querySelector('.section-body');
+            if (body) {
+                // set explicit height then animate to 0
+                body.style.height = body.scrollHeight + 'px';
+                // force reflow
+                body.getBoundingClientRect();
+                body.style.transition = 'height 240ms ease';
+                body.style.height = '0px';
+            }
+
+            // hide any following nodes that are logically part of this topic
+            const following = collectFollowingSiblings(section);
+            const saved = [];
+            following.forEach(function(node) {
+                saved.push({ node: node, display: node.style.display || '' });
+                node.style.display = 'none';
+            });
+            if (saved.length) hiddenSiblingsMap.set(section, saved);
+
+            btn.setAttribute('aria-expanded', 'false');
+            section.classList.add('collapsed');
+            // persist
+            if (section.id) saveState(section.id, true);
+        }
+
+        function expandSection(section, btn) {
+            const body = section.querySelector('.section-body');
+            // restore any hidden following siblings
+            const saved = hiddenSiblingsMap.get(section);
+            if (saved) {
+                saved.forEach(function(item) {
+                    try { item.node.style.display = item.display || ''; } catch (e) {}
+                });
+                hiddenSiblingsMap.delete(section);
+            }
+
+            if (body) {
+                // remove collapsed so natural height is available
+                section.classList.remove('collapsed');
+                // start from 0 then animate to scrollHeight
+                body.style.height = '0px';
+                // force reflow
+                body.getBoundingClientRect();
+                body.style.transition = 'height 240ms ease';
+                body.style.height = body.scrollHeight + 'px';
+                btn.setAttribute('aria-expanded', 'true');
+                // after transition, clear height to allow responsive behavior
+                const handler = function() {
+                    body.style.height = '';
+                    body.removeEventListener('transitionend', handler);
+                };
+                body.addEventListener('transitionend', handler);
+            } else {
+                // if no body, just toggle class and aria
+                section.classList.remove('collapsed');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+
+            // persist
+            if (section.id) saveState(section.id, false);
+        }
+
+        toggles.forEach(function(btn) {
+            const sectionId = btn.getAttribute('aria-controls');
+            const section = sectionId ? document.getElementById(sectionId) : btn.closest('.dashboard-section');
+            if (!section) return;
+            // initialize state from storage
+            // Default behavior: sections start COLLAPSED unless user previously expanded them
+            const state = section.id ? loadState(section.id) : null;
+            if (state === 'expanded') {
+                // user explicitly expanded before
+                btn.setAttribute('aria-expanded', 'true');
+                section.classList.remove('collapsed');
+            } else {
+                // default collapsed (covers state === 'collapsed' or null)
+                section.classList.add('collapsed');
+                const body = section.querySelector('.section-body');
+                if (body) body.style.height = '0px';
+                btn.setAttribute('aria-expanded', 'false');
+            }
+
+            btn.addEventListener('click', function() {
+                const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+                if (isExpanded) collapseSection(section, btn);
+                else expandSection(section, btn);
+            });
+        });
+    })();
+
     // --- Lógica do Modal de Edição (Clientes - Existente) ---
     const modalEditarCliente = document.getElementById('modalEditarCliente');
     if (modalEditarCliente) {
@@ -235,6 +351,14 @@ document.addEventListener("DOMContentLoaded", function() {
             modalForm.querySelector('#edit_data_pagamento').value = data_pagamento;
             modalForm.querySelector('#edit_metodo_pagamento').value = metodo_pagamento;
             modalForm.querySelector('#edit_status').value = status;
+            // Popula id_forma_pagamento (se informado no botão trigger)
+            try {
+                const idForma = event.relatedTarget.getAttribute('data-id-forma-pagamento');
+                const hid = modalForm.querySelector('#edit_id_forma_pagamento');
+                if (hid) hid.value = idForma || '';
+            } catch (e) {
+                console.warn('Não foi possível popular edit_id_forma_pagamento:', e);
+            }
          });
     }
 
@@ -247,89 +371,37 @@ document.addEventListener("DOMContentLoaded", function() {
             const descricao = btn.getAttribute('data-descricao');
             const valor = btn.getAttribute('data-valor');
             const tipo = btn.getAttribute('data-tipo');
-            const vencimento = btn.getAttribute('data-vencimento');
+            const vencimento = btn.getAttribute('data-vencimento'); 
             const data_competencia = btn.getAttribute('data-data_competencia');
             const data_pagamento = btn.getAttribute('data-data_pagamento');
             const metodo_pagamento = btn.getAttribute('data-metodo_pagamento');
             const status = btn.getAttribute('data-status');
 
-            const modal = document.getElementById('modalEditarLancamento');
-            if (!modal) return;
-            const modalForm = modal.querySelector('form');
-            if (!modalForm) return;
+            const modalForm = modalEditarLancamento.querySelector('form');
+            modalForm.querySelector('#edit_id_lancamento').value = id;
+            modalForm.querySelector('#edit_id_empresa').value = id_empresa;
+            modalForm.querySelector('#edit_descricao').value = descricao;
+            modalForm.querySelector('#edit_valor').value = valor;
+            modalForm.querySelector('#edit_tipo').value = tipo;
+            modalForm.querySelector('#edit_data_vencimento').value = vencimento;
+            modalForm.querySelector('#edit_data_competencia').value = data_competencia;
+            modalForm.querySelector('#edit_data_pagamento').value = data_pagamento;
+            modalForm.querySelector('#edit_metodo_pagamento').value = metodo_pagamento;
+            modalForm.querySelector('#edit_status').value = status;
             try {
-                modalForm.querySelector('#edit_id_lancamento').value = id || '';
-                modalForm.querySelector('#edit_id_empresa').value = id_empresa || '';
-                modalForm.querySelector('#edit_descricao').value = descricao || '';
-                modalForm.querySelector('#edit_valor').value = valor || '';
-                modalForm.querySelector('#edit_tipo').value = tipo || '';
-                modalForm.querySelector('#edit_data_vencimento').value = vencimento || '';
-                modalForm.querySelector('#edit_data_competencia').value = data_competencia || '';
-                modalForm.querySelector('#edit_data_pagamento').value = data_pagamento || '';
-                modalForm.querySelector('#edit_metodo_pagamento').value = metodo_pagamento || '';
-                modalForm.querySelector('#edit_status').value = status || '';
+                const idForma = btn.getAttribute('data-id-forma-pagamento');
+                const hid = modalForm.querySelector('#edit_id_forma_pagamento');
+                if (hid) hid.value = idForma || '';
             } catch (e) {
-                console.error('Erro ao popular modalEditarLancamento via click fallback:', e);
+                console.warn('Não foi possível popular edit_id_forma_pagamento (fallback):', e);
             }
         });
     });
 
+});
+
     
-
-    // Confirmar Pagamento Modal population
-    const modalConfirmarPagamento = document.getElementById('modalConfirmarPagamento');
-    if (modalConfirmarPagamento) {
-        modalConfirmarPagamento.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const id_lancamento = button.getAttribute('data-id_lancamento');
-            modalConfirmarPagamento.querySelector('#confirm_id_lancamento').value = id_lancamento;
-        });
-    }
-
-    // --- Lógica do Modal de Edição (Formas de Pagamento - NOVO) ---
-    const modalEditarFormaPagamento = document.getElementById('modalEditarFormaPagamento');
-    if (modalEditarFormaPagamento) {
-        modalEditarFormaPagamento.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const id = button.getAttribute('data-id');
-            const nome = button.getAttribute('data-nome');
-            const icone = button.getAttribute('data-icone');
-            const ativo = button.getAttribute('data-ativo');
-            
-            const modalForm = modalEditarFormaPagamento.querySelector('form');
-            modalForm.querySelector('#edit_id').value = id;
-            modalForm.querySelector('#edit_nome').value = nome;
-            modalForm.querySelector('#edit_icone_bootstrap').value = icone;
-            modalForm.querySelector('#edit_ativo').checked = (ativo == '1');
-        });
-    }
-
-}); // Fecha o listener DOMContentLoaded
-
-/**
- * Mostra/esconde campos de associação na tela de cadastro de usuário
- * baseado no tipo (Cliente ou Contador).
- * @param {string} prefix Prefixo dos IDs dos campos ('', 'edit_', etc.)
- */
-function toggleUsuarioCampos(prefix) {
-    const tipo = document.getElementById(prefix + 'tipo_usuario').value;
-    const divCliente = document.getElementById(prefix + 'assoc_cliente_div');
-    const divContador = document.getElementById(prefix + 'assoc_contador_div');
-
-    if (!divCliente || !divContador) return; 
-
-    if (tipo === 'cliente') {
-        divCliente.style.display = 'block';
-        divContador.style.display = 'none';
-    } else if (tipo === 'contador') {
-        divCliente.style.display = 'none';
-        divContador.style.display = 'block';
-    } else {
-        divCliente.style.display = 'none';
-        divContador.style.display = 'none';
-    }
-}
-
+    
     // --- Auto-busca de CNPJ: adiciona listeners ao campo principal e ao campo de edição ---
     const cnpjField = document.getElementById('cnpj');
     if (cnpjField) {
@@ -351,6 +423,159 @@ function toggleUsuarioCampos(prefix) {
         });
     }
 
+
+
+// =========================
+// Mobile filters modal logic (DOMContentLoaded)
+// Move filtros para dentro do modal quando a largura for <= BREAKPOINT
+// =========================
+document.addEventListener('DOMContentLoaded', function() {
+    const BREAKPOINT = 1020;
+    const FORM_SELECTORS = ['#form-filtros', '#form-filtros-dashboard', '#form-filtros-cobrancas'];
+    const modalEl = document.getElementById('mobileFiltersModal');
+    const modalBody = document.getElementById('mobile-filters-modal-body');
+    if (!modalEl || !modalBody) return;
+    const bsModal = new bootstrap.Modal(modalEl, {backdrop: 'static'});
+
+    const movedForms = new Map();
+
+    function createToggleButton() {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-outline-primary btn-sm mobile-filters-toggle ms-auto';
+        // ms-auto empurra o botão para a direita dentro de um container flex
+        btn.innerHTML = '<i class="bi bi-funnel-fill"></i> Filtros';
+        return btn;
+    }
+
+    function moveFormToModal(formEl) {
+        if (!formEl) return;
+        if (movedForms.has(formEl)) { try { bsModal.show(); } catch (e) {} ; return; }
+        const originalParent = formEl.parentNode;
+        const originalNext = formEl.nextSibling;
+        movedForms.set(formEl, { parent: originalParent, nextSibling: originalNext });
+        modalBody.innerHTML = '';
+        modalBody.appendChild(formEl);
+        formEl.style.display = '';
+        try { bsModal.show(); } catch (e) { console.warn('Erro ao abrir modal de filtros (move):', e); }
+    }
+
+    function restoreMovedForms() {
+        movedForms.forEach(function(state, form) {
+            try {
+                if (state.nextSibling) state.parent.insertBefore(form, state.nextSibling);
+                else state.parent.appendChild(form);
+                form.style.display = '';
+            } catch (e) {
+                console.warn('Erro ao restaurar form depois do modal:', e);
+            }
+        });
+        movedForms.clear();
+    }
+
+    modalEl.addEventListener('hidden.bs.modal', restoreMovedForms);
+
+    function ensureButtonsAndVisibility() {
+        const width = window.innerWidth;
+        FORM_SELECTORS.forEach(function(sel) {
+            const formEl = document.querySelector(sel);
+            if (!formEl) return;
+            const card = formEl.closest('.card');
+            const header = card ? card.querySelector('.card-header') : null;
+
+            if (width <= BREAKPOINT) {
+                formEl.style.display = 'none';
+                // Se já existir um botão estático, garante que esteja visível e que tenha handler
+                let existingBtn = header ? header.querySelector('.mobile-filters-toggle') : null;
+                if (existingBtn) {
+                    existingBtn.style.display = '';
+                    // evita rebinds
+                    if (!existingBtn.dataset.mobileBound) {
+                        existingBtn.addEventListener('click', function(evt) {
+                            // tenta mover o form para o modal antes do Bootstrap abrir
+                            let targetForm = null;
+                            try { if (card) targetForm = card.querySelector('form'); } catch (e) { targetForm = null; }
+                            if (!targetForm) targetForm = formEl;
+                            if (!targetForm) {
+                                for (const s of FORM_SELECTORS) {
+                                    const f = document.querySelector(s);
+                                    if (f) { targetForm = f; break; }
+                                }
+                            }
+                            if (targetForm) moveFormToModal(targetForm);
+                            // allow default (bootstrap) to continue
+                        });
+                        existingBtn.dataset.mobileBound = '1';
+                    }
+                } else if (header && !header.querySelector('.mobile-filters-toggle')) {
+                    const btn = createToggleButton();
+                    btn.addEventListener('click', function() {
+                        // Em telas pequenas abrimos o modal e movemos o form
+                        const widthNow = window.innerWidth;
+                        let targetForm = null;
+                        try { if (card) targetForm = card.querySelector('form'); } catch (e) { targetForm = null; }
+                        if (!targetForm) targetForm = formEl;
+                        if (!targetForm) {
+                            for (const s of FORM_SELECTORS) {
+                                const f = document.querySelector(s);
+                                if (f) { targetForm = f; break; }
+                            }
+                        }
+                        if (!targetForm) return;
+                        if (widthNow <= BREAKPOINT) {
+                            moveFormToModal(targetForm);
+                        } else {
+                            // Desktop: apenas foca/rola até o formulário em vez de abrir modal
+                            try {
+                                const firstInput = targetForm.querySelector('input, select, textarea');
+                                if (firstInput) {
+                                    firstInput.focus();
+                                    firstInput.scrollIntoView({behavior: 'smooth', block: 'center'});
+                                } else {
+                                    targetForm.scrollIntoView({behavior: 'smooth', block: 'center'});
+                                }
+                            } catch (e) { console.warn('Erro ao focar form:', e); }
+                        }
+                    });
+                    // garante header como flex para que ms-auto funcione e empurre o botão ao fim
+                    header.style.display = header.style.display || 'flex';
+                    header.style.alignItems = header.style.alignItems || 'center';
+                    header.style.gap = header.style.gap || '0.5rem';
+                    header.appendChild(btn);
+                }
+            } else {
+                formEl.style.display = '';
+                if (header) {
+                    const btn = header.querySelector('.mobile-filters-toggle');
+                    if (btn) btn.remove();
+                }
+                if (modalBody) modalBody.innerHTML = '';
+            }
+        });
+    }
+
+    ensureButtonsAndVisibility();
+
+    let resizeTimer = null;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() { ensureButtonsAndVisibility(); }, 120);
+    });
+
+    // Se houver botões que abrem o modal genérico (por exemplo um botão global de Filtros),
+    // garante que quando clicados movam o form apropriado para dentro do modal.
+    document.querySelectorAll('[data-bs-target="#mobileFiltersModal"]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            // tenta localizar um formulário dos seletores conhecidos (prioridade definida pela lista)
+            let targetForm = null;
+            for (const s of FORM_SELECTORS) {
+                const f = document.querySelector(s);
+                if (f) { targetForm = f; break; }
+            }
+            if (targetForm) moveFormToModal(targetForm);
+        });
+    });
+});
 
 
 /**

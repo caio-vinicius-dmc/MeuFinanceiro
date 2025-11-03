@@ -310,11 +310,14 @@ if (isClient()) {
 
         <!-- Card de Filtros do Cliente -->
         <div class="card mb-4">
-            <div class="card-header">
-                <i class="bi bi-filter me-2"></i>Filtros
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-filter me-2"></i>Filtros</span>
+                <button type="button" class="btn btn-outline-primary btn-sm mobile-filters-toggle ms-auto" data-bs-toggle="modal" data-bs-target="#mobileFiltersModal">
+                    <i class="bi bi-funnel-fill"></i> Filtros
+                </button>
             </div>
             <div class="card-body">
-            <form method="GET" class="row g-3 align-items-end">
+            <form id="form-filtros-cobrancas" method="GET" class="row g-3 align-items-end">
                     <input type="hidden" name="page" value="cobrancas">
                     <div class="col-md-3">
                         <label for="tipo_data" class="form-label">Filtrar por Data de</label>
@@ -484,11 +487,14 @@ if (isClient()) {
 
         <!-- Card de Filtros -->
         <div class="card mb-4">
-            <div class="card-header">
-                <i class="bi bi-filter me-2"></i>Filtros
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-filter me-2"></i>Filtros</span>
+                <button type="button" class="btn btn-outline-primary btn-sm mobile-filters-toggle ms-auto" data-bs-toggle="modal" data-bs-target="#mobileFiltersModal">
+                    <i class="bi bi-funnel-fill"></i> Filtros
+                </button>
             </div>
             <div class="card-body">
-                <form method="GET" class="row g-3 align-items-end">
+                <form id="form-filtros-cobrancas" method="GET" class="row g-3 align-items-end">
                     <input type="hidden" name="page" value="cobrancas">
                     <div class="col-md-6">
                         <label class="form-label">Vencimento (entre)</label>

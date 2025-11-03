@@ -425,6 +425,7 @@ if (!empty($activeFilters)): ?>
                                                                                 data-data_competencia="<?php echo htmlspecialchars($lanc['data_competencia'] ?? ''); ?>"
                                                                                 data-data_pagamento="<?php echo htmlspecialchars($lanc['data_pagamento'] ?? ''); ?>"
                                                                                 data-metodo_pagamento="<?php echo htmlspecialchars($lanc['metodo_pagamento'] ?? ''); ?>"
+                                                                                data-id-forma-pagamento="<?php echo htmlspecialchars($lanc['id_forma_pagamento'] ?? ''); ?>"
                                                                                 data-status="<?php echo htmlspecialchars($lanc['status']); ?>"                                        title="Editar Lançamento">
                                     <i class="bi bi-pencil"></i>
                                 </button>
@@ -583,13 +584,15 @@ if (!empty($activeFilters)): ?>
 
                                                         <option value="">Selecione...</option>
 
-                                                        <?php foreach ($formas_pagamento as $forma): ?>
+                                                                <?php foreach ($formas_pagamento as $forma): ?>
 
-                                                            <option value="<?php echo htmlspecialchars($forma['nome']); ?>"><?php echo htmlspecialchars($forma['nome']); ?></option>
+                                                                    <option value="<?php echo htmlspecialchars($forma['nome']); ?>" data-id="<?php echo $forma['id']; ?>"><?php echo htmlspecialchars($forma['nome']); ?></option>
 
-                                                        <?php endforeach; ?>
+                                                                <?php endforeach; ?>
 
                                                     </select>
+
+                                                            <input type="hidden" name="id_forma_pagamento" id="novo_id_forma_pagamento" />
 
                                                 </div>
 
@@ -745,11 +748,13 @@ if (!empty($activeFilters)): ?>
 
                                                         <?php foreach ($formas_pagamento as $forma): ?>
 
-                                                            <option value="<?php echo htmlspecialchars($forma['nome']); ?>"><?php echo htmlspecialchars($forma['nome']); ?></option>
+                                                            <option value="<?php echo htmlspecialchars($forma['nome']); ?>" data-id="<?php echo $forma['id']; ?>"><?php echo htmlspecialchars($forma['nome']); ?></option>
 
                                                         <?php endforeach; ?>
 
                                                     </select>
+
+                                                    <input type="hidden" name="id_forma_pagamento" id="edit_id_forma_pagamento" />
 
                                                 </div>
 
@@ -833,17 +838,19 @@ if (!empty($activeFilters)): ?>
 
                                                 <label for="confirm_metodo_pagamento" class="form-label">Forma de Pagamento</label>
 
-                                                <select id="confirm_metodo_pagamento" name="metodo_pagamento" class="form-select" required>
+                                                    <select id="confirm_metodo_pagamento" name="metodo_pagamento" class="form-select" required>
 
                                                     <option value="">Selecione...</option>
 
                                                     <?php foreach ($formas_pagamento as $forma): ?>
 
-                                                        <option value="<?php echo htmlspecialchars($forma['nome']); ?>"><?php echo htmlspecialchars($forma['nome']); ?></option>
+                                                        <option value="<?php echo htmlspecialchars($forma['nome']); ?>" data-id="<?php echo $forma['id']; ?>"><?php echo htmlspecialchars($forma['nome']); ?></option>
 
                                                     <?php endforeach; ?>
 
-                                                </select>
+                                                    </select>
+
+                                                    <input type="hidden" name="id_forma_pagamento" id="confirm_id_forma_pagamento" />
 
                                             </div>
 

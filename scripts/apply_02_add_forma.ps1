@@ -35,9 +35,22 @@ if ($LASTEXITCODE -ne 0) { Write-Error "Erro ao gerar backup (exit=$LASTEXITCODE
 Write-Host "Backup criado com sucesso."
 
 Write-Host "Aplicando migration: $MigrationFile"
-# Aplica migration
-& $mysqlExe -h $DbHost -P $DbPort -u $DbUser $DbName < $MigrationFile
-if ($LASTEXITCODE -ne 0) { Write-Error "Erro ao aplicar migration (exit=$LASTEXITCODE)"; exit 1 }
+# Aplica migration: envia o conteúdo para o stdin do mysql
+$migrationSql = Get-Content -Raw -Path $MigrationFile
+$proc = Start-Process -FilePath $mysqlExe -ArgumentList "-h", $DbHost, "-P", $DbPort, "-u", $DbUser, $DbName -NoNewWindow -PassThru -RedirectStandardInput "$env:TEMP\mysql_stdin_$$.sql"
+try {
+    # escreve o SQL temporariamente no arquivo de stdin redirecionado
+    $tempStdin = "$env:TEMP\mysql_stdin_$$.sql"
+    Set-Content -Path $tempStdin -Value $migrationSql -Encoding UTF8
+    # Usa type (Get-Content) piped para o processo
+    & cmd /c "type $tempStdin | `"$mysqlExe`" -h $DbHost -P $DbPort -u $DbUser $DbName"
+    $exit = $LASTEXITCODE
+    Remove-Item -Force $tempStdin -ErrorAction SilentlyContinue
+    if ($exit -ne 0) { Write-Error "Erro ao aplicar migration (exit=$exit)"; exit 1 }
+} catch {
+    Remove-Item -Force $tempStdin -ErrorAction SilentlyContinue
+    throw
+}
 Write-Host "Migration aplicada com sucesso."
 
 Write-Host "Resumo: backup em $BackupPath, migration aplicada: $MigrationFile"

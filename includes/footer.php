@@ -9,8 +9,13 @@
             <div class="container-fluid">
                 <div class="row align-items-center gy-3">
                     <div class="col-md-4 d-flex flex-column justify-content-center">
-                        <div class="fw-bold">DMC - Dynami Motion Century</div>
-                        <small class="text-muted">&copy; 2025. Todos os direitos reservados.</small>
+                        <div class="d-flex align-items-center">
+                                <img src="<?php echo base_url('assets/img/logo-dmc.jpg'); ?>" alt="DMC" class="footer-logo me-2" />
+                            <div>
+                                <div class="fw-bold">DMC - Dynami Motion Century</div>
+                                <small class="text-muted">&copy; 2025. Todos os direitos reservados.</small>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="col-md-4 d-flex justify-content-center">
@@ -34,6 +39,21 @@
         </footer>
 
     <?php endif; // Fim do if (isLoggedIn()) ?>
+
+        <!-- Modal genérico para filtros mobile -->
+        <div class="modal fade" id="mobileFiltersModal" tabindex="-1" aria-labelledby="mobileFiltersModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="mobileFiltersModalLabel">Filtros</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                    </div>
+                    <div class="modal-body" id="mobile-filters-modal-body">
+                        <!-- Conteúdo do formulário de filtros será injetado via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>

@@ -537,7 +537,7 @@ $status_chart_json = json_encode([
         <span><i class="bi bi-filter me-2"></i> Filtros</span>
     </div>
     <div class="card-body">
-        <form method="GET" class="row g-3 align-items-end">
+    <form id="form-filtros-dashboard" method="GET" class="row g-3 align-items-end">
             <input type="hidden" name="page" value="dashboard">
             
             <div class="col-md-6">
@@ -603,13 +603,16 @@ $status_chart_json = json_encode([
 </div>
 
 <?php if (hasLancamentosAccess()): ?>
-<section class="dashboard-section dashboard-section-lancamentos">
+<section id="dashboard-lancamentos-section" class="dashboard-section dashboard-section-lancamentos collapsed">
     <div class="section-header">
         <span class="badge bg-primary badge-topic"><i class="bi bi-arrow-left-right"></i></span>
         <div>
             <div class="title">Lançamentos</div>
             <div class="subtitle">Indicadores e projeções dos lançamentos financeiros</div>
         </div>
+        <button type="button" class="btn btn-sm btn-link section-toggle ms-auto" aria-expanded="false" aria-controls="dashboard-lancamentos-section">
+            <i class="bi bi-chevron-down"></i>
+        </button>
     </div>
     <?php
         // Títulos dos cards (ajustados para a visão do cliente)
@@ -630,7 +633,7 @@ $status_chart_json = json_encode([
             $card_title_total_vencido_periodo = 'Total Vencido (Período)';
         }
     ?>
-    <div class="section-body">
+    <div class="section-body" style="height:0px;">
     <div class="row g-4 mb-4">
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma total das receitas com data de vencimento no período, que ainda não foram pagas.">
         <div class="card card-metric">
@@ -811,15 +814,18 @@ $status_chart_json = json_encode([
 
 
 <!-- Seção: Indicadores de Cobranças (separado de Lançamentos) -->
-<section class="dashboard-section dashboard-section-cobrancas">
+<section id="dashboard-cobrancas-section" class="dashboard-section dashboard-section-cobrancas collapsed">
     <div class="section-header">
         <span class="badge bg-warning text-dark badge-topic"><i class="bi bi-receipt-cutoff"></i></span>
         <div>
             <div class="title">Cobranças</div>
             <div class="subtitle">Resumo e cartões relacionados às cobranças</div>
         </div>
+        <button type="button" class="btn btn-sm btn-link section-toggle ms-auto" aria-expanded="false" aria-controls="dashboard-cobrancas-section">
+            <i class="bi bi-chevron-down"></i>
+        </button>
     </div>
-    <div class="section-body">
+    <div class="section-body" style="height:0px;">
     <div class="row g-4 mb-4">
     <?php
         $label_pendentes = isClient() ? 'Cobranças a Pagar' : 'Cobranças a Receber';
@@ -931,91 +937,226 @@ $status_chart_json = json_encode([
 </div>
 
     <?php if (isAdmin()): ?>
-    <div class="col-12 mt-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-clock-history me-2"></i> Atividade Recente (Últimos 5 Lançamentos)
+    <section id="dashboard-atividade-section" class="dashboard-section dashboard-section-atividade collapsed">
+        <div class="section-header">
+            <span class="badge bg-secondary badge-topic"><i class="bi bi-clock-history"></i></span>
+            <div>
+                <div class="title">Atividade do Sistema (Logs)</div>
+                <div class="subtitle">Últimos 5 registros de logs</div>
             </div>
-            <div class="card-body p-0">
-                <?php
-                // --- Lógica da Atividade Recente (Mantida) ---
-                $params_activity = [];
-                $where_activity_conditions = [];
-                
-                if(isAdmin()) {
+            <button type="button" class="btn btn-sm btn-link section-toggle ms-auto" aria-expanded="true" aria-controls="dashboard-atividade-section">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+        <div class="section-body" style="height:0px;">
+            <div class="card mb-0">
+                <div class="card-body p-0">
+                    <?php
+                    // --- Lógica da Atividade Recente (Mantida) ---
+                    $params_activity = [];
+                    $where_activity_conditions = [];
+                    
+                    // Admin vê o log de ações (logs), mostrado aqui como últimos 5 registros
                     $stmt_activity = $pdo->query("SELECT l.*, u.nome FROM logs l LEFT JOIN usuarios u ON l.id_usuario = u.id ORDER BY l.timestamp DESC LIMIT 5");
                     $activities = $stmt_activity->fetchAll();
-                } else {
-                    $base_join_activity = "FROM lancamentos l JOIN empresas e ON l.id_empresa = e.id";
+                    ?>
 
-                    if ($filtro_empresa_id) {
-                         $where_activity_conditions[] = "l.id_empresa = ?";
-                         $params_activity[] = $filtro_empresa_id;
-                    } elseif ($filtro_cliente_id) {
-                         $where_activity_conditions[] = "e.id_cliente = ?";
-                         $params_activity[] = $filtro_cliente_id;
-                    }
-
-                    if (isContador()) {
-                        if (!empty($clientes_permitidos_ids)) {
-                             $placeholders = implode(',', array_fill(0, count($clientes_permitidos_ids), '?'));
-                             $where_activity_conditions[] = "e.id_cliente IN ($placeholders)";
-                             $params_activity = array_merge($params_activity, $clientes_permitidos_ids);
-                        } else {
-                             $where_activity_conditions[] = "1=0";
-                        }
-                    } elseif (isClient()) {
-                        $where_activity_conditions[] = "e.id_cliente = ?";
-                        $params_activity[] = $_SESSION['id_cliente_associado'];
-                    }
-
-                    $where_activity_sql = "WHERE 1=1";
-                    if(!empty($where_activity_conditions)) {
-                        $where_activity_sql = "WHERE " . implode(' AND ', $where_activity_conditions);
-                    }
-                    
-                    $sql_activity = "SELECT l.*, e.razao_social $base_join_activity 
-                                     $where_activity_sql
-                                     ORDER BY l.id DESC LIMIT 5";
-                    $stmt_activity = $pdo->prepare($sql_activity);
-                    $stmt_activity->execute($params_activity);
-                    $activities = $stmt_activity->fetchAll();
-                }
-                ?>
-                
-                <ul class="list-group list-group-flush">
-                    <?php if (empty($activities)): ?>
-                         <li class="list-group-item text-muted text-center">Nenhuma atividade recente.</li>
-                    <?php endif; ?>
-                    <?php foreach($activities as $item): ?>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <?php if(isAdmin()): ?>
-                                <div>
-                                    <div class="fw-bold"><?php echo htmlspecialchars($item['acao']); ?></div>
-                                    <small class="text-muted"><?php echo htmlspecialchars($item['nome'] ?? 'Sistema'); ?> em <?php echo $item['tabela_afetada']; ?></small>
-                                </div>
-                                <small><?php echo date('d/m H:i', strtotime($item['timestamp'])); ?></small>
-                            <?php else: ?>
-                                <div>
-                                    <div class="fw-bold"><?php echo htmlspecialchars($item['descricao']); ?></div>
-                                    <small class="text-muted"><?php echo htmlspecialchars($item['razao_social']); ?></small>
-                                </div>
-                                <span class="fw-bold <?php echo ($item['tipo'] == 'receita') ? 'text-success' : 'text-danger'; ?>">
-                                     R$ <?php echo number_format($item['valor'], 2, ',', '.'); ?>
-                                </span>
-                            <?php endif; ?>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
-                <div class="card-footer text-center bg-white border-0">
-                    <a href="index.php?page=<?php echo isAdmin() ? 'logs' : 'lancamentos'; ?>" class="text-decoration-none fw-medium">
-                        Ver tudo
-                        <i class="bi bi-arrow-right-short"></i>
-                    </a>
+                    <ul class="list-group list-group-flush">
+                        <?php if (empty($activities)): ?>
+                             <li class="list-group-item text-muted text-center">Nenhuma atividade recente.</li>
+                        <?php endif; ?>
+                        <?php foreach($activities as $item): ?>
+                            <?php $log_id = intval($item['id'] ?? 0); ?>
+                            <li class="list-group-item p-0">
+                                <a href="index.php?page=logs#log-<?php echo $log_id; ?>" class="d-flex w-100 text-decoration-none text-reset py-2 px-3">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold"><?php echo htmlspecialchars($item['acao']); ?></div>
+                                        <small class="text-muted"><?php echo htmlspecialchars($item['nome'] ?? 'Sistema'); ?> em <?php echo htmlspecialchars($item['tabela_afetada'] ?? ''); ?></small>
+                                    </div>
+                                    <small class="text-muted ms-3"><?php echo date('d/m H:i', strtotime($item['timestamp'])); ?></small>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="card-footer text-center bg-white border-0">
+                        <a href="index.php?page=logs" class="text-decoration-none fw-medium">
+                            Ver tudo
+                            <i class="bi bi-arrow-right-short"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
+    <?php endif; ?>
+    
+    <?php if (hasLancamentosAccess()): ?>
+    <!-- Seção: Atividade Recente - Últimos 5 Lançamentos (visível para Admin e usuários com acesso a Lançamentos) -->
+    <section id="dashboard-atividade-lancamentos-section" class="dashboard-section dashboard-section-atividade-lancamentos">
+        <div class="section-header">
+            <span class="badge bg-info text-dark badge-topic"><i class="bi bi-list-check"></i></span>
+            <div>
+                    <div class="title">Atividade Recente — Lançamentos</div>
+                <div class="subtitle">Últimos 5 Lançamentos</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-link section-toggle ms-auto" aria-expanded="false" aria-controls="dashboard-atividade-lancamentos-section">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+        <div class="section-body" style="height:0px;">
+            <div class="card mb-0">
+                <div class="card-body p-0">
+                    <?php
+                    // Busca os 5 lançamentos mais recentes respeitando filtros e permissões
+                    $params_recent = [];
+                    $where_recent = [];
+                    $base_join_recent = "FROM lancamentos l JOIN empresas e ON l.id_empresa = e.id";
+
+                    if ($filtro_empresa_id) {
+                        $where_recent[] = "l.id_empresa = ?";
+                        $params_recent[] = $filtro_empresa_id;
+                    } elseif ($filtro_cliente_id) {
+                        $where_recent[] = "e.id_cliente = ?";
+                        $params_recent[] = $filtro_cliente_id;
+                    } else {
+                        if (isContador()) {
+                            if (empty($clientes_permitidos_ids)) {
+                                $where_recent[] = "1=0";
+                            } else {
+                                $placeholders = implode(',', array_fill(0, count($clientes_permitidos_ids), '?'));
+                                $where_recent[] = "e.id_cliente IN ($placeholders)";
+                                $params_recent = array_merge($params_recent, $clientes_permitidos_ids);
+                            }
+                        } elseif (isClient()) {
+                            $where_recent[] = "e.id_cliente = ?";
+                            $params_recent[] = $_SESSION['id_cliente_associado'];
+                        }
+                    }
+
+                    $where_recent_sql = "";
+                    if (!empty($where_recent)) {
+                        $where_recent_sql = "WHERE " . implode(' AND ', $where_recent);
+                    }
+
+                    $sql_recent = "SELECT l.id, l.descricao, l.valor, l.tipo, l.data_vencimento, e.razao_social $base_join_recent $where_recent_sql ORDER BY l.id DESC LIMIT 5";
+                    $stmt_recent = $pdo->prepare($sql_recent);
+                    $stmt_recent->execute($params_recent);
+                    $recent_items = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
+                    ?>
+
+                    <ul class="list-group list-group-flush">
+                        <?php if (empty($recent_items)): ?>
+                            <li class="list-group-item text-muted text-center">Nenhum lançamento recente.</li>
+                        <?php endif; ?>
+                        <?php foreach ($recent_items as $it): ?>
+                            <?php $lid = intval($it['id'] ?? 0); ?>
+                            <li class="list-group-item p-0">
+                                <a href="index.php?page=lancamentos#lancamento-<?php echo $lid; ?>" class="d-flex w-100 text-decoration-none text-reset py-2 px-3">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold"><?php echo htmlspecialchars($it['descricao']); ?></div>
+                                        <small class="text-muted"><?php echo htmlspecialchars($it['razao_social']); ?> — <?php echo date('d/m/Y', strtotime($it['data_vencimento'])); ?></small>
+                                    </div>
+                                    <span class="fw-bold ms-3 <?php echo ($it['tipo'] == 'receita') ? 'text-success' : 'text-danger'; ?>">R$ <?php echo number_format($it['valor'], 2, ',', '.'); ?></span>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+
+                    <div class="card-footer text-center bg-white border-0">
+                        <a href="index.php?page=lancamentos" class="text-decoration-none fw-medium">
+                            Ver todos os lançamentos
+                            <i class="bi bi-arrow-right-short"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <?php endif; ?>
+
+    <?php if (isAdmin() || isContador() || isClient()): ?>
+    <!-- Seção: Atividade Recente - Últimas 5 Cobranças -->
+    <section id="dashboard-atividade-cobrancas-section" class="dashboard-section dashboard-section-atividade-cobrancas collapsed">
+        <div class="section-header">
+            <span class="badge bg-info text-dark badge-topic"><i class="bi bi-receipt-cutoff"></i></span>
+            <div>
+                <div class="title">Atividade Recente — Cobranças</div>
+                <div class="subtitle">Últimas 5 Cobranças</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-link section-toggle ms-auto" aria-expanded="false" aria-controls="dashboard-atividade-cobrancas-section">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+        <div class="section-body" style="height:0px;">
+            <div class="card mb-0">
+                <div class="card-body p-0">
+                    <?php
+                    // Busca as 5 cobranças mais recentes respeitando filtros/permissões
+                    $params_recent_cob = [];
+                    $where_recent_cob = [];
+                    $base_join_recent_cob = "FROM cobrancas cob JOIN empresas e ON cob.id_empresa = e.id";
+
+                    // Usa a mesma hierarquia de filtros de cobrancas já calculada (se existirem vars)
+                    if (!empty($filtro_empresa_id)) {
+                        $where_recent_cob[] = "cob.id_empresa = ?";
+                        $params_recent_cob[] = $filtro_empresa_id;
+                    } elseif (!empty($filtro_cliente_id)) {
+                        $where_recent_cob[] = "e.id_cliente = ?";
+                        $params_recent_cob[] = $filtro_cliente_id;
+                    } else {
+                        if (isContador()) {
+                            if (empty($clientes_permitidos_ids)) {
+                                $where_recent_cob[] = "1=0";
+                            } else {
+                                $placeholders = implode(',', array_fill(0, count($clientes_permitidos_ids), '?'));
+                                $where_recent_cob[] = "e.id_cliente IN ($placeholders)";
+                                $params_recent_cob = array_merge($params_recent_cob, $clientes_permitidos_ids);
+                            }
+                        } elseif (isClient()) {
+                            $where_recent_cob[] = "e.id_cliente = ?";
+                            $params_recent_cob[] = $_SESSION['id_cliente_associado'];
+                        }
+                    }
+
+                    $where_recent_cob_sql = "";
+                    if (!empty($where_recent_cob)) {
+                        $where_recent_cob_sql = "WHERE " . implode(' AND ', $where_recent_cob);
+                    }
+
+                    $sql_recent_cob = "SELECT cob.id, cob.descricao, cob.valor, cob.status_pagamento, cob.data_vencimento, e.razao_social $base_join_recent_cob $where_recent_cob_sql ORDER BY cob.id DESC LIMIT 5";
+                    $stmt_recent_cob = $pdo->prepare($sql_recent_cob);
+                    $stmt_recent_cob->execute($params_recent_cob);
+                    $recent_cobs = $stmt_recent_cob->fetchAll(PDO::FETCH_ASSOC);
+                    ?>
+
+                    <ul class="list-group list-group-flush">
+                        <?php if (empty($recent_cobs)): ?>
+                            <li class="list-group-item text-muted text-center">Nenhuma cobrança recente.</li>
+                        <?php endif; ?>
+                        <?php foreach ($recent_cobs as $c): ?>
+                            <?php $cid = intval($c['id'] ?? 0); ?>
+                            <li class="list-group-item p-0">
+                                <a href="index.php?page=cobrancas#cobranca-<?php echo $cid; ?>" class="d-flex w-100 text-decoration-none text-reset py-2 px-3">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold"><?php echo htmlspecialchars($c['descricao']); ?></div>
+                                        <small class="text-muted"><?php echo htmlspecialchars($c['razao_social']); ?> — <?php echo date('d/m/Y', strtotime($c['data_vencimento'])); ?></small>
+                                    </div>
+                                    <span class="fw-bold ms-3 <?php echo ($c['status_pagamento'] === 'Pago') ? 'text-success' : 'text-danger'; ?>">R$ <?php echo number_format($c['valor'], 2, ',', '.'); ?></span>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+
+                    <div class="card-footer text-center bg-white border-0">
+                        <a href="index.php?page=cobrancas" class="text-decoration-none fw-medium">
+                            Ver todas as cobranças
+                            <i class="bi bi-arrow-right-short"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
     <?php endif; ?>
 </div>
 

@@ -323,6 +323,39 @@ body.sidebar-collapsed .sidebar-logo {
     border-radius: 999px;
 }
 
+/* Collapse behavior for dashboard sections */
+.dashboard-section.collapsed .section-body {
+    display: none;
+}
+
+/* Smooth collapse: we'll animate height via JS but provide sensible defaults */
+.dashboard-section .section-body {
+    overflow: hidden;
+    transition: height 240ms ease;
+}
+.dashboard-section.collapsed .section-body {
+    height: 0 !important;
+}
+
+.section-toggle {
+    color: var(--bs-secondary);
+    border: none;
+    background: transparent;
+    padding: 0.25rem 0.5rem;
+}
+.section-toggle .bi {
+    transition: transform 0.18s ease;
+    font-size: 1.05rem;
+    display: inline-block;
+}
+.section-toggle[aria-expanded="false"] .bi {
+    transform: rotate(-90deg);
+}
+
+/* Make toggle icon blue to match primary color */
+.section-toggle { color: var(--bs-primary); }
+.section-toggle .bi { color: var(--bs-primary); }
+
 /* Estilos para a Tabela de Atividade Recente */
 .list-group-item {
     border-left: 3px solid transparent;
@@ -453,6 +486,22 @@ body.sidebar-collapsed .sidebar-logo {
 }
 .app-footer .col-md-4.d-flex.flex-column {
     justify-content: center; /* centraliza verticalmente quando é coluna */
+}
+
+/* Logo do footer */
+.app-footer .footer-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%; /* tornar circular */
+    object-fit: cover; /* mantém proporção e preenche a área */
+    display: inline-block;
+}
+
+@media (max-width: 767.98px) {
+    .app-footer .footer-logo {
+        width: 36px;
+        height: 36px;
+    }
 }
 
 .login-image-side {
@@ -613,6 +662,35 @@ body.sidebar-collapsed .sidebar-logo {
 /* Garante que o div interno do container use a altura total para a centralização Flexbox */
 .app-footer .container-fluid > div {
     height: 100%;
+}
+
+/* Mobile: evitar footer fixo/altura fixa que quebre o layout em telas pequenas */
+@media (max-width: 767.98px) {
+    .app-footer {
+        position: static; /* deixa o footer em fluxo normal para quebrar linhas */
+        height: auto;
+        padding: 1rem;
+    }
+
+    .app-footer .container-fluid > div {
+        height: auto;
+    }
+
+    .app-footer .row {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .app-footer .col-md-4 {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+        padding: 0.25rem 0;
+    }
+
+    .app-footer .footer-nav {
+        margin-top: 0.25rem;
+    }
 }
 
 /* Espaçamento do Rodapé para Respeitar o Sidebar (DESKTOP) */
