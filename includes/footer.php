@@ -29,9 +29,9 @@
                     <div class="col-md-4 d-flex justify-content-md-end justify-content-center">
                         <div class="d-flex align-items-center gap-2">
                             <div class="footer-version text-muted me-3">v1.9</div>
-                            <a href="#" class="btn btn-outline-secondary btn-sm rounded-circle social-btn" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
-                            <a href="#" class="btn btn-outline-secondary btn-sm rounded-circle social-btn" aria-label="LinkedIn"><i class="bi bi-linkedin"></i></a>
-                            <a href="#" class="btn btn-outline-secondary btn-sm rounded-circle social-btn" aria-label="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+                            <a href="https://www.instagram.com/dynamic.motion.century" class="btn btn-outline-secondary btn-sm rounded-circle social-btn" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
+                            <a href="https://twitter.com/dynamicMcentury" class="btn btn-outline-secondary btn-sm rounded-circle social-btn" aria-label="twitter"><i class="bi bi-twitter"></i></a>
+                            <!--<a href="#" class="btn btn-outline-secondary btn-sm rounded-circle social-btn" aria-label="WhatsApp"><i class="bi bi-whatsapp"></i></a>-->
                         </div>
                     </div>
                 </div>

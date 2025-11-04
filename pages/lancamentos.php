@@ -190,6 +190,30 @@ $sql_formas_pagamento = "SELECT id, nome FROM formas_pagamento ORDER BY nome";
 $stmt_formas_pagamento = $pdo->prepare($sql_formas_pagamento);
 $stmt_formas_pagamento->execute();
 $formas_pagamento = $stmt_formas_pagamento->fetchAll(PDO::FETCH_ASSOC);
+// Buscar valores dinâmicos existentes no banco para tipos e status (usados no modal de import)
+try {
+    $stmt_tipos = $pdo->prepare("SELECT DISTINCT tipo FROM lancamentos WHERE tipo IS NOT NULL AND TRIM(tipo) <> '' ORDER BY tipo");
+    $stmt_tipos->execute();
+    $tipos_db = $stmt_tipos->fetchAll(PDO::FETCH_COLUMN);
+    // Normaliza para lowercase e garante os valores padrão sempre presentes
+    $tipos_db = array_map(function($v){ return mb_strtolower(trim($v)); }, $tipos_db);
+    $tipos_db = array_values(array_unique($tipos_db));
+    // Garantir que 'receita' e 'despesa' apareçam mesmo que ausentes no histórico
+    if (!in_array('receita', $tipos_db)) $tipos_db[] = 'receita';
+    if (!in_array('despesa', $tipos_db)) $tipos_db[] = 'despesa';
+
+    $stmt_status = $pdo->prepare("SELECT DISTINCT status FROM lancamentos WHERE status IS NOT NULL AND TRIM(status) <> '' ORDER BY status");
+    $stmt_status->execute();
+    $statuses_db = $stmt_status->fetchAll(PDO::FETCH_COLUMN);
+    if (empty($statuses_db)) {
+        // Fallback para rótulos conhecidos
+        $statuses_db = array_keys($status_options);
+    }
+} catch (Exception $e) {
+    // Se houver falha na leitura, usa valores padrão
+    $tipos_db = ['receita','despesa'];
+    $statuses_db = array_keys($status_options);
+}
 // Função para determinar o status real e a cor do badge
 function getLancamentoStatusInfo($lancamento) {
     $today = new DateTime();
@@ -228,9 +252,32 @@ function getLancamentoStatusInfo($lancamento) {
 
 ?>
 
+<?php
+// Exibe erros detalhados de importação (linhas inválidas) caso existam na sessão
+if (session_status() == PHP_SESSION_NONE) {
+    @session_start();
+}
+if (!empty($_SESSION['import_errors']) && is_array($_SESSION['import_errors'])): ?>
+    <div class="alert alert-danger" role="alert">
+        <h5 class="alert-heading">Erros na importação do arquivo CSV</h5>
+        <p>O arquivo enviado contém linhas inválidas. Nenhum lançamento foi importado. Verifique os detalhes abaixo:</p>
+        <ul class="mb-0">
+            <?php foreach ($_SESSION['import_errors'] as $err): ?>
+                <li><?php echo htmlspecialchars($err); ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+    <?php unset($_SESSION['import_errors']);
+endif;
+?>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h3>Lançamentos Financeiros</h3>
     <div class="d-flex gap-2">
+        <!-- Botão de Importação CSV -->
+        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalImportarLancamentos">
+            <i class="bi bi-upload"></i> Importar
+        </button>
         <button id="btn-exportar" class="btn btn-outline-success" title="Exportar dados filtrados para CSV">
             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar
         </button>
@@ -444,6 +491,38 @@ if (!empty($activeFilters)): ?>
         </div>
     </div>
 </div>
+                        <script>
+                            // Aguarda o DOM carregar antes de ligar os botões Copiar (modal pode estar abaixo no HTML)
+                            document.addEventListener('DOMContentLoaded', function(){
+                                // Listas vindas do servidor
+                                var formas = <?php echo json_encode(array_map(function($f){ return $f['nome']; }, $formas_pagamento)); ?>;
+                                var tipos = <?php echo json_encode($tipos_db); ?>;
+                                var status = <?php echo json_encode($statuses_db); ?>;
+
+                                function wireCopy(btnId, list){
+                                    var btn = document.getElementById(btnId);
+                                    if (!btn) return;
+                                    btn.addEventListener('click', function(){
+                                        var text = list.join(', ');
+                                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                                            navigator.clipboard.writeText(text).then(function(){
+                                                var original = btn.innerText;
+                                                btn.innerText = 'Copiado!';
+                                                setTimeout(function(){ btn.innerText = original; }, 2000);
+                                            }).catch(function(){
+                                                alert('Não foi possível copiar automaticamente. Lista:\n' + text);
+                                            });
+                                        } else {
+                                            alert('Cole manualmente: ' + text);
+                                        }
+                                    });
+                                }
+
+                                wireCopy('btn-copy-formas', formas);
+                                wireCopy('btn-copy-tipos', tipos);
+                                wireCopy('btn-copy-status', status);
+                            });
+                        </script>
 
 <!-- Paginação -->
 <?php if (!empty($total_items)): ?>
@@ -466,6 +545,99 @@ if (!empty($activeFilters)): ?>
         </nav>
     <?php endif; ?>
 <?php endif; ?>
+
+                        <!-- Modal Importar Lançamentos CSV -->
+                        <div class="modal fade" id="modalImportarLancamentos" tabindex="-1" aria-labelledby="modalImportarLancamentosLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="modalImportarLancamentosLabel">Importar Lançamentos (CSV)</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <form action="process/crud_handler.php" method="POST" enctype="multipart/form-data">
+                                        <input type="hidden" name="action" value="import_lancamentos">
+                                        <div class="modal-body">
+                                            <div class="container-fluid">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <h6>Passo 1 — Escolha do arquivo</h6>
+                                                        <p class="small text-muted">Envie um CSV separado por ponto-e-vírgula (<code>;</code>). O modelo disponível já contém as colunas necessárias.</p>
+                                                        <div class="mb-3">
+                                                            <label for="csv_file" class="form-label">Arquivo CSV</label>
+                                                            <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv,text/csv" required>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <a id="btn-download-template" class="btn btn-link p-0" href="<?php echo base_url('assets/sample_templates/import_lancamentos_template.csv'); ?>" download>
+                                                                <i class="bi bi-download me-1"></i> Baixar modelo (abre no Excel)
+                                                            </a>
+                                                        </div>
+
+                                                        <hr>
+
+                                                        <h6>Passo 2 — Empresa destino</h6>
+                                                        <p class="small text-muted">Selecione a empresa que receberá os lançamentos importados.</p>
+                                                        <div class="mb-3">
+                                                            <label for="id_empresa_import" class="form-label">Importar para Empresa</label>
+                                                            <select id="id_empresa_import" name="id_empresa" class="form-select" required>
+                                                                <option value="">Selecione a Empresa...</option>
+                                                                <?php foreach ($empresas_modal as $empresa): ?>
+                                                                    <option value="<?php echo $empresa['id']; ?>"><?php echo htmlspecialchars($empresa['nome_responsavel'] . ' / ' . $empresa['razao_social']); ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-md-6">
+                                                        <h6>Referências rápidas (valores aceitos)</h6>
+                                                        <p class="small text-muted">Copie os valores abaixo para colar no CSV e evitar rejeições.</p>
+
+                                                        <div class="mb-2">
+                                                            <label class="form-label">Formas de Pagamento</label>
+                                                            <div class="d-flex flex-wrap align-items-center gap-1">
+                                                                <?php foreach ($formas_pagamento as $fp): ?>
+                                                                            <span class="badge bg-light text-dark border me-1 mb-1"><?php echo htmlspecialchars($fp['nome']); ?></span>
+                                                                        <?php endforeach; ?>
+                                                            </div>
+                                                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="btn-copy-formas">Copiar formas</button>
+                                                        </div>
+
+                                                                <div class="mb-2">
+                                                                    <label class="form-label">Tipos</label>
+                                                                    <div class="d-flex flex-wrap align-items-center gap-1">
+                                                                        <?php foreach ($tipos_db as $t): ?>
+                                                                            <span class="badge bg-light text-dark border me-1 mb-1"><?php echo htmlspecialchars($t); ?></span>
+                                                                        <?php endforeach; ?>
+                                                                    </div>
+                                                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="btn-copy-tipos">Copiar tipos</button>
+                                                                </div>
+
+                                                                <div class="mb-2">
+                                                                    <label class="form-label">Status</label>
+                                                                    <div class="d-flex flex-wrap align-items-center gap-1">
+                                                                        <?php foreach ($statuses_db as $s): ?>
+                                                                            <span class="badge bg-light text-dark border me-1 mb-1"><?php echo htmlspecialchars($s); ?></span>
+                                                                        <?php endforeach; ?>
+                                                                    </div>
+                                                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="btn-copy-status">Copiar status</button>
+                                                                </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <div>
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                </div>
+                                                <div>
+                                                    <button type="submit" class="btn btn-primary">Importar</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="modal fade" id="modalNovoLancamento" tabindex="-1" aria-labelledby="modalNovoLancamentoLabel" aria-hidden="true">
 

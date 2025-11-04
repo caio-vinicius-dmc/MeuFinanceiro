@@ -185,5 +185,18 @@ global $page;
                 </div>
                 <?php unset($_SESSION['error_message']); // Limpa a mensagem ?>
             <?php endif; ?>
+            <?php if (isset($_SESSION['import_errors']) && is_array($_SESSION['import_errors'])): ?>
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-diamond-fill me-2"></i>
+                    <strong>Atenção:</strong> Alguns registros não foram importados:
+                    <ul class="mb-0 mt-2">
+                        <?php foreach (array_slice($_SESSION['import_errors'], 0, 20) as $err): ?>
+                            <li class="small text-wrap"><?php echo htmlspecialchars($err); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                <?php unset($_SESSION['import_errors']); ?>
+            <?php endif; ?>
         </div>
         <?php endif; ?>

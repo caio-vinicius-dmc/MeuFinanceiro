@@ -13,120 +13,6 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
 
 switch ($action) {
 
-    case 'atualizar_status_lancamento':
-        if (isAdmin() || isContador() || isClient()) {
-            $id = $_POST['id_lancamento'];
-            $novo_status = $_POST['status']; // Expected to be 'Pago' or 'Em aberto'
-            $data_pagamento = $_POST['data_pagamento'] ?? null;
-            $metodo_pagamento = $_POST['metodo_pagamento'] ?? null;
-            $id_forma_pagamento = isset($_POST['id_forma_pagamento']) ? ($_POST['id_forma_pagamento'] !== '' ? $_POST['id_forma_pagamento'] : null) : null;
-
-            error_log("DEBUG: atualizar_status_lancamento - ID: $id, Novo Status Recebido: $novo_status");
-
-            // Detecta se a coluna id_forma_pagamento existe
-            $colStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_forma_pagamento'");
-            $colStmt->execute();
-            $has_forma_col = $colStmt->fetchColumn() > 0;
-
-            // Get current lancamento data for comparison and logging
-            if ($has_forma_col) {
-                $stmt_old_data = $pdo->prepare("SELECT status, data_vencimento, data_pagamento, metodo_pagamento, id_forma_pagamento FROM lancamentos WHERE id = ?");
-            } else {
-                $stmt_old_data = $pdo->prepare("SELECT status, data_vencimento, data_pagamento, metodo_pagamento FROM lancamentos WHERE id = ?");
-            }
-            $stmt_old_data->execute([$id]);
-            $old_lancamento_data = $stmt_old_data->fetch(PDO::FETCH_ASSOC);
-
-            if (!$old_lancamento_data) {
-                $_SESSION['error_message'] = "Lançamento não encontrado.";
-                error_log("DEBUG: Lançamento ID $id não encontrado.");
-                header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
-                exit;
-            }
-
-            $old_status = $old_lancamento_data['status'];
-            $old_data_pagamento = $old_lancamento_data['data_pagamento'];
-            $old_metodo_pagamento = $old_lancamento_data['metodo_pagamento'] ?? null;
-            $old_id_forma = $old_lancamento_data['id_forma_pagamento'] ?? null;
-
-            error_log("DEBUG: Old Status: $old_status, Old Data Pagamento: $old_data_pagamento, Old Metodo Pagamento: $old_metodo_pagamento");
-
-            $log_details = [];
-            $update_fields = [];
-            $update_params = [];
-
-            // Handle status change
-            if ($novo_status == 'Pago') {
-                if ($old_status != 'pago') {
-                    $update_fields[] = "status = ?";
-                    $update_params[] = 'pago';
-                    $log_details[] = "Status: $old_status -> pago";
-                }
-                // Only update data_pagamento and metodo_pagamento if marking as paid
-                if ($data_pagamento && $data_pagamento != $old_data_pagamento) {
-                    $update_fields[] = "data_pagamento = ?";
-                    $update_params[] = $data_pagamento;
-                    $log_details[] = "Data Pagamento: " . ($old_data_pagamento ?? 'N/D') . " -> $data_pagamento";
-                }
-                if ($metodo_pagamento && $metodo_pagamento != $old_metodo_pagamento) {
-                    $update_fields[] = "metodo_pagamento = ?";
-                    $update_params[] = $metodo_pagamento;
-                    $log_details[] = "Forma Pgto: " . ($old_metodo_pagamento ?? 'N/D') . " -> " . $metodo_pagamento;
-                }
-                if ($has_forma_col && $id_forma_pagamento !== null && $id_forma_pagamento != $old_id_forma) {
-                    $update_fields[] = "id_forma_pagamento = ?";
-                    $update_params[] = $id_forma_pagamento;
-                    $log_details[] = "Forma Pgto (id): " . ($old_id_forma ?? 'N/D') . " -> " . $id_forma_pagamento;
-                }
-            } elseif ($novo_status == 'Em aberto') {
-                // Se o status antigo era 'pago', forçamos a mudança para 'pendente' e limpamos os campos de pagamento.
-                if (strtolower($old_status) == 'pago') {
-                    $update_fields[] = "status = ?";
-                    $update_params[] = 'pendente';
-                    $log_details[] = "Status: $old_status -> pendente";
-
-                    // Limpa data_pagamento
-                    $update_fields[] = "data_pagamento = NULL";
-                    $log_details[] = "Data Pagamento: " . ($old_data_pagamento ?? 'N/D') . " -> NULL";
-
-                    // Limpa metodo_pagamento
-                    $update_fields[] = "metodo_pagamento = NULL";
-                    $log_details[] = "Forma Pgto: " . ($old_metodo_pagamento ?? 'N/D') . " -> NULL";
-
-                    // Limpa id_forma_pagamento também se existir
-                    if ($has_forma_col) {
-                        $update_fields[] = "id_forma_pagamento = NULL";
-                        $log_details[] = "Forma Pgto (id): " . ($old_id_forma ?? 'N/D') . " -> NULL";
-                    }
-                }
-            }
-
-            if (empty($update_fields)) {
-                $_SESSION['success_message'] = "Nenhuma alteração necessária para o lançamento.";
-                header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
-                exit;
-            }
-
-            try {
-                $sql = "UPDATE lancamentos SET " . implode(", ", $update_fields) . " WHERE id = ?";
-                $update_params[] = $id;
-                $stmt = $pdo->prepare($sql);
-
-                if ($stmt->execute($update_params)) {
-                    $_SESSION['success_message'] = "Lançamento atualizado com sucesso!";
-                    logAction("Atualizou Lançamento", "lancamentos", $id, implode("; ", $log_details));
-                } else {
-                    $errorInfo = $stmt->errorInfo();
-                    $_SESSION['error_message'] = "Erro ao atualizar lançamento: " . ($errorInfo[2] ?? "Erro desconhecido.");
-                }
-            } catch (PDOException $e) {
-                $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
-            }
-            header("Location: " . base_url('index.php?page=lancamentos') . '&_t=' . time());
-            exit;
-        }
-        break;
-
         case 'enviar_cobranca_email':
             // Envia por email uma cobrança específica para o contato do cliente/empresa
             $id_cobranca = $_GET['id'] ?? $_POST['id'] ?? null;
@@ -233,6 +119,311 @@ switch ($action) {
             header('Location: ' . base_url('index.php?page=configuracoes_email'));
             exit;
             break;
+
+    case 'import_lancamentos':
+        // Importa um CSV de lançamentos para a empresa selecionada.
+        if (!(isAdmin() || isContador() || isClient())) {
+            $_SESSION['error_message'] = 'Você não tem permissão para importar lançamentos.';
+            header('Location: ' . base_url('index.php?page=lancamentos'));
+            exit;
+        }
+
+        // Checa arquivo
+        if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+            $_SESSION['error_message'] = 'Arquivo CSV não enviado ou inválido.';
+            header('Location: ' . base_url('index.php?page=lancamentos'));
+            exit;
+        }
+
+        $id_empresa = $_POST['id_empresa'] ?? null;
+        if (empty($id_empresa)) {
+            $_SESSION['error_message'] = 'Selecione a empresa destino para a importação.';
+            header('Location: ' . base_url('index.php?page=lancamentos'));
+            exit;
+        }
+
+        // Verifica permissão para a empresa selecionada (clientes e contadores)
+        try {
+            $stmtCheck = $pdo->prepare('SELECT id_cliente FROM empresas WHERE id = ?');
+            $stmtCheck->execute([$id_empresa]);
+            $empresa_cliente = $stmtCheck->fetchColumn();
+            if (!$empresa_cliente) {
+                $_SESSION['error_message'] = 'Empresa selecionada não encontrada.';
+                header('Location: ' . base_url('index.php?page=lancamentos'));
+                exit;
+            }
+            if (isClient()) {
+                $id_cliente_logado = $_SESSION['id_cliente_associado'] ?? null;
+                if ($id_cliente_logado != $empresa_cliente) {
+                    $_SESSION['error_message'] = 'Você não tem permissão para importar para esta empresa.';
+                    header('Location: ' . base_url('index.php?page=lancamentos'));
+                    exit;
+                }
+            }
+            if (isContador()) {
+                // contador só pode importar para empresas de clientes associados
+                $stmtAssoc = $pdo->prepare('SELECT id_cliente FROM contador_clientes_assoc WHERE id_usuario_contador = ?');
+                $stmtAssoc->execute([$_SESSION['user_id']]);
+                $assoc = $stmtAssoc->fetchAll(PDO::FETCH_COLUMN);
+                if (!in_array($empresa_cliente, $assoc)) {
+                    $_SESSION['error_message'] = 'Você não está associado ao cliente desta empresa.';
+                    header('Location: ' . base_url('index.php?page=lancamentos'));
+                    exit;
+                }
+            }
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Erro ao validar permissão: ' . $e->getMessage();
+            header('Location: ' . base_url('index.php?page=lancamentos'));
+            exit;
+        }
+
+        // Helpers locais
+        function normalize_header($s) {
+            $s = mb_strtolower(trim($s));
+            $trans = ['á'=>'a','à'=>'a','ã'=>'a','â'=>'a','ä'=>'a','é'=>'e','è'=>'e','ê'=>'e','í'=>'i','ì'=>'i','ó'=>'o','ò'=>'o','õ'=>'o','ô'=>'o','ú'=>'u','ç'=>'c'];
+            $s = strtr($s, $trans);
+            $s = preg_replace('/[^a-z0-9]/', '', $s);
+            return $s;
+        }
+
+        function parse_decimal($raw) {
+            $r = trim((string)$raw);
+            if ($r === '') return null;
+            // Remove currency symbols and spaces
+            $r = preg_replace('/[R$\s]/u','',$r);
+            // If contains comma and dot, assume dot thousand and comma decimal -> remove dots, replace comma
+            if (strpos($r, ',') !== false && strpos($r, '.') !== false) {
+                $r = str_replace('.', '', $r);
+                $r = str_replace(',', '.', $r);
+            } else {
+                // replace comma with dot
+                $r = str_replace(',', '.', $r);
+            }
+            // remove any non-numeric except dot and minus
+            $r = preg_replace('/[^0-9.\-]/', '', $r);
+            return is_numeric($r) ? (float)$r : null;
+        }
+
+        function parse_date_flex($s) {
+            $s = trim((string)$s);
+            if ($s === '') return null;
+            // YYYY-MM-DD
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $s)) return $s;
+            // DD/MM/YYYY
+            if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $s)) {
+                $parts = explode('/',$s);
+                return $parts[2] . '-' . $parts[1] . '-' . $parts[0];
+            }
+            // Try strtotime
+            $t = strtotime($s);
+            if ($t !== false) return date('Y-m-d', $t);
+            return null;
+        }
+
+        // Mapeia formas de pagamento do sistema (nome => id) para validação rápida
+        $formas_map = [];
+        $stmt_fp = $pdo->prepare('SELECT id, nome FROM formas_pagamento');
+        $stmt_fp->execute();
+        $all_formas = $stmt_fp->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($all_formas as $fp) {
+            $formas_map[mb_strtolower(trim($fp['nome']))] = $fp['id'];
+        }
+
+        $tmp = $_FILES['csv_file']['tmp_name'];
+        $inserted = 0;
+        $errors = [];
+
+        try {
+            if (!is_uploaded_file($tmp)) {
+                throw new Exception('Arquivo inválido ou não enviado corretamente.');
+            }
+            // Verifica extensão do arquivo (ajuda a pegar uploads incorretos)
+            $originalName = $_FILES['csv_file']['name'] ?? '';
+            $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['csv', 'txt'])) {
+                throw new Exception('Tipo de arquivo inválido. Envie um arquivo com extensão .csv');
+            }
+            $filesize = @filesize($tmp);
+            if ($filesize === 0 || $filesize === false) {
+                throw new Exception('Arquivo vazio. Verifique o conteúdo do CSV.');
+            }
+
+            if (($handle = fopen($tmp, 'r')) === false) {
+                throw new Exception('Não foi possível abrir o arquivo CSV para leitura.');
+            }
+
+            // Read header (CSV com separador ';')
+            $header = fgetcsv($handle, 0, ';', '"');
+            if ($header === false) {
+                throw new Exception('Arquivo CSV vazio ou inválido.');
+            }
+            // Detect common mistake: file uses comma as delimiter
+            if (count($header) === 1 && strpos($header[0], ',') !== false) {
+                throw new Exception('Parece que seu arquivo usa vírgula (,) como separador. O importador aceita apenas ponto-e-vírgula (;). Por favor, converta o arquivo para usar ponto-e-vírgula.');
+            }
+            $map = [];
+            foreach ($header as $i => $h) {
+                $norm = normalize_header($h);
+                // Map expected names
+                if (in_array($norm, ['descricao','desc','descr'])) $map[$i] = 'descricao';
+                else if (in_array($norm, ['valor','val','vlor'])) $map[$i] = 'valor';
+                else if (in_array($norm, ['tipo','tip'])) $map[$i] = 'tipo';
+                else if (in_array($norm, ['datavencimento','datavenc','vencimento','datavto','datavenc'])) $map[$i] = 'data_vencimento';
+                else if (in_array($norm, ['datacompetencia','datacompet','competencia','compet'])) $map[$i] = 'data_competencia';
+                else if (in_array($norm, ['datapagamento','datapag','data_pagamento','pagamento'])) $map[$i] = 'data_pagamento';
+                else if (in_array($norm, ['formadepagamento','formapagamento','formapagto','forma_pagamento','metodopagamento','metodo_pagamento'])) $map[$i] = 'metodo_pagamento';
+                else if (in_array($norm, ['status','situacao','situacao_pagamento','estado'])) $map[$i] = 'status';
+                else $map[$i] = null; // ignora colunas não reconhecidas
+            }
+
+            // Verifica se o cabeçalho possui as colunas obrigatórias
+            $mappedFields = array_values(array_filter($map));
+            $hasDescricao = in_array('descricao', $mappedFields);
+            $hasValor = in_array('valor', $mappedFields);
+            $hasTipo = in_array('tipo', $mappedFields);
+            $hasVenc = in_array('data_vencimento', $mappedFields);
+            if (!($hasDescricao && $hasValor && $hasTipo && $hasVenc)) {
+                throw new Exception('Cabeçalho inválido. Colunas obrigatórias: Descrição, Valor, Tipo e Data vencimento. Verifique o arquivo e tente novamente.');
+            }
+
+            // Prepara statements de insert (detecta coluna id_forma_pagamento)
+            $colStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_forma_pagamento'");
+            $colStmt->execute();
+            $has_forma_col = $colStmt->fetchColumn() > 0;
+
+            if ($has_forma_col) {
+                $insertSql = "INSERT INTO lancamentos (id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, data_pagamento, metodo_pagamento, id_forma_pagamento, status) VALUES (?,?,?,?,?,?,?,?,?,?)";
+            } else {
+                $insertSql = "INSERT INTO lancamentos (id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, data_pagamento, metodo_pagamento, status) VALUES (?,?,?,?,?,?,?,?,?)";
+            }
+            $stmtInsert = $pdo->prepare($insertSql);
+
+            // Leitura e validação de todas as linhas antes de inserir (tudo ou nada)
+            $allRows = [];
+            $line = 1;
+            while (($row = fgetcsv($handle, 0, ';', '"')) !== false) {
+                $line++;
+                $allRows[] = ['line' => $line, 'row' => $row];
+            }
+
+            $prepared = [];
+            foreach ($allRows as $rinfo) {
+                $line = $rinfo['line'];
+                $row = $rinfo['row'];
+                $data = ['descricao'=>null,'valor'=>null,'tipo'=>null,'data_vencimento'=>null,'data_competencia'=>null,'data_pagamento'=>null,'metodo_pagamento'=>null,'status'=>null];
+                foreach ($row as $i => $cell) {
+                    if (!isset($map[$i]) || $map[$i] === null) continue;
+                    $data[$map[$i]] = $cell;
+                }
+
+                $rowErrors = [];
+                if (empty(trim((string)$data['descricao']))) $rowErrors[] = 'Descrição ausente';
+                $valor = parse_decimal($data['valor']);
+                if ($valor === null) $rowErrors[] = 'Valor inválido';
+                $tipo = mb_strtolower(trim((string)$data['tipo']));
+                if (!in_array($tipo, ['receita','despesa'])) $rowErrors[] = 'Tipo inválido (use receita/despesa)';
+                $dv = parse_date_flex($data['data_vencimento']);
+                if ($dv === null) $rowErrors[] = 'Data vencimento inválida ou ausente';
+                $dc = parse_date_flex($data['data_competencia']);
+                $dp = parse_date_flex($data['data_pagamento']);
+
+                $metodo = trim((string)$data['metodo_pagamento']);
+                $id_forma = null;
+                if ($metodo !== '') {
+                    $key = mb_strtolower($metodo);
+                    if (isset($formas_map[$key])) {
+                        $id_forma = $formas_map[$key];
+                    } else {
+                        $rowErrors[] = 'Forma de pagamento não encontrada: ' . $metodo;
+                    }
+                }
+
+                $status_raw = trim((string)$data['status']);
+                $status_norm = null;
+                if ($status_raw !== '') {
+                    $skey = mb_strtolower($status_raw);
+                    if (strpos($skey, 'pago') !== false) $status_norm = 'pago';
+                    elseif (strpos($skey, 'aberto') !== false || strpos($skey, 'pendente') !== false) $status_norm = 'pendente';
+                    else $rowErrors[] = 'Status inválido (use Em aberto ou Pago)';
+                } else {
+                    $status_norm = 'pendente';
+                }
+
+                if (!empty($rowErrors)) {
+                    $errors[] = "Linha $line: " . implode('; ', $rowErrors);
+                    continue;
+                }
+
+                $valor_grav = $valor;
+                $metodo_txt = $metodo !== '' ? $metodo : null;
+
+                if ($has_forma_col) {
+                    $params = [$id_empresa, $data['descricao'], $valor_grav, $tipo, $dv, $dc ?: null, $dp ?: null, $metodo_txt, $id_forma, $status_norm];
+                } else {
+                    $params = [$id_empresa, $data['descricao'], $valor_grav, $tipo, $dv, $dc ?: null, $dp ?: null, $metodo_txt, $status_norm];
+                }
+                $prepared[] = $params;
+            }
+
+            if (!empty($errors)) {
+                fclose($handle);
+                $_SESSION['error_message'] = 'Arquivo possui linhas inválidas. Nenhum lançamento foi importado.';
+                $_SESSION['import_errors'] = $errors;
+                header('Location: ' . base_url('index.php?page=lancamentos'));
+                exit;
+            }
+
+            // Insere todos os registros validados dentro de uma transação
+            $pdo->beginTransaction();
+            try {
+                foreach ($prepared as $params) {
+                    $stmtInsert->execute($params);
+                    $inserted++;
+                }
+                $pdo->commit();
+                fclose($handle);
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                if (isset($handle) && is_resource($handle)) fclose($handle);
+                $_SESSION['error_message'] = 'Erro ao inserir registros: ' . $e->getMessage();
+                header('Location: ' . base_url('index.php?page=lancamentos'));
+                exit;
+            }
+        } catch (Exception $e) {
+            // Em caso de erro, desfaz qualquer inserção parcial e informa o usuário
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            if (isset($handle) && is_resource($handle)) {
+                fclose($handle);
+            }
+            $_SESSION['error_message'] = 'Importação inválida: ' . $e->getMessage();
+            // Anexa detalhes das linhas que falharam, se houver
+            if (!empty($errors)) {
+                $_SESSION['import_errors'] = $errors;
+            }
+            header('Location: ' . base_url('index.php?page=lancamentos'));
+            exit;
+        }
+
+        // Prepara mensagem de retorno
+        $msgs = [];
+        if ($inserted > 0) $msgs[] = "{$inserted} lançamentos importados com sucesso.";
+        if (!empty($errors)) {
+            // grava erros no session como lista (limitado)
+            $_SESSION['error_message'] = 'Algumas linhas não foram importadas. Veja detalhes abaixo.';
+            $_SESSION['import_errors'] = $errors;
+        } else {
+            $_SESSION['success_message'] = implode(' ', $msgs);
+        }
+        // Se houver mensagens de sucesso e erro simultâneas, prioriza exibir erro + sucesso
+        if (!empty($errors) && $inserted > 0) {
+            $_SESSION['success_message'] = implode(' ', $msgs);
+        }
+
+        header('Location: ' . base_url('index.php?page=lancamentos'));
+        exit;
+        break;
 
     case 'editar_lancamento':
         if (isAdmin() || isContador() || isClient()) { // All can edit
