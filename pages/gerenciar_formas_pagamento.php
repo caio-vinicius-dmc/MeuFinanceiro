@@ -105,6 +105,30 @@ $formas_pagamento = $stmt->fetchAll();
         </div>
     </div>
 </div>
+                    <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        const modalEditar = document.getElementById('modalEditarFormaPagamento');
+                        if (modalEditar) {
+                            modalEditar.addEventListener('show.bs.modal', function (event) {
+                                const button = event.relatedTarget;
+                                const id = button.getAttribute('data-id');
+                                const nome = button.getAttribute('data-nome') || '';
+                                const icone = button.getAttribute('data-icone') || '';
+                                const ativo = button.getAttribute('data-ativo');
+
+                                const modalId = modalEditar.querySelector('#edit_id');
+                                const modalNome = modalEditar.querySelector('#edit_nome');
+                                const modalIcone = modalEditar.querySelector('#edit_icone_bootstrap');
+                                const modalAtivo = modalEditar.querySelector('#edit_ativo');
+
+                                if (modalId) modalId.value = id || '';
+                                if (modalNome) modalNome.value = nome;
+                                if (modalIcone) modalIcone.value = icone;
+                                if (modalAtivo) modalAtivo.checked = (ativo == 1 || ativo === '1');
+                            });
+                        }
+                    });
+                    </script>
 
 <!-- Modal de Edição -->
 <div class="modal fade" id="modalEditarFormaPagamento" tabindex="-1" aria-labelledby="modalEditarLabel" aria-hidden="true">
