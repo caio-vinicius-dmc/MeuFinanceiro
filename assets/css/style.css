@@ -407,11 +407,13 @@ body.sidebar-collapsed .sidebar-logo {
 
 .login-form-side {
     display: flex;
+    flex-direction: column; /* empilha conteúdo (card + footer) verticalmente) */
     align-items: center; 
     justify-content: center;
     background-color: #f8f9fa;
     padding: 2rem;
     min-height: auto; /* permite que o conteúdo cresça em telas pequenas */
+    gap: 1rem; /* espaço entre o card e o footer */
 }
 
 @media (min-width: 992px) {
@@ -425,10 +427,16 @@ body.sidebar-collapsed .sidebar-logo {
     .login-form-side {
         padding: 1rem; /* reduz padding para caber mais conteúdo */
     }
-    .login-card {
-        box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-        border-radius: 0.6rem;
-        padding: 0.5rem;
+    .login-form-side {
+        /* Não forçar 100vh nem alinhamento à esquerda aqui —
+           manter a centralização definida anteriormente e permitir
+           que o conteúdo se ajuste proporcionalmente em telas maiores */
+        min-height: auto;
+        align-items: center; /* centraliza horizontalmente */
+        justify-content: center; /* centraliza verticalmente */
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
+        gap: 1rem;
     }
     .login-card .card-body {
         padding: 1rem;
@@ -515,7 +523,7 @@ body.sidebar-collapsed .sidebar-logo {
 .app-footer .footer-logo {
     width: 48px;
     height: 48px;
-    border-radius: 50%; /* tornar circular */
+    border-radius: 100%; /* tornar circular (100% requested) */
     object-fit: cover; /* mantém proporção e preenche a área */
     display: inline-block;
 }
@@ -599,9 +607,15 @@ body.sidebar-collapsed .sidebar-logo {
         margin-left: 0;
     }
     .login-form-side {
-        min-height: 100vh; 
-        align-items: flex-start;
-        padding-top: 4rem;
+        /* Em mobile queremos o card centralizado horizontalmente e verticalmente */
+        min-height: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* centra horizontalmente (eixo cruzado) */
+        justify-content: center; /* centra verticalmente (eixo principal) */
+        padding-top: 1.5rem; /* espaçamento mais leve no topo */
+        padding-bottom: 1.5rem;
+        gap: 1rem;
     }
     .login-card {
         box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
@@ -710,6 +724,41 @@ body.sidebar-collapsed .sidebar-logo {
     /* CONTROLADOR DE ALTURA E ALINHAMENTO */
     padding: 0 1.5rem; 
     height: 45px; 
+}
+
+/* Override para footer público quando usado na tela de login (não deve ficar fixo) */
+.public-footer {
+    /* base: neutral, inline footer for public pages (login) */
+    position: static;
+    width: auto;
+    display: block;
+    background: transparent;
+    border-top: none;
+    padding: 0.5rem 0;
+}
+
+/* Garantir que a logo usada no footer público também fique arredondada */
+.public-footer .footer-logo,
+.login-form-side .public-footer .footer-logo {
+    border-radius: 100%;
+    object-fit: cover;
+    display: inline-block;
+}
+
+/* When placed inside the login column, make it compact and aligned */
+.login-form-side .public-footer {
+    padding-left: 0;
+    padding-right: 0;
+    margin-top: 1.25rem;
+}
+
+.login-form-side .public-footer .footer-logo { width: 36px; height: 36px; }
+.login-form-side .public-footer .footer-version { display: none; }
+
+/* Ensure the public footer's internal layout is flexible and mobile-friendly */
+.public-footer .container-fluid {
+    padding-left: 0;
+    padding-right: 0;
 }
 
 /* Garante que o div interno do container use a altura total para a centralização Flexbox */

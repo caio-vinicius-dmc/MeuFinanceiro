@@ -72,27 +72,40 @@ $where_sql_com_prefixo = "WHERE " . $where_sql;
 
 // --- 3. Consultas para os Cards e Indicadores ---
 
-// 3a. A Receber = Pendente OU Confirmado pelo Cliente
-$sql_receber = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'receita' AND l.status IN ('pendente', 'confirmado_cliente')";
+// 3a. A Receber = Pendente OU Confirmado pelo Cliente (filtro por data_vencimento)
+$sql_receber = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'receita' AND LOWER(l.status) IN ('pendente', 'confirmado_cliente')";
 $stmt_receber = $pdo->prepare($sql_receber);
 $stmt_receber->execute($params);
 $total_a_receber = $stmt_receber->fetch()['total'] ?? 0;
 
-// 3b. A Pagar = Pendente OU Confirmado pelo Cliente
-$sql_pagar = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'despesa' AND l.status IN ('pendente', 'confirmado_cliente')";
+// 3b. A Pagar = Pendente OU Confirmado pelo Cliente (filtro por data_vencimento)
+$sql_pagar = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'despesa' AND LOWER(l.status) IN ('pendente', 'confirmado_cliente')";
 $stmt_pagar = $pdo->prepare($sql_pagar);
 $stmt_pagar->execute($params);
 $total_a_pagar = $stmt_pagar->fetch()['total'] ?? 0;
 
-// 3c. Saldo Realizado = APENAS o que está 'pago' (baixado)
-$sql_pago = "SELECT SUM(CASE WHEN l.tipo = 'receita' THEN valor ELSE -valor END) AS total $base_join $where_sql_com_prefixo AND l.status = 'pago'";
+// --- Preparar WHERE/PARAMS para consultas baseadas em data_pagamento (Realizado) ---
+$where_conditions_pag = $where_conditions;
+// Substitui o primeiro filtro (data_vencimento) por um filtro que prioriza data_pagamento
+// e, caso data_pagamento seja NULL, usa data_vencimento como fallback.
+if (!empty($where_conditions_pag)) {
+    // assume que o primeiro elemento original é o filtro de data_vencimento
+    $where_conditions_pag[0] = "(l.data_pagamento BETWEEN ? AND ? OR (l.data_pagamento IS NULL AND l.data_vencimento BETWEEN ? AND ?))";
+}
+// Precisamos passar os parâmetros de data duas vezes (para data_pagamento e para o fallback data_vencimento)
+$params_pag = array_merge([$filtro_data_inicio, $filtro_data_fim, $filtro_data_inicio, $filtro_data_fim], $params_permissoes);
+$where_sql_pag = implode(' AND ', $where_conditions_pag);
+$where_sql_pag_com_prefixo = "WHERE " . $where_sql_pag;
+
+// 3c. Saldo Realizado = APENAS o que está 'pago' (baixado) - usa data_pagamento
+$sql_pago = "SELECT SUM(CASE WHEN l.tipo = 'receita' THEN valor ELSE -valor END) AS total $base_join $where_sql_pag_com_prefixo AND LOWER(l.status) = 'pago'";
 $stmt_pago = $pdo->prepare($sql_pago);
-$stmt_pago->execute($params);
+$stmt_pago->execute($params_pag);
 $total_pago = $stmt_pago->fetch()['total'] ?? 0;
 
 // NOTE: 'contestado' status removed from application; não calculamos mais contestados aqui.
 
-// 3f. Indicador: Total de Lançamentos Vencidos no Período (Inclui PAGO e PENDENTE)
+// 3f. Indicador: Total de Lançamentos Vencidos no Período (Inclui PAGO e PENDENTE) - mantém data_vencimento
 $sql_total_vencido = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo";
 $stmt_total_vencido = $pdo->prepare($sql_total_vencido);
 $stmt_total_vencido->execute($params);
@@ -101,16 +114,16 @@ $total_vencido_periodo = $stmt_total_vencido->fetch()['total'] ?? 0;
 // 3g. Indicador: Projeção de Saldo (Realizado + (Receber - Pagar))
 $projecao_saldo = $total_pago + ($total_a_receber - $total_a_pagar);
 
-// 3h. Indicador: Percentual de Receita Paga
-$sql_receita_paga = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'receita' AND l.status = 'pago'";
+// 3h. Indicador: Percentual de Receita Paga (usa data_pagamento para o numerador e denominador)
+$sql_receita_paga = "SELECT SUM(valor) AS total $base_join $where_sql_pag_com_prefixo AND l.tipo = 'receita' AND LOWER(l.status) = 'pago'";
 $stmt_receita_paga = $pdo->prepare($sql_receita_paga);
-$stmt_receita_paga->execute($params);
+$stmt_receita_paga->execute($params_pag);
 $valor_receita_paga = $stmt_receita_paga->fetch()['total'] ?? 0;
 
-// Total de Receitas no Período
-$sql_total_receita_periodo = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'receita'";
+// Total de Receitas no Período (considerando realizadas no período — usar data_pagamento para consistência com 'realizado')
+$sql_total_receita_periodo = "SELECT SUM(valor) AS total $base_join $where_sql_pag_com_prefixo AND l.tipo = 'receita'";
 $stmt_total_receita_periodo = $pdo->prepare($sql_total_receita_periodo);
-$stmt_total_receita_periodo->execute($params);
+$stmt_total_receita_periodo->execute($params_pag);
 $total_receita_periodo = $stmt_total_receita_periodo->fetch()['total'] ?? 0;
 
 $percent_pago = ($total_receita_periodo > 0) ? ($valor_receita_paga / $total_receita_periodo) * 100 : 0;
@@ -139,7 +152,7 @@ $stmt_avg_despesa->execute($params);
 $media_despesa = $stmt_avg_despesa->fetch()['media'] ?? 0;
 
 // Total de despesas marcadas como 'pago' (realizado despesa)
-$sql_despesa_paga = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'despesa' AND l.status = 'pago'";
+$sql_despesa_paga = "SELECT SUM(valor) AS total $base_join $where_sql_com_prefixo AND l.tipo = 'despesa' AND LOWER(l.status) = 'pago'";
 $stmt_despesa_paga = $pdo->prepare($sql_despesa_paga);
 $stmt_despesa_paga->execute($params);
 $valor_despesa_paga = $stmt_despesa_paga->fetch()['total'] ?? 0;
@@ -234,13 +247,13 @@ if ($filtro_empresa_id) {
 $where_sql_cob = "WHERE " . implode(' AND ', $where_conditions_cob);
 
 // Consulta: Total a Receber (Cobranças pendentes)
-$sql_cob_pendente = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_cob AND cob.status_pagamento = 'Pendente'";
+$sql_cob_pendente = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_cob AND LOWER(cob.status_pagamento) = 'pendente'";
 $stmt_cob_pendente = $pdo->prepare($sql_cob_pendente);
 $stmt_cob_pendente->execute($params_cob);
 $total_cobrancas_pendentes = $stmt_cob_pendente->fetch()['total'] ?? 0;
 
 // Consulta: Total Recebido (Cobranças pagas)
-$sql_cob_pago = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_cob AND cob.status_pagamento = 'Pago'";
+$sql_cob_pago = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_cob AND LOWER(cob.status_pagamento) = 'pago'";
 $stmt_cob_pago = $pdo->prepare($sql_cob_pago);
 $stmt_cob_pago->execute($params_cob);
 $total_cobrancas_recebidas = $stmt_cob_pago->fetch()['total'] ?? 0;
@@ -294,7 +307,7 @@ if ($filtro_empresa_id) {
 }
 
 $where_sql_vencidas = "WHERE " . implode(' AND ', $where_vencidas);
-$sql_cob_vencidas_nao_pagas = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_vencidas AND cob.status_pagamento != 'Pago'";
+$sql_cob_vencidas_nao_pagas = "SELECT SUM(cob.valor) AS total $base_join_cob $where_sql_vencidas AND LOWER(cob.status_pagamento) != 'pago'";
 $stmt_cob_vencidas = $pdo->prepare($sql_cob_vencidas_nao_pagas);
 $stmt_cob_vencidas->execute($params_vencidas);
 $total_cobrancas_vencidas = $stmt_cob_vencidas->fetch()['total'] ?? 0;
@@ -408,8 +421,8 @@ $where_grafico_fluxo_conditions[] = "l.data_pagamento BETWEEN ? AND ?";
 $params_grafico_fluxo[] = $filtro_data_inicio;
 $params_grafico_fluxo[] = $filtro_data_fim;
 
-// 2. Status
-$where_grafico_fluxo_conditions[] = "l.status = 'pago'";
+// 2. Status (case-insensitive)
+$where_grafico_fluxo_conditions[] = "LOWER(l.status) = 'pago'";
 
 // 3. Permissão/Filtros (Baseado na lógica da Seção 2, mas sem o filtro de data_vencimento)
 $where_fluxo_perm = [];
@@ -502,9 +515,10 @@ $status_data_raw = $stmt_status_receita->fetchAll(PDO::FETCH_ASSOC);
 
 $status_data = [];
 
-// Processa dados brutos para o formato do gráfico
+// Processa dados brutos para o formato do gráfico (case-insensitive para status)
 foreach ($status_data_raw as $item) {
-    if ($item['status'] == 'pago') {
+    $st = strtolower(trim((string)$item['status'] ?? ''));
+    if ($st === 'pago') {
         $status_data['Pago'] = ($status_data['Pago'] ?? 0) + $item['total'];
     } else {
         // Agrupa 'pendente' e 'confirmado_cliente' e qualquer outro status não-pago como 'A Receber'
@@ -658,7 +672,7 @@ $status_chart_json = json_encode([
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Saldo líquido dos lançamentos que foram efetivamente pagos (Receitas Pagas - Despesas Pagas) no período.">
         <div class="card card-metric">
              <i class="bi bi-check-circle card-metric-icon"></i>
-            <div class="metric-title"><?php echo $card_title_saldo_realizado; ?></div>
+            <div class="metric-title"><?php echo $card_title_saldo_realizado; ?> <small class="text-muted"><i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-placement="top" title="Calculado por valores marcados como pagos; utiliza a data de pagamento quando disponível, caso contrário usa a data de vencimento como fallback."></i></small></div>
             <div class="metric-value <?php echo ($total_pago >= 0) ? 'text-success-emphasis' : 'text-danger-emphasis'; ?>">
                 R$ <?php echo number_format($total_pago, 2, ',', '.'); ?>
             </div>
@@ -686,6 +700,7 @@ $status_chart_json = json_encode([
                     <div class="metric-value">
                         <?php echo number_format($percent_pago, 1, ',', '.'); ?>%
                     </div>
+                    <div class="metric-sub text-muted">R$ <?php echo number_format($valor_receita_paga ?? 0, 2, ',', '.'); ?> / R$ <?php echo number_format($total_receita_periodo ?? 0, 2, ',', '.'); ?></div>
                 </div>
             </div>
             <?php endif; ?>
@@ -703,53 +718,44 @@ $status_chart_json = json_encode([
     <?php endif; ?>
 </div>
 
-<!-- Nova linha: cards adicionais para clientes (Receitas/Despesas realizadas, contagens e médias) -->
-<div class="row g-4 mb-4">
-    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total de Receitas realizadas (pagas) no período.">
-        <div class="card card-metric">
-            <i class="bi bi-cash-stack card-metric-icon"></i>
-            <div class="metric-title">Receitas Realizadas</div>
-            <div class="metric-value text-success-emphasis">
-                R$ <?php echo number_format($valor_receita_paga, 2, ',', '.'); ?>
+<!-- Blocos adicionais removidos: seção simplificada para manter apenas os indicadores essenciais (Total a Receber, Total a Pagar, Saldo Realizado, % Receita Paga). -->
+<!-- Se desejar, posso reintroduzir cards menores (contagens/médias) opcionalmente em uma área colapsável. -->
+<!-- Card colapsável: Métricas secundárias (contagens e médias) -->
+<div class="mb-3">
+    <a class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" href="#secondaryMetrics" role="button" aria-expanded="false" aria-controls="secondaryMetrics">
+        <i class="bi bi-list-check"></i> Métricas secundárias
+    </a>
+    <div class="collapse mt-3" id="secondaryMetrics">
+        <div class="card card-body">
+            <div class="row g-3">
+                <div class="col-sm-6 col-md-3">
+                    <div class="small-card p-2 border rounded text-center">
+                        <div class="fw-semibold">Receitas (Qtd)</div>
+                        <div class="fs-5 text-body"><?php echo intval($qtd_receitas); ?></div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <div class="small-card p-2 border rounded text-center">
+                        <div class="fw-semibold">Despesas (Qtd)</div>
+                        <div class="fs-5 text-body"><?php echo intval($qtd_despesas); ?></div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <div class="small-card p-2 border rounded text-center">
+                        <div class="fw-semibold">Média Receita</div>
+                        <div class="fs-5 text-body">R$ <?php echo number_format($media_receita, 2, ',', '.'); ?></div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <div class="small-card p-2 border rounded text-center">
+                        <div class="fw-semibold">Média Despesa</div>
+                        <div class="fs-5 text-body">R$ <?php echo number_format($media_despesa, 2, ',', '.'); ?></div>
+                    </div>
+                </div>
             </div>
-            <div class="metric-sub">Qtd: <?php echo $qtd_receitas; ?> — Média: R$ <?php echo number_format($media_receita, 2, ',', '.'); ?></div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total de Despesas realizadas (pagas) no período.">
-        <div class="card card-metric">
-            <i class="bi bi-wallet2 card-metric-icon"></i>
-            <div class="metric-title">Despesas Realizadas</div>
-            <div class="metric-value text-danger-emphasis">
-                R$ <?php echo number_format($valor_despesa_paga, 2, ',', '.'); ?>
-            </div>
-            <div class="metric-sub">Qtd: <?php echo $qtd_despesas; ?> — Média: R$ <?php echo number_format($media_despesa, 2, ',', '.'); ?></div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total projetado a receber no período (pendente + confirmado).">
-        <div class="card card-metric">
-            <i class="bi bi-list-columns card-metric-icon"></i>
-            <div class="metric-title">A Receber (Qtd)</div>
-            <div class="metric-value">
-                <?php echo $qtd_receitas; ?>
-            </div>
-            <div class="metric-sub">Valor total: R$ <?php echo number_format($total_a_receber, 2, ',', '.'); ?></div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Total projetado a pagar no período (pendente + confirmado).">
-        <div class="card card-metric">
-            <i class="bi bi-list-columns-reverse card-metric-icon"></i>
-            <div class="metric-title">A Pagar (Qtd)</div>
-            <div class="metric-value">
-                <?php echo $qtd_despesas; ?>
-            </div>
-            <div class="metric-sub">Valor total: R$ <?php echo number_format($total_a_pagar, 2, ',', '.'); ?></div>
         </div>
     </div>
 </div>
-
 <?php if (!empty($lancamentos_por_tipo_receita) || !empty($lancamentos_por_tipo_despesa)): ?>
     <div class="row g-4 mb-4">
         <?php if (!empty($lancamentos_por_tipo_receita)): ?>
@@ -1163,7 +1169,8 @@ $status_chart_json = json_encode([
                                         <div class="fw-bold"><?php echo htmlspecialchars($c['tipo_nome'] ?? $c['descricao'] ?? '—'); ?></div>
                                         <small class="text-muted"><?php echo htmlspecialchars($c['razao_social']); ?> — <?php echo date('d/m/Y', strtotime($c['data_vencimento'])); ?></small>
                                     </div>
-                                    <span class="fw-bold ms-3 <?php echo ($c['status_pagamento'] === 'Pago') ? 'text-success' : 'text-danger'; ?>">R$ <?php echo number_format($c['valor'], 2, ',', '.'); ?></span>
+                                            <?php $c_status = strtolower(trim((string)($c['status_pagamento'] ?? ''))); ?>
+                                            <span class="fw-bold ms-3 <?php echo ($c_status === 'pago') ? 'text-success' : 'text-danger'; ?>">R$ <?php echo number_format($c['valor'], 2, ',', '.'); ?></span>
                                 </a>
                             </li>
                         <?php endforeach; ?>

@@ -39,7 +39,13 @@ if (isset($_SESSION['error_message'])) {
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     
-    <link rel="stylesheet" href="<?php echo base_url('assets/css/style.css?v=2.0'); ?>"> </head>
+    <link rel="stylesheet" href="<?php echo base_url('assets/css/style.css?v=2.0'); ?>">
+
+    <!-- Favicon (mesma imagem usada no header global) -->
+    <link rel="icon" type="image/png" href="<?php echo base_url('assets/img/favicon.png'); ?>">
+    <link rel="shortcut icon" href="<?php echo base_url('assets/img/favicon.png'); ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?php echo base_url('assets/img/favicon.png'); ?>">
+</head>
 <body class="login-wrapper">
 
     <div class="container-fluid min-vh-100 p-0 login-wrapper">
@@ -98,6 +104,10 @@ if (isset($_SESSION['error_message'])) {
                             </div>
                         </form>
                     </div>
+                </div>
+                <!-- Footer público compacto (não ocupa toda a tela) -->
+                <div class="login-footer mt-4">
+                    <?php include_once __DIR__ . '/../includes/footer_public.php'; ?>
                 </div>
             </div>
         </div>
