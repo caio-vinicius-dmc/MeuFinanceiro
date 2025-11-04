@@ -17,6 +17,18 @@ function getEmpresaNome($id) {
     return $stmt->fetchColumn();
 }
 
+function getCategoriaNome($id) {
+    global $pdo;
+    if (empty($id)) return null;
+    try {
+        $stmt = $pdo->prepare("SELECT nome FROM categorias_lancamento WHERE id = ?");
+        $stmt->execute([$id]);
+        return $stmt->fetchColumn();
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
 // NOTE: `lancamentos` armazena a forma de pagamento em `metodo_pagamento` (string).
 // Não existe a coluna `id_forma_pagamento` na tabela `lancamentos` no esquema atual.
 // Por isso o filtro e o select abaixo usam o nome da forma (campo `nome` de formas_pagamento)
@@ -32,6 +44,7 @@ $filtro_pag_fim = $_GET['pag_fim'] ?? null;     // novo filtro: data de pagament
 $filtro_comp_inicio = $_GET['comp_inicio'] ?? null; // novo filtro: data de competência inicio
 $filtro_comp_fim = $_GET['comp_fim'] ?? null;       // novo filtro: data de competência fim
 $filtro_forma_pag = $_GET['forma_pagamento'] ?? null; // novo filtro: forma de pagamento (nome)
+$filtro_categoria = $_GET['categoria'] ?? null;
 $filtro_valor_min = $_GET['valor_min'] ?? null;
 $filtro_valor_max = $_GET['valor_max'] ?? null;
 
@@ -114,6 +127,10 @@ if (!empty($filtro_forma_pag)) {
     $where_conditions[] = "l.metodo_pagamento = ?";
     $params[] = $filtro_forma_pag;
 }
+if (!empty($filtro_categoria)) {
+    $where_conditions[] = "l.id_categoria = ?";
+    $params[] = $filtro_categoria;
+}
 if (is_numeric($filtro_valor_min)) {
     $where_conditions[] = "l.valor >= ?";
     $params[] = $filtro_valor_min;
@@ -138,13 +155,31 @@ $per_page = 25;
 $page_num = max(1, intval($_GET['page_num'] ?? 1));
 $offset = ($page_num - 1) * $per_page;
 
-$sql = "SELECT l.*, e.razao_social, e.id_cliente, c.nome_responsavel 
+$has_categorias_table = false;
+try {
+    $tStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'categorias_lancamento'");
+    $tStmt->execute();
+    $has_categorias_table = $tStmt->fetchColumn() > 0;
+} catch (Exception $e) { $has_categorias_table = false; }
+
+if ($has_categorias_table) {
+    $sql = "SELECT l.*, e.razao_social, e.id_cliente, c.nome_responsavel, cat.nome AS categoria_nome 
+    FROM lancamentos l
+    JOIN empresas e ON l.id_empresa = e.id
+    JOIN clientes c ON e.id_cliente = c.id
+    LEFT JOIN categorias_lancamento cat ON l.id_categoria = cat.id
+    $where_sql
+    ORDER BY l.data_vencimento DESC
+    LIMIT ? OFFSET ?";
+} else {
+    $sql = "SELECT l.*, e.razao_social, e.id_cliente, c.nome_responsavel 
     FROM lancamentos l
     JOIN empresas e ON l.id_empresa = e.id
     JOIN clientes c ON e.id_cliente = c.id
     $where_sql
     ORDER BY l.data_vencimento DESC
     LIMIT ? OFFSET ?";
+}
 
 $params_for_query = $params;
 $params_for_query[] = $per_page;
@@ -153,6 +188,15 @@ $params_for_query[] = $offset;
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params_for_query);
 $lancamentos = $stmt->fetchAll();
+
+// Categorias (para modais). Se a tabela não existir, usamos array vazia.
+try {
+    $stmt_cats = $pdo->prepare("SELECT id, nome FROM categorias_lancamento WHERE ativo = 1 ORDER BY nome");
+    $stmt_cats->execute();
+    $categorias_modal = $stmt_cats->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $categorias_modal = [];
+}
 
 // --- 4. Consulta para População de Dropdowns (Empresas) ---
 $sql_empresas_modal = "SELECT e.id, e.razao_social, c.nome_responsavel 
@@ -190,6 +234,14 @@ $sql_formas_pagamento = "SELECT id, nome FROM formas_pagamento ORDER BY nome";
 $stmt_formas_pagamento = $pdo->prepare($sql_formas_pagamento);
 $stmt_formas_pagamento->execute();
 $formas_pagamento = $stmt_formas_pagamento->fetchAll(PDO::FETCH_ASSOC);
+// Categorias (para filtro e modais). Se a tabela não existir, usamos array vazia.
+try {
+    $stmt_cats = $pdo->prepare("SELECT id, nome FROM categorias_lancamento WHERE ativo = 1 ORDER BY nome");
+    $stmt_cats->execute();
+    $categorias_modal = $stmt_cats->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $categorias_modal = [];
+}
 // Buscar valores dinâmicos existentes no banco para tipos e status (usados no modal de import)
 try {
     $stmt_tipos = $pdo->prepare("SELECT DISTINCT tipo FROM lancamentos WHERE tipo IS NOT NULL AND TRIM(tipo) <> '' ORDER BY tipo");
@@ -356,6 +408,16 @@ endif;
             </div>
 
             <div class="col-md-3">
+                <label class="form-label">Categoria</label>
+                <select id="filtro_categoria" name="categoria" class="form-select">
+                    <option value="">Todas as Categorias</option>
+                    <?php foreach ($categorias_modal as $cat): ?>
+                        <option value="<?php echo $cat['id']; ?>" <?php echo ($filtro_categoria == $cat['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($cat['nome']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-md-3">
                 <label class="form-label">Valor Entre (R$)</label>
                 <div class="input-group">
                     <input type="number" step="0.01" class="form-control" name="valor_min" value="<?php echo htmlspecialchars($filtro_valor_min ?? ''); ?>" placeholder="Mínimo" title="Valor Mínimo">
@@ -381,6 +443,7 @@ if (!empty($filtro_venc_inicio) || !empty($filtro_venc_fim)) $activeFilters[] = 
 if (!empty($filtro_pag_inicio) || !empty($filtro_pag_fim)) $activeFilters[] = 'Pagamento: ' . htmlspecialchars($filtro_pag_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_pag_fim ?? '-');
 if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFilters[] = 'Competência: ' . htmlspecialchars($filtro_comp_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_comp_fim ?? '-');
 if (!empty($filtro_forma_pag)) $activeFilters[] = 'Forma: ' . htmlspecialchars(getFormaPagamentoNome($filtro_forma_pag) ?? $filtro_forma_pag);
+if (!empty($filtro_categoria)) $activeFilters[] = 'Categoria: ' . htmlspecialchars(getCategoriaNome($filtro_categoria) ?? $filtro_categoria);
 if (!empty($filtro_valor_min) || !empty($filtro_valor_max)) $activeFilters[] = 'Valor: ' . htmlspecialchars($filtro_valor_min ?? '-') . ' → ' . htmlspecialchars($filtro_valor_max ?? '-');
 if (!empty($activeFilters)): ?>
     <div class="mb-3">
@@ -399,6 +462,7 @@ if (!empty($activeFilters)): ?>
                         <th>Competência</th>
                         <th>Pagamento</th>
                         <th>Forma Pgto.</th>
+                        <th>Categoria</th>
                         <th>Cliente/Empresa</th>
                         <th>Descrição</th>
                         <th>Valor</th>
@@ -424,6 +488,7 @@ if (!empty($activeFilters)): ?>
                             <td><?php echo $lanc['data_competencia'] ? date('d/m/Y', strtotime($lanc['data_competencia'])) : '-'; ?></td>
                             <td><?php echo $lanc['data_pagamento'] ? date('d/m/Y', strtotime($lanc['data_pagamento'])) : '-'; ?></td>
                             <td><?php echo htmlspecialchars($lanc['metodo_pagamento'] ?? '-'); ?></td>
+                            <td><?php echo htmlspecialchars($lanc['categoria_nome'] ?? '-'); ?></td>
                             <td>
                                 <div class="fw-bold"><?php echo htmlspecialchars($lanc['razao_social']); ?></div>
                                 <small class="text-muted"><?php echo htmlspecialchars($lanc['nome_responsavel']); ?></small>
@@ -473,6 +538,7 @@ if (!empty($activeFilters)): ?>
                                                                                 data-data_pagamento="<?php echo htmlspecialchars($lanc['data_pagamento'] ?? ''); ?>"
                                                                                 data-metodo_pagamento="<?php echo htmlspecialchars($lanc['metodo_pagamento'] ?? ''); ?>"
                                                                                 data-id-forma-pagamento="<?php echo htmlspecialchars($lanc['id_forma_pagamento'] ?? ''); ?>"
+                                                                                data-id-categoria="<?php echo htmlspecialchars($lanc['id_categoria'] ?? ''); ?>"
                                                                                 data-status="<?php echo htmlspecialchars($lanc['status']); ?>"                                        title="Editar Lançamento">
                                     <i class="bi bi-pencil"></i>
                                 </button>
@@ -498,6 +564,7 @@ if (!empty($activeFilters)): ?>
                                 var formas = <?php echo json_encode(array_map(function($f){ return $f['nome']; }, $formas_pagamento)); ?>;
                                 var tipos = <?php echo json_encode($tipos_db); ?>;
                                 var status = <?php echo json_encode($statuses_db); ?>;
+                                var categorias = <?php echo json_encode(array_map(function($c){ return $c['nome']; }, $categorias_modal)); ?>;
 
                                 function wireCopy(btnId, list){
                                     var btn = document.getElementById(btnId);
@@ -521,6 +588,7 @@ if (!empty($activeFilters)): ?>
                                 wireCopy('btn-copy-formas', formas);
                                 wireCopy('btn-copy-tipos', tipos);
                                 wireCopy('btn-copy-status', status);
+                                wireCopy('btn-copy-categorias', categorias);
                             });
                         </script>
 
@@ -619,6 +687,16 @@ if (!empty($activeFilters)): ?>
                                                                         <?php endforeach; ?>
                                                                     </div>
                                                                     <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="btn-copy-status">Copiar status</button>
+                                                                </div>
+                                
+                                                                <div class="mb-2">
+                                                                    <label class="form-label">Categorias</label>
+                                                                    <div class="d-flex flex-wrap align-items-center gap-1">
+                                                                        <?php foreach ($categorias_modal as $c): ?>
+                                                                            <span class="badge bg-light text-dark border me-1 mb-1"><?php echo htmlspecialchars($c['nome']); ?></span>
+                                                                        <?php endforeach; ?>
+                                                                    </div>
+                                                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="btn-copy-categorias">Copiar categorias</button>
                                                                 </div>
                                                     </div>
                                                 </div>
@@ -766,6 +844,16 @@ if (!empty($activeFilters)): ?>
 
                                                             <input type="hidden" name="id_forma_pagamento" id="novo_id_forma_pagamento" />
 
+                                                </div>
+
+                                                <div class="col-md-4">
+                                                    <label for="novo_id_categoria" class="form-label">Categoria</label>
+                                                    <select id="novo_id_categoria" name="id_categoria" class="form-select">
+                                                        <option value="">Sem categoria</option>
+                                                        <?php foreach ($categorias_modal as $cat): ?>
+                                                            <option value="<?php echo $cat['id']; ?>"><?php echo htmlspecialchars($cat['nome']); ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
                                                 </div>
 
                                             </div>
@@ -928,6 +1016,16 @@ if (!empty($activeFilters)): ?>
 
                                                     <input type="hidden" name="id_forma_pagamento" id="edit_id_forma_pagamento" />
 
+                                                </div>
+
+                                                <div class="col-md-4">
+                                                    <label for="edit_id_categoria" class="form-label">Categoria</label>
+                                                    <select id="edit_id_categoria" name="id_categoria" class="form-select">
+                                                        <option value="">Sem categoria</option>
+                                                        <?php foreach ($categorias_modal as $cat): ?>
+                                                            <option value="<?php echo $cat['id']; ?>"><?php echo htmlspecialchars($cat['nome']); ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
                                                 </div>
 
                         

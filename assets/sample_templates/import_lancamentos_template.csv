@@ -1,11 +1,11 @@
-﻿Descrição;Valor;Tipo;Data vencimento;Data competência;Data pagamento;Status;Forma de pagamento
-Venda Produto A;1500.00;receita;10/11/2025;01/11/2025;;Em aberto;Transferência Bancária
-Pagamento Fornecedor X;750,5;despesa;10/11/2025;01/11/2025;12/11/2025;Pago;Boleto Bancário
-Assinatura Cliente Y;299,9;receita;15/11/2025;01/11/2025;;Em aberto;Cartão de Crédito
-Compra Material;120;despesa;05/11/2025;01/11/2025;05/11/2025;Pago;Pix
-Serviço Prestado Z;4500;receita;20/11/2025;01/11/2025;;Em aberto;Transferência Bancária
-Taxa Bancária;15;despesa;03/11/2025;01/11/2025;03/11/2025;Pago;Cartão de Crédito
-Reembolso Cliente;200;despesa;12/11/2025;01/11/2025;;Em aberto;Transferência Bancária
-Comissão Vendas;250,75;despesa;08/11/2025;01/11/2025;08/11/2025;Pago;Boleto Bancário
-Honorários Contador;1800;despesa;18/11/2025;01/11/2025;;Em aberto;Transferência Bancária
-Serviço Extra X;650;receita;22/11/2025;01/11/2025;;Em aberto;Pix
+﻿Descrição;Valor;Tipo;Data vencimento;Data competência;Data pagamento;Status;Forma de pagamento;Categoria
+Venda Produto A;1500.00;receita;10/11/2025;01/11/2025;;Em aberto;Transferência Bancária;Venda
+Pagamento Fornecedor X;750,5;despesa;10/11/2025;01/11/2025;12/11/2025;Pago;Boleto Bancário;Compra
+Assinatura Cliente Y;299,9;receita;15/11/2025;01/11/2025;;Em aberto;Cartão de Crédito;Venda
+Compra Material;120;despesa;05/11/2025;01/11/2025;05/11/2025;Pago;Pix;Compra
+Serviço Prestado Z;4500;receita;20/11/2025;01/11/2025;;Em aberto;Transferência Bancária;Sistema
+Taxa Bancária;15;despesa;03/11/2025;01/11/2025;03/11/2025;Pago;Cartão de Crédito;Fornecedor
+Reembolso Cliente;200;despesa;12/11/2025;01/11/2025;;Em aberto;Transferência Bancária;Reembolso
+Comissão Vendas;250,75;despesa;08/11/2025;01/11/2025;08/11/2025;Pago;Boleto Bancário;Comissão
+Honorários Contador;1800;despesa;18/11/2025;01/11/2025;;Em aberto;Transferência Bancária;Honorário
+Serviço Extra X;650;receita;22/11/2025;01/11/2025;;Em aberto;Pix;Serviço

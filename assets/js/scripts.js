@@ -343,6 +343,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const data_pagamento = event.relatedTarget.getAttribute('data-data_pagamento');
             const metodo_pagamento = event.relatedTarget.getAttribute('data-metodo_pagamento');
             const status = event.relatedTarget.getAttribute('data-status');
+            const id_categoria = event.relatedTarget.getAttribute('data-id-categoria');
             
             const modalForm = modalEditarLancamento.querySelector('form');
 
@@ -356,6 +357,13 @@ document.addEventListener("DOMContentLoaded", function() {
             modalForm.querySelector('#edit_data_pagamento').value = data_pagamento;
             modalForm.querySelector('#edit_metodo_pagamento').value = metodo_pagamento;
             modalForm.querySelector('#edit_status').value = status;
+            // Popula categoria (se o campo existir no modal)
+            try {
+                const catSel = modalForm.querySelector('#edit_id_categoria');
+                if (catSel) catSel.value = id_categoria || '';
+            } catch (e) {
+                console.warn('Não foi possível popular edit_id_categoria:', e);
+            }
             // Popula id_forma_pagamento (se informado no botão trigger)
             try {
                 const idForma = event.relatedTarget.getAttribute('data-id-forma-pagamento');
@@ -399,6 +407,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (hid) hid.value = idForma || '';
             } catch (e) {
                 console.warn('Não foi possível popular edit_id_forma_pagamento (fallback):', e);
+            }
+            try {
+                const idCat = btn.getAttribute('data-id-categoria');
+                const catSel = modalForm.querySelector('#edit_id_categoria');
+                if (catSel) catSel.value = idCat || '';
+            } catch (e) {
+                console.warn('Não foi possível popular edit_id_categoria (fallback):', e);
             }
         });
     });

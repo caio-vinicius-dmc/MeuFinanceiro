@@ -138,6 +138,12 @@ global $page;
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link <?php echo ($page == 'gerenciar_categorias') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_categorias'); ?>">
+                                <i class="bi bi-card-list me-3"></i>
+                                <span class="sidebar-link-text">Categorias de Lançamento</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link <?php echo ($page == 'gerenciar_tipos_cobranca') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_tipos_cobranca'); ?>">
                                 <i class="bi bi-tags-fill me-3"></i> 
                                 <span class="sidebar-link-text">Tipos de Cobrança</span>

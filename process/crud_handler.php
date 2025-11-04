@@ -120,6 +120,89 @@ switch ($action) {
             exit;
             break;
 
+    case 'criar_categoria_lancamento':
+        if (!isAdmin()) {
+            $_SESSION['error_message'] = 'Apenas administradores podem criar categorias.';
+            header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
+            exit;
+        }
+        $nome = trim($_POST['nome'] ?? '');
+        $descricao = trim($_POST['descricao'] ?? '');
+        $ativo = isset($_POST['ativo']) ? 1 : 0;
+        if ($nome === '') {
+            $_SESSION['error_message'] = 'Nome da categoria obrigatório.';
+            header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
+            exit;
+        }
+        try {
+            $stmt = $pdo->prepare('INSERT INTO categorias_lancamento (nome, descricao, ativo) VALUES (?, ?, ?)');
+            $stmt->execute([$nome, $descricao, $ativo]);
+            $_SESSION['success_message'] = 'Categoria criada com sucesso.';
+            logAction('Criou Categoria Lancamento', 'categorias_lancamento', $pdo->lastInsertId(), $nome);
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Erro ao criar categoria: ' . $e->getMessage();
+        }
+        header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
+        exit;
+        break;
+
+    case 'editar_categoria_lancamento':
+        if (!isAdmin()) {
+            $_SESSION['error_message'] = 'Apenas administradores podem editar categorias.';
+            header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
+            exit;
+        }
+        $id = intval($_POST['id'] ?? 0);
+        $nome = trim($_POST['nome'] ?? '');
+        $descricao = trim($_POST['descricao'] ?? '');
+        $ativo = isset($_POST['ativo']) ? 1 : 0;
+        if ($id <= 0 || $nome === '') {
+            $_SESSION['error_message'] = 'Dados inválidos para atualização.';
+            header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
+            exit;
+        }
+        try {
+            $stmt = $pdo->prepare('UPDATE categorias_lancamento SET nome = ?, descricao = ?, ativo = ? WHERE id = ?');
+            $stmt->execute([$nome, $descricao, $ativo, $id]);
+            $_SESSION['success_message'] = 'Categoria atualizada com sucesso.';
+            logAction('Editou Categoria Lancamento', 'categorias_lancamento', $id, $nome);
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Erro ao atualizar categoria: ' . $e->getMessage();
+        }
+        header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
+        exit;
+        break;
+
+    case 'excluir_categoria_lancamento':
+        if (!isAdmin()) {
+            $_SESSION['error_message'] = 'Apenas administradores podem excluir categorias.';
+            header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
+            exit;
+        }
+        $id = intval($_GET['id'] ?? 0);
+        if ($id <= 0) {
+            $_SESSION['error_message'] = 'ID inválido.';
+            header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
+            exit;
+        }
+        try {
+            // Antes de excluir, removemos referência em lançamentos (set null)
+            $pdo->beginTransaction();
+            $stmtNull = $pdo->prepare('UPDATE lancamentos SET id_categoria = NULL WHERE id_categoria = ?');
+            $stmtNull->execute([$id]);
+            $stmt = $pdo->prepare('DELETE FROM categorias_lancamento WHERE id = ?');
+            $stmt->execute([$id]);
+            $pdo->commit();
+            $_SESSION['success_message'] = 'Categoria excluída com sucesso.';
+            logAction('Excluiu Categoria Lancamento', 'categorias_lancamento', $id);
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $_SESSION['error_message'] = 'Erro ao excluir categoria: ' . $e->getMessage();
+        }
+        header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
+        exit;
+        break;
+
     case 'import_lancamentos':
         // Importa um CSV de lançamentos para a empresa selecionada.
         if (!(isAdmin() || isContador() || isClient())) {
@@ -220,13 +303,26 @@ switch ($action) {
             return null;
         }
 
-        // Mapeia formas de pagamento do sistema (nome => id) para validação rápida
+        // Mapeia formas de pagamento e categorias do sistema (nome => id) para validação rápida
         $formas_map = [];
         $stmt_fp = $pdo->prepare('SELECT id, nome FROM formas_pagamento');
         $stmt_fp->execute();
         $all_formas = $stmt_fp->fetchAll(PDO::FETCH_ASSOC);
         foreach ($all_formas as $fp) {
             $formas_map[mb_strtolower(trim($fp['nome']))] = $fp['id'];
+        }
+
+        // Categorias (pode não existir ainda se migration não aplicada)
+        $categorias_map = [];
+        try {
+            $stmt_cat = $pdo->prepare('SELECT id, nome FROM categorias_lancamento WHERE ativo = 1');
+            $stmt_cat->execute();
+            $all_cats = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($all_cats as $c) {
+                $categorias_map[mb_strtolower(trim($c['nome']))] = $c['id'];
+            }
+        } catch (Exception $e) {
+            // Se a tabela categorias_lancamento não existir ainda, apenas ignoramos (import/cadastro seguirá sem validação por nome)
         }
 
         $tmp = $_FILES['csv_file']['tmp_name'];
@@ -273,6 +369,7 @@ switch ($action) {
                 else if (in_array($norm, ['datapagamento','datapag','data_pagamento','pagamento'])) $map[$i] = 'data_pagamento';
                 else if (in_array($norm, ['formadepagamento','formapagamento','formapagto','forma_pagamento','metodopagamento','metodo_pagamento'])) $map[$i] = 'metodo_pagamento';
                 else if (in_array($norm, ['status','situacao','situacao_pagamento','estado'])) $map[$i] = 'status';
+                else if (in_array($norm, ['categoria','categoria_lancamento','categoria_lanc','categoria_lancamentos'])) $map[$i] = 'categoria';
                 else $map[$i] = null; // ignora colunas não reconhecidas
             }
 
@@ -286,16 +383,22 @@ switch ($action) {
                 throw new Exception('Cabeçalho inválido. Colunas obrigatórias: Descrição, Valor, Tipo e Data vencimento. Verifique o arquivo e tente novamente.');
             }
 
-            // Prepara statements de insert (detecta coluna id_forma_pagamento)
+            // Prepara statements de insert (detecta coluna id_forma_pagamento e id_categoria)
             $colStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_forma_pagamento'");
             $colStmt->execute();
             $has_forma_col = $colStmt->fetchColumn() > 0;
 
-            if ($has_forma_col) {
-                $insertSql = "INSERT INTO lancamentos (id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, data_pagamento, metodo_pagamento, id_forma_pagamento, status) VALUES (?,?,?,?,?,?,?,?,?,?)";
-            } else {
-                $insertSql = "INSERT INTO lancamentos (id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, data_pagamento, metodo_pagamento, status) VALUES (?,?,?,?,?,?,?,?,?)";
-            }
+            $colStmt2 = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_categoria'");
+            $colStmt2->execute();
+            $has_categoria_col = $colStmt2->fetchColumn() > 0;
+
+            // Monta SQL dinâmico conforme colunas disponíveis
+            $insertCols = ['id_empresa','descricao','valor','tipo','data_vencimento','data_competencia','data_pagamento','metodo_pagamento'];
+            if ($has_forma_col) $insertCols[] = 'id_forma_pagamento';
+            if ($has_categoria_col) $insertCols[] = 'id_categoria';
+            $insertCols[] = 'status';
+            $placeholders = implode(',', array_fill(0, count($insertCols), '?'));
+            $insertSql = "INSERT INTO lancamentos (" . implode(',', $insertCols) . ") VALUES ($placeholders)";
             $stmtInsert = $pdo->prepare($insertSql);
 
             // Leitura e validação de todas as linhas antes de inserir (tudo ou nada)
@@ -338,6 +441,17 @@ switch ($action) {
                     }
                 }
 
+                // Categoria (opcional) - mapear nome -> id se a coluna existir
+                $id_categoria = null;
+                if (isset($data['categoria']) && trim((string)$data['categoria']) !== '') {
+                    $cat_key = mb_strtolower(trim((string)$data['categoria']));
+                    if (isset($categorias_map[$cat_key])) {
+                        $id_categoria = $categorias_map[$cat_key];
+                    } else {
+                        $rowErrors[] = 'Categoria não encontrada: ' . $data['categoria'];
+                    }
+                }
+
                 $status_raw = trim((string)$data['status']);
                 $status_norm = null;
                 if ($status_raw !== '') {
@@ -357,11 +471,19 @@ switch ($action) {
                 $valor_grav = $valor;
                 $metodo_txt = $metodo !== '' ? $metodo : null;
 
-                if ($has_forma_col) {
-                    $params = [$id_empresa, $data['descricao'], $valor_grav, $tipo, $dv, $dc ?: null, $dp ?: null, $metodo_txt, $id_forma, $status_norm];
-                } else {
-                    $params = [$id_empresa, $data['descricao'], $valor_grav, $tipo, $dv, $dc ?: null, $dp ?: null, $metodo_txt, $status_norm];
-                }
+                // Monta params seguindo a ordem de $insertCols
+                $params = [];
+                $params[] = $id_empresa;
+                $params[] = $data['descricao'];
+                $params[] = $valor_grav;
+                $params[] = $tipo;
+                $params[] = $dv;
+                $params[] = $dc ?: null;
+                $params[] = $dp ?: null;
+                $params[] = $metodo_txt;
+                if ($has_forma_col) $params[] = $id_forma;
+                if ($has_categoria_col) $params[] = $id_categoria;
+                $params[] = $status_norm;
                 $prepared[] = $params;
             }
 
@@ -425,6 +547,54 @@ switch ($action) {
         exit;
         break;
 
+    case 'cadastrar_lancamento':
+        if (isAdmin() || isContador() || isClient()) {
+            $id_empresa = $_POST['id_empresa'] ?? null;
+            $descricao = $_POST['descricao'] ?? null;
+            $valor = $_POST['valor'] ?? null;
+            $tipo = $_POST['tipo'] ?? 'receita';
+            $data_vencimento = $_POST['data_vencimento'] ?? null;
+            $data_competencia = $_POST['data_competencia'] ?? null;
+            $data_pagamento = $_POST['data_pagamento'] ?? null;
+            $metodo_pagamento = $_POST['metodo_pagamento'] ?? null;
+            $id_forma = isset($_POST['id_forma_pagamento']) ? ($_POST['id_forma_pagamento'] !== '' ? $_POST['id_forma_pagamento'] : null) : null;
+            $id_categoria = isset($_POST['id_categoria']) ? ($_POST['id_categoria'] !== '' ? $_POST['id_categoria'] : null) : null;
+            $status = $_POST['status'] ?? 'pendente';
+
+            // Detecta colunas opcionais
+            $colStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_forma_pagamento'");
+            $colStmt->execute();
+            $has_forma_col = $colStmt->fetchColumn() > 0;
+            $colStmt2 = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_categoria'");
+            $colStmt2->execute();
+            $has_categoria_col = $colStmt2->fetchColumn() > 0;
+
+            // Monta colunas e params dinamicamente
+            $cols = ['id_empresa','descricao','valor','tipo','data_vencimento','data_competencia','data_pagamento','metodo_pagamento'];
+            $params = [$id_empresa,$descricao,$valor,$tipo,$data_vencimento,$data_competencia ?: null,$data_pagamento ?: null,$metodo_pagamento];
+            if ($has_forma_col) { $cols[] = 'id_forma_pagamento'; $params[] = $id_forma; }
+            if ($has_categoria_col) { $cols[] = 'id_categoria'; $params[] = $id_categoria; }
+            $cols[] = 'status'; $params[] = $status;
+
+            $placeholders = implode(',', array_fill(0, count($cols), '?'));
+            $sql = "INSERT INTO lancamentos (" . implode(',', $cols) . ") VALUES ($placeholders)";
+            $stmt = $pdo->prepare($sql);
+            try {
+                if ($stmt->execute($params)) {
+                    $novo_id = $pdo->lastInsertId();
+                    $_SESSION['success_message'] = 'Lançamento criado com sucesso.';
+                    logAction('Criou Lançamento', 'lancamentos', $novo_id, $descricao);
+                } else {
+                    $_SESSION['error_message'] = 'Erro ao criar lançamento.';
+                }
+            } catch (Exception $e) {
+                $_SESSION['error_message'] = 'Erro ao criar lançamento: ' . $e->getMessage();
+            }
+            header('Location: ' . base_url('index.php?page=lancamentos'));
+            exit;
+        }
+        break;
+
     case 'editar_lancamento':
         if (isAdmin() || isContador() || isClient()) { // All can edit
             $id = $_POST['id_lancamento'];
@@ -436,18 +606,23 @@ switch ($action) {
             $data_competencia_novo = $_POST['data_competencia'] ?? null;
             $metodo_pagamento_novo = $_POST['metodo_pagamento'] ?? null;
             $id_forma_pagamento_novo = isset($_POST['id_forma_pagamento']) ? ($_POST['id_forma_pagamento'] !== '' ? $_POST['id_forma_pagamento'] : null) : null;
+            $id_categoria_novo = isset($_POST['id_categoria']) ? ($_POST['id_categoria'] !== '' ? $_POST['id_categoria'] : null) : null;
             // Detecta se a coluna id_forma_pagamento existe
             $colStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_forma_pagamento'");
             $colStmt->execute();
             $has_forma_col = $colStmt->fetchColumn() > 0;
+            // Detecta se a coluna id_categoria existe
+            $colStmtCat = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lancamentos' AND COLUMN_NAME = 'id_categoria'");
+            $colStmtCat->execute();
+            $has_categoria_col = $colStmtCat->fetchColumn() > 0;
             $status_novo = $_POST['status']; // New: status can be edited
 
             // 1. AUDITORIA: Busca dados antigos
-            if ($has_forma_col) {
-                $stmt_old = $pdo->prepare("SELECT id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, id_forma_pagamento, status FROM lancamentos WHERE id = ?");
-            } else {
-                $stmt_old = $pdo->prepare("SELECT id_empresa, descricao, valor, tipo, data_vencimento, data_competencia, metodo_pagamento, status FROM lancamentos WHERE id = ?");
-            }
+            // Seleciona colunas antigas para auditoria (inclui id_forma_pagamento e id_categoria quando existirem)
+            $selectCols = ['id_empresa','descricao','valor','tipo','data_vencimento','data_competencia','metodo_pagamento','status'];
+            if ($has_forma_col) $selectCols[] = 'id_forma_pagamento';
+            if ($has_categoria_col) $selectCols[] = 'id_categoria';
+            $stmt_old = $pdo->prepare("SELECT " . implode(',', $selectCols) . " FROM lancamentos WHERE id = ?");
             $stmt_old->execute([$id]);
             $old_data = $stmt_old->fetch(PDO::FETCH_ASSOC);
             
@@ -482,6 +657,25 @@ switch ($action) {
                 $det_new = ($metodo_pagamento_novo ?? 'N/D') . ($has_forma_col ? (' (id: ' . ($id_forma_pagamento_novo ?? 'N/D') . ')') : '');
                 $detalhes_log[] = "Forma Pgto: " . $det_old . " -> " . $det_new;
             }
+            // Categoria
+            if ($has_categoria_col) {
+                if (($old_data['id_categoria'] ?? null) !== ($id_categoria_novo ?? null)) {
+                    // busca nomes para log amigável
+                    $old_cat_name = 'N/D';
+                    $new_cat_name = 'N/D';
+                    if (!empty($old_data['id_categoria'])) {
+                        $s = $pdo->prepare("SELECT nome FROM categorias_lancamento WHERE id = ?");
+                        $s->execute([$old_data['id_categoria']]);
+                        $old_cat_name = $s->fetchColumn() ?? 'N/D';
+                    }
+                    if (!empty($id_categoria_novo)) {
+                        $s2 = $pdo->prepare("SELECT nome FROM categorias_lancamento WHERE id = ?");
+                        $s2->execute([$id_categoria_novo]);
+                        $new_cat_name = $s2->fetchColumn() ?? 'N/D';
+                    }
+                    $detalhes_log[] = "Categoria: {$old_cat_name} -> {$new_cat_name}";
+                }
+            }
             if ($old_data['status'] !== $status_novo) {
                  $detalhes_log[] = "Status: {$old_data['status']} -> {$status_novo}";
             }
@@ -496,17 +690,25 @@ switch ($action) {
             $log_details_string = "Campos alterados: " . implode('; ', $detalhes_log);
 
             // 3. Atualiza o banco de dados
+            // Monta UPDATE dinâmico conforme colunas presentes
+            $update_fields = [
+                'id_empresa = ?', 'descricao = ?', 'valor = ?', 'tipo = ?', 'data_vencimento = ?', 'data_competencia = ?', 'metodo_pagamento = ?'
+            ];
+            $update_params = [$id_empresa_novo, $descricao_novo, $valor_novo, $tipo_novo, $data_vencimento_novo, $data_competencia_novo, $metodo_pagamento_novo];
             if ($has_forma_col) {
-                $sql = "UPDATE lancamentos SET 
-                            id_empresa = ?, descricao = ?, valor = ?, tipo = ?, data_vencimento = ?, data_competencia = ?, metodo_pagamento = ?, id_forma_pagamento = ?, status = ?
-                        WHERE id = ?";
-                $params = [$id_empresa_novo, $descricao_novo, $valor_novo, $tipo_novo, $data_vencimento_novo, $data_competencia_novo, $metodo_pagamento_novo, $id_forma_pagamento_novo, $status_novo, $id];
-            } else {
-                $sql = "UPDATE lancamentos SET 
-                            id_empresa = ?, descricao = ?, valor = ?, tipo = ?, data_vencimento = ?, data_competencia = ?, metodo_pagamento = ?, status = ?
-                        WHERE id = ?";
-                $params = [$id_empresa_novo, $descricao_novo, $valor_novo, $tipo_novo, $data_vencimento_novo, $data_competencia_novo, $metodo_pagamento_novo, $status_novo, $id];
+                $update_fields[] = 'id_forma_pagamento = ?';
+                $update_params[] = $id_forma_pagamento_novo;
             }
+            if ($has_categoria_col) {
+                $update_fields[] = 'id_categoria = ?';
+                $update_params[] = $id_categoria_novo;
+            }
+            $update_fields[] = 'status = ?';
+            $update_params[] = $status_novo;
+
+            $sql = "UPDATE lancamentos SET " . implode(', ', $update_fields) . " WHERE id = ?";
+            $update_params[] = $id;
+            $params = $update_params;
             $stmt = $pdo->prepare($sql);
             if ($stmt->execute($params)) {
                 $_SESSION['success_message'] = "Lançamento atualizado com sucesso!";
