@@ -97,6 +97,126 @@ function getSmtpSettings() {
 }
 
 /**
+ * Retorna política de upload de documentos (mime whitelist e tamanho máximo em bytes).
+ * Pode ser adaptada para ler do DB (system_settings) se necessário.
+ */
+function getDocumentUploadPolicy() {
+    // Valores padrão
+    $policy = [
+        'allowed_mimes' => [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ],
+        'max_size_bytes' => 10 * 1024 * 1024 // 10 MB
+    ];
+
+    // Tentar carregar ajustes do DB se existir tabela system_settings
+    try {
+        global $pdo;
+        $stmt = $pdo->prepare("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('documents_max_size_bytes','documents_allowed_mimes')");
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        if (!empty($rows['documents_max_size_bytes'])) {
+            $val = intval($rows['documents_max_size_bytes']);
+            if ($val > 1024) $policy['max_size_bytes'] = $val;
+        }
+        if (!empty($rows['documents_allowed_mimes'])) {
+            $m = array_map('trim', explode(',', $rows['documents_allowed_mimes']));
+            if (!empty($m)) $policy['allowed_mimes'] = $m;
+        }
+    } catch (Exception $e) {
+        // ignore and use defaults
+    }
+
+    return $policy;
+}
+
+/**
+ * Verifica se um usuário está associado a uma pasta (tabela pivot) ou é o owner antigo.
+ * Retorna true se associado (ou se o usuário for admin).
+ */
+function isUserAssociatedToPasta($user_id, $pasta_id) {
+    if (isAdmin()) return true;
+    global $pdo;
+    try {
+        // verifica existência da tabela pivot
+        $stmt = $pdo->prepare("SELECT 1 FROM documentos_pastas_usuarios LIMIT 1");
+        $stmt->execute();
+        // tabela existe, checa associação
+        $stmt2 = $pdo->prepare('SELECT COUNT(1) FROM documentos_pastas_usuarios WHERE pasta_id = ? AND user_id = ?');
+        $stmt2->execute([$pasta_id, $user_id]);
+        return $stmt2->fetchColumn() > 0;
+    } catch (Exception $e) {
+        // fallback para coluna owner_user_id (compatibilidade com versões anteriores)
+        try {
+            $stmt = $pdo->prepare('SELECT owner_user_id FROM documentos_pastas WHERE id = ?');
+            $stmt->execute([$pasta_id]);
+            $owner = $stmt->fetchColumn();
+            return ($owner !== false && intval($owner) === intval($user_id));
+        } catch (Exception $e2) {
+            return false;
+        }
+    }
+}
+
+/**
+ * Verifica se um cliente (empresa) possui qualquer usuário associado a uma pasta.
+ * Útil para contas do tipo 'cliente' que representam empresas com múltiplos usuários.
+ */
+function isClientAssociatedToPasta($cliente_id, $pasta_id) {
+    if (isAdmin()) return true;
+    global $pdo;
+    try {
+        // verifica pivot via usuários que pertencem ao cliente
+        $stmt = $pdo->prepare('SELECT COUNT(1) FROM documentos_pastas_usuarios dpu JOIN usuarios u ON dpu.user_id = u.id WHERE dpu.pasta_id = ? AND u.id_cliente_associado = ?');
+        $stmt->execute([$pasta_id, $cliente_id]);
+        return $stmt->fetchColumn() > 0;
+    } catch (Exception $e) {
+        // fallback: verifica owner_user_id
+        try {
+            $stmt = $pdo->prepare('SELECT owner_user_id FROM documentos_pastas WHERE id = ?');
+            $stmt->execute([$pasta_id]);
+            $owner = $stmt->fetchColumn();
+            if ($owner === false || $owner === null) return false;
+            $stmt2 = $pdo->prepare('SELECT id_cliente_associado FROM usuarios WHERE id = ?');
+            $stmt2->execute([$owner]);
+            $owner_cliente = $stmt2->fetchColumn();
+            return ($owner_cliente !== false && intval($owner_cliente) === intval($cliente_id));
+        } catch (Exception $e2) {
+            return false;
+        }
+    }
+}
+
+/**
+ * Retorna array com usuários associados a uma pasta (id e nome). Se pivot ausente, tenta owner_user_id.
+ */
+function getUsuariosAssociadosPasta($pasta_id) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare('SELECT u.id, u.nome FROM documentos_pastas_usuarios dpu JOIN usuarios u ON dpu.user_id = u.id WHERE dpu.pasta_id = ?');
+        $stmt->execute([$pasta_id]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        // fallback
+        try {
+            $stmt = $pdo->prepare('SELECT id, nome FROM usuarios WHERE id = (SELECT owner_user_id FROM documentos_pastas WHERE id = ?)');
+            $stmt->execute([$pasta_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ? [$row] : [];
+        } catch (Exception $e2) {
+            return [];
+        }
+    }
+}
+
+/**
  * Envia um email de notificação sobre um lançamento.
  * @param string $toEmail Email do destinatário (cliente).
  * @param string $toName Nome do destinatário.
@@ -174,6 +294,52 @@ function sendNotificationEmail($toEmail, $toName, $lancamento) {
     }
     */
     
+    return $mail_success;
+}
+
+/**
+ * Envia um e-mail genérico de notificação (documentos)
+ */
+function sendDocumentNotification($toEmail, $toName, $subject, $bodyHtml) {
+    $settings = getSmtpSettings();
+
+    if (empty($settings['smtp_username']) || empty($settings['smtp_password'])) {
+        error_log("Erro de E-mail (Documentos): Configurações SMTP ausentes ou incompletas.");
+        return false;
+    }
+
+    // Simulação de envio (mantemos comportamento seguro se PHPMailer não estiver instalado)
+    $mail_success = true;
+
+    /*
+    if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+        error_log('PHPMailer não encontrado. Execute "composer install" no diretório do projeto para habilitar envio real de emails.');
+        return false;
+    }
+
+    try {
+        $mail = new PHPMailer\\PHPMailer\\PHPMailer(true);
+        $mail->isSMTP();
+        $mail->Host = $settings['smtp_host'];
+        $mail->Port = $settings['smtp_port'];
+        $mail->SMTPAuth = true;
+        $mail->Username = $settings['smtp_username'];
+        $mail->Password = $settings['smtp_password'];
+        $secure = strtolower(trim($settings['smtp_secure'] ?? ''));
+        if ($secure === 'starttls') $secure = 'tls';
+        if (!empty($secure)) $mail->SMTPSecure = $secure;
+        $mail->setFrom($settings['email_from'], 'Sistema Financeiro');
+        $mail->addAddress($toEmail, $toName);
+        $mail->Subject = $subject;
+        $mail->Body = $bodyHtml;
+        $mail->isHTML(true);
+        $mail_success = $mail->send();
+    } catch (Exception $e) {
+        error_log("Erro no PHPMailer (Documentos): " . $e->getMessage());
+        $mail_success = false;
+    }
+    */
+
     return $mail_success;
 }
 

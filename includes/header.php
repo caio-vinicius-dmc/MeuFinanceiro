@@ -91,6 +91,12 @@ global $page;
                             <span class="sidebar-link-text">Cobranças</span>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo ($page == 'documentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=documentos'); ?>">
+                            <i class="bi bi-folder2-open me-3"></i>
+                            <span class="sidebar-link-text">Documentos</span>
+                        </a>
+                    </li>
 
                     <?php // Menus do Admin e Contador ?>
                     <?php if (isAdmin() || isContador()): ?>
@@ -135,6 +141,12 @@ global $page;
                             <a class="nav-link <?php echo ($page == 'gerenciar_formas_pagamento') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_formas_pagamento'); ?>">
                                 <i class="bi bi-wallet2 me-3"></i> 
                                 <span class="sidebar-link-text">Formas de Pagamento</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?php echo ($page == 'gerenciar_documentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_documentos'); ?>">
+                                <i class="bi bi-folder2 me-3"></i>
+                                <span class="sidebar-link-text">Gerenciar Documentos</span>
                             </a>
                         </li>
                         <li class="nav-item">

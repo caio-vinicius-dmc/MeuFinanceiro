@@ -29,7 +29,9 @@ $allowed_pages = [
     'gerenciar_formas_pagamento',
     'cobrancas',
     'gerenciar_tipos_cobranca',
-    'gerenciar_categorias'
+    'gerenciar_categorias',
+    'documentos',
+    'gerenciar_documentos'
 ];
 
 // Se a página não for de login E não estiver logado, força o login
@@ -52,7 +54,7 @@ if (isContador()) {
 } 
 elseif (isClient()) {
     // Cliente só pode ver dashboard e lançamentos
-    $allowed_client_pages = ['dashboard', 'lancamentos', 'meu_perfil','cobrancas']; // <-- Adicionado perfil
+    $allowed_client_pages = ['dashboard', 'lancamentos', 'meu_perfil','cobrancas','documentos']; // <-- Adicionado perfil
     if (!in_array($page, $allowed_client_pages)) {
         $page = 'dashboard'; // Redireciona
     }
