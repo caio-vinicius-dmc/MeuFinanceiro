@@ -13,7 +13,30 @@ global $page;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão Financeira</title>
+    <?php
+    // Construir título dinâmico com prefixo DMC -
+    // Se uma página setar $page_title, usamos ela. Senão usamos um mapeamento simples baseado em $page.
+    $default_titles = [
+        'dashboard' => 'Dashboard',
+        'lancamentos' => 'Lançamentos',
+        'cobrancas' => 'Cobranças',
+        'cadastro_usuarios' => 'Cadastro de Usuários',
+        'cadastro_clientes' => 'Cadastro de Clientes',
+        'cadastro_empresas' => 'Cadastro de Empresas',
+        'logs' => 'Logs',
+        'meu_perfil' => 'Meu Perfil',
+        'configuracoes_email' => 'Configurações de Email',
+        'gerenciar_formas_pagamento' => 'Formas de Pagamento',
+        'gerenciar_tipos_cobranca' => 'Tipos de Cobrança',
+    ];
+
+    if (!empty($page_title)) {
+        $title_text = $page_title;
+    } else {
+        $title_text = $default_titles[$page] ?? ucfirst($page);
+    }
+    ?>
+    <title>DMC - <?php echo htmlspecialchars($title_text, ENT_QUOTES, 'UTF-8'); ?></title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     
