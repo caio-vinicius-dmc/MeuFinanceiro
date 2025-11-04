@@ -285,10 +285,25 @@ body.sidebar-collapsed .sidebar-logo {
     margin-bottom: 0.5rem;
 }
 .card-metric .metric-value {
-    font-size: 2.25rem;
+        /* Tamanhos explícitos por breakpoint: mobile/tablet/desktop (aumentado apenas para mobile) */
+        font-size: 1rem; /* mobile default (~16px) - aumentado conforme solicitado */
     font-weight: 700;
     color: #212529;
 }
+
+    /* Tablet: aumentar o tamanho das métricas */
+    @media (min-width: 576px) and (max-width: 991.98px) {
+        .card-metric .metric-value {
+            font-size: 1.1rem; /* tablet (~18px) - reduzido levemente */
+        }
+    }
+
+    /* Desktop: maior destaque, porém menor que antes */
+    @media (min-width: 992px) {
+        .card-metric .metric-value {
+            font-size: 1.5rem; /* desktop (~24px) - reduzido levemente */
+        }
+    }
 
 /* 6. Dashboard Sections: tópicos separados para Lançamentos e Cobranças */
 .dashboard-section {
