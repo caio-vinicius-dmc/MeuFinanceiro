@@ -101,6 +101,14 @@ body.sidebar-collapsed .sidebar-logo {
     body.sidebar-collapsed .sidebar-nav.offcanvas-lg {
         width: var(--sidebar-width-collapsed);
     }
+
+    /* When a sidebar group is expanded, slightly increase sidebar width for visual emphasis */
+    body:not(.sidebar-collapsed).sidebar-expanded-group .sidebar-nav.offcanvas-lg {
+        width: 285px; /* small expansion from 270px */
+    }
+    body:not(.sidebar-collapsed).sidebar-expanded-group .main-content {
+        margin-left: 285px;
+    }
     body.sidebar-collapsed .sidebar-link-text,
     body.sidebar-collapsed .sidebar-brand-text {
       display: none;
@@ -210,6 +218,35 @@ body.sidebar-collapsed .sidebar-logo {
     text-align: center;
     margin-right: 0.75rem;
     transition: margin 0.3s ease-in-out;
+}
+
+/* Make group toggle buttons visually identical to nav links on hover/focus */
+.sidebar-nav .btn-toggle {
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+    padding: 0.75rem 1.25rem;
+    transition: all 0.2s ease-in-out;
+    white-space: nowrap;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+}
+
+.sidebar-nav .btn-toggle:hover,
+.sidebar-nav .btn-toggle:focus {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-nav .btn-toggle i {
+    font-size: 1.25rem;
+    width: 30px;
+    text-align: center;
+    margin-right: 0.75rem;
 }
 
 .nav-item-divider {

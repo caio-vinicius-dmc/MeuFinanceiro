@@ -116,50 +116,79 @@ global $page;
                         
                     <?php endif; ?>
 
-                    <?php // Menu exclusivo do Admin ?>
+                    <?php // Menu exclusivo do Admin - agrupado em seções colapsáveis ?>
                     <?php if (isAdmin()): ?>
                         <li class="nav-item-divider"></li>
+                        <!-- Cadastros -->
                         <li class="nav-item">
-                            <a class="nav-link <?php echo ($page == 'cadastro_usuarios') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_usuarios'); ?>">
-                                <i class="bi bi-people-fill me-3"></i> 
-                                <span class="sidebar-link-text">Usuários</span>
-                            </a>
+                            <button type="button" class="nav-link btn btn-toggle sidebar-group-toggle" data-bs-toggle="collapse" data-bs-target="#sidebar-group-cadastros" aria-expanded="false" aria-controls="sidebar-group-cadastros" id="toggle-cadastros">
+                                <i class="bi bi-folder-plus me-3"></i>
+                                <span class="sidebar-link-text">Cadastros</span>
+                            </button>
+                            <ul class="nav flex-column collapse ps-3" id="sidebar-group-cadastros">
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo ($page == 'cadastro_usuarios') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=cadastro_usuarios'); ?>">
+                                        <i class="bi bi-person-fill me-2"></i>
+                                        <span class="sidebar-link-text">Usuários</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo ($page == 'gerenciar_categorias') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_categorias'); ?>">
+                                        <i class="bi bi-card-list me-2"></i>
+                                        <span class="sidebar-link-text">Categorias</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo ($page == 'gerenciar_tipos_cobranca') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_tipos_cobranca'); ?>">
+                                        <i class="bi bi-tags-fill me-2"></i>
+                                        <span class="sidebar-link-text">Tipos de Cobrança</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo ($page == 'gerenciar_formas_pagamento') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_formas_pagamento'); ?>">
+                                        <i class="bi bi-wallet2 me-2"></i>
+                                        <span class="sidebar-link-text">Formas de Pagamento</span>
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
+
+                        <!-- Configurações -->
                         <li class="nav-item">
-                            <a class="nav-link <?php echo ($page == 'logs') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=logs'); ?>">
-                                <i class="bi bi-file-earmark-text me-3"></i> 
-                                <span class="sidebar-link-text">Logs</span>
-                            </a>
+                            <button type="button" class="nav-link btn btn-toggle sidebar-group-toggle" data-bs-toggle="collapse" data-bs-target="#sidebar-group-configs" aria-expanded="false" aria-controls="sidebar-group-configs" id="toggle-configs">
+                                <i class="bi bi-gear-fill me-3"></i>
+                                <span class="sidebar-link-text">Configurações</span>
+                            </button>
+                            <ul class="nav flex-column collapse ps-3" id="sidebar-group-configs">
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo ($page == 'configuracoes_email') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=configuracoes_email'); ?>">
+                                        <i class="bi bi-envelope me-2"></i>
+                                        <span class="sidebar-link-text">Config. Email</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo ($page == 'gerenciar_documentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_documentos'); ?>">
+                                        <i class="bi bi-folder2 me-2"></i>
+                                        <span class="sidebar-link-text">Gerenciar Documentos</span>
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
+
+                        <!-- Relatórios -->
                         <li class="nav-item">
-                            <a class="nav-link <?php echo ($page == 'configuracoes_email') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=configuracoes_email'); ?>">
-                                <i class="bi bi-file-earmark-text me-3"></i> 
-                                <span class="sidebar-link-text">Config. Email</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link <?php echo ($page == 'gerenciar_formas_pagamento') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_formas_pagamento'); ?>">
-                                <i class="bi bi-wallet2 me-3"></i> 
-                                <span class="sidebar-link-text">Formas de Pagamento</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link <?php echo ($page == 'gerenciar_documentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_documentos'); ?>">
-                                <i class="bi bi-folder2 me-3"></i>
-                                <span class="sidebar-link-text">Gerenciar Documentos</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link <?php echo ($page == 'gerenciar_categorias') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_categorias'); ?>">
-                                <i class="bi bi-card-list me-3"></i>
-                                <span class="sidebar-link-text">Categorias de Lançamento</span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link <?php echo ($page == 'gerenciar_tipos_cobranca') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_tipos_cobranca'); ?>">
-                                <i class="bi bi-tags-fill me-3"></i> 
-                                <span class="sidebar-link-text">Tipos de Cobrança</span>
-                            </a>
+                            <button type="button" class="nav-link btn btn-toggle sidebar-group-toggle" data-bs-toggle="collapse" data-bs-target="#sidebar-group-relatorios" aria-expanded="false" aria-controls="sidebar-group-relatorios" id="toggle-relatorios">
+                                <i class="bi bi-bar-chart-line-fill me-3"></i>
+                                <span class="sidebar-link-text">Relatórios</span>
+                            </button>
+                            <ul class="nav flex-column collapse ps-3" id="sidebar-group-relatorios">
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo ($page == 'logs') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=logs'); ?>">
+                                        <i class="bi bi-file-earmark-text me-2"></i>
+                                        <span class="sidebar-link-text">Logs</span>
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                     <?php endif; ?>
                 </ul>

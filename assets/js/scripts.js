@@ -89,6 +89,54 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
+    // --- Ao clicar em um grupo do sidebar, expande o sidebar se estiver recolhido ---
+    const sidebarGroupToggles = Array.from(document.querySelectorAll('.sidebar-group-toggle'));
+    sidebarGroupToggles.forEach(function(btn) {
+        btn.addEventListener('click', function(ev) {
+            // If sidebar is collapsed, expand it first so nested items become visible
+            if (document.body.classList.contains('sidebar-collapsed')) {
+                document.body.classList.remove('sidebar-collapsed');
+                localStorage.setItem('sidebarCollapsed', 'false');
+                // allow some time for CSS to transition before toggling collapse
+                setTimeout(function() {
+                    // toggle the collapse target
+                    var targetId = btn.getAttribute('aria-controls');
+                    if (targetId) {
+                        var collapseEl = document.getElementById(targetId);
+                        if (collapseEl) {
+                            var bs = bootstrap.Collapse.getOrCreateInstance(collapseEl);
+                            bs.toggle();
+                        }
+                    }
+                }, 260);
+                // prevent default to avoid immediate collapse toggle
+                ev.preventDefault();
+                return;
+            }
+            // Otherwise let bootstrap handle the collapse normally
+        });
+    });
+
+    // --- Adjust sidebar width when any group collapse is shown ---
+    try {
+        var groupCollapses = Array.from(document.querySelectorAll('.sidebar-nav .collapse'));
+        groupCollapses.forEach(function(el) {
+            el.addEventListener('show.bs.collapse', function() {
+                // only adjust if sidebar is not collapsed
+                if (!document.body.classList.contains('sidebar-collapsed')) {
+                    document.body.classList.add('sidebar-expanded-group');
+                }
+            });
+            el.addEventListener('hide.bs.collapse', function() {
+                // remove class only if no other collapse is visible
+                setTimeout(function() {
+                    var anyOpen = Array.from(document.querySelectorAll('.sidebar-nav .collapse.show')).length > 0;
+                    if (!anyOpen) document.body.classList.remove('sidebar-expanded-group');
+                }, 40); // small delay to allow Bootstrap to update classes
+            });
+        });
+    } catch (e) { console.error('sidebar group collapse attach error', e); }
+
     // --- Campos Condicionais (Novo Usuário) ---
     const tipoUsuarioSelect = document.getElementById('tipo_usuario');
     if (tipoUsuarioSelect) {
