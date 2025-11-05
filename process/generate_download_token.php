@@ -23,6 +23,29 @@ if (!$a) {
 }
 
 $user_id = $_SESSION['user_id'];
+// Attempt to infer the empresa related to this file (best-effort):
+// 1) prefer the owner_user_id -> usuarios_empresas pivot
+// 2) fallback to current selected company
+try {
+    $file_company = null;
+    $owner_uid = intval($a['owner_user_id'] ?? 0);
+    if ($owner_uid > 0) {
+        $stmtC = $pdo->prepare('SELECT empresa_id FROM usuarios_empresas WHERE usuario_id = ? LIMIT 1');
+        $stmtC->execute([$owner_uid]);
+        $file_company = $stmtC->fetchColumn();
+    }
+    if (empty($file_company)) {
+        $cid = current_company_id();
+        if ($cid !== null) $file_company = $cid;
+    }
+    if (!empty($file_company)) {
+        // Ensure the requesting user can access this company (admin bypasses inside helper)
+        ensure_user_can_access_company(intval($file_company));
+    }
+} catch (Exception $e) {
+    // best-effort only: if anything fails here, continue to the regular permission checks below
+}
+
 if (!isAdmin() && intval($a['enviado_por_user_id']) !== intval($user_id) && !isUserAssociatedToPasta($user_id, $a['pasta_id'])) {
     http_response_code(403);
     echo json_encode(['error' => 'sem permissão']);

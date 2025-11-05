@@ -43,6 +43,25 @@ if (!$a) {
 
 // Check permission: file must be approved or requester is admin or uploader or associated to folder
 $user_id = $_SESSION['user_id'];
+// Best-effort: try to determine the file's company (via owner_user_id -> usuarios_empresas pivot) and enforce company access
+try {
+    $file_company = null;
+    $owner_uid = intval($a['owner_user_id'] ?? 0);
+    if ($owner_uid > 0) {
+        $stmtC = $pdo->prepare('SELECT empresa_id FROM usuarios_empresas WHERE usuario_id = ? LIMIT 1');
+        $stmtC->execute([$owner_uid]);
+        $file_company = $stmtC->fetchColumn();
+    }
+    if (empty($file_company)) {
+        $cid = current_company_id();
+        if ($cid !== null) $file_company = $cid;
+    }
+    if (!empty($file_company)) {
+        ensure_user_can_access_company(intval($file_company));
+    }
+} catch (Exception $e) {
+    // ignore best-effort failures and continue with existing permission checks
+}
 if ($a['status'] !== 'approved') {
     $allowed = false;
     if (isAdmin()) $allowed = true;
