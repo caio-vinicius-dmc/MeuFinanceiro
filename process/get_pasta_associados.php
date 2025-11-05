@@ -18,7 +18,12 @@ if ($pasta_id <= 0) {
 
 try {
     // fetch all users with client name
-    $pdo = get_pdo();
+    // use the global $pdo provided by config/db.php (included via config/functions.php)
+    global $pdo;
+    if (!isset($pdo) || !$pdo) {
+        echo json_encode(['ok' => false, 'error' => 'Erro interno: conexão com o banco não disponível']);
+        exit;
+    }
     $stmt = $pdo->prepare('SELECT u.id, u.nome, u.email, u.id_cliente_associado, c.nome_responsavel as cliente_nome FROM usuarios u LEFT JOIN clientes c ON u.id_cliente_associado = c.id ORDER BY u.nome ASC');
     $stmt->execute();
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);

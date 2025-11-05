@@ -321,7 +321,7 @@ try {
                                         <label class="form-label">Nome da Pasta</label>
                                         <input type="text" name="nome" id="edit_pasta_nome" class="form-control" required>
                                     </div>
-                                    <div class="mb-3">
+                                    <div class="mb-3" id="edit_pasta_parent_wrapper">
                                         <label class="form-label">Pasta Pai (ou vazio)</label>
                                         <select name="parent_id" id="edit_pasta_parent" class="form-select">
                                             <option value="">-- Nenhuma (raiz) --</option>
@@ -431,6 +431,7 @@ try {
                             document.getElementById('edit_pasta_nome').value = pastaNome;
                             // ensure parent select does not allow selecting self
                             var sel = document.getElementById('edit_pasta_parent');
+                            var wrapper = document.getElementById('edit_pasta_parent_wrapper');
                             if (sel) {
                                 // compute descendants and disable them + self
                                 var descendants = (function getDescendants(id){
@@ -445,8 +446,20 @@ try {
                                 })(pastaId);
                                 for (var i = 0; i < sel.options.length; i++) {
                                     var val = sel.options[i].value;
-                                    sel.options[i].disabled = (val === pastaId || descendants.indexOf(parseInt(val)) !== -1);
+                                    sel.options[i].disabled = (String(val) === String(pastaId) || descendants.indexOf(parseInt(val)) !== -1);
                                 }
+                                // determine if this pasta is a root (no parent) and hide wrapper if so
+                                try {
+                                    var found = (window.DOC_PASTAS || []).find(function(pp){ return String(pp.id) === String(pastaId); });
+                                    var isRoot = (found && (found.parent_id === null || found.parent_id == 0 || found.parent_id === '')) || (!found && (pastaId === null || pastaId == 0 || pastaId === ''));
+                                    if (wrapper) wrapper.style.display = isRoot ? 'none' : '';
+                                    if (!isRoot) {
+                                        var parentVal = (found && (found.parent_id !== null && found.parent_id != 0)) ? String(found.parent_id) : '';
+                                        sel.value = parentVal;
+                                    } else {
+                                        sel.value = '';
+                                    }
+                                } catch (e) { if (wrapper) wrapper.style.display = ''; }
                             }
                         });
 
@@ -628,13 +641,7 @@ try {
                             if (!body) return;
                             body.innerHTML = '';
                             // small visible marker so we can tell the JS ran and inserted content
-                            var infoDiv = document.createElement('div'); infoDiv.className = 'mb-2 small text-muted';
-                            // compute direct child subfolders from client-side map
-                            try {
-                                var childCount = (window.DOC_PASTAS || []).filter(function(pp){ return String(pp.parent_id) === String(pastaId) || pp.parent_id == pastaId; }).length;
-                                infoDiv.textContent = 'Conteúdo carregado via JavaScript — Subpastas: ' + childCount;
-                            } catch (e) { infoDiv.textContent = 'Conteúdo carregado via JavaScript'; }
-                            body.appendChild(infoDiv);
+                            // (info text removed) -- previously showed a JS debug line about subfolders
 
                             // Create a centered vertical stack to hold action buttons (same size, stacked)
                             var actionsWrapper = document.createElement('div');
@@ -651,8 +658,9 @@ try {
                                     var editModal = new bootstrap.Modal(document.getElementById('editPastaModal'));
                                     document.getElementById('edit_pasta_id').value = pastaId;
                                     document.getElementById('edit_pasta_nome').value = pastaNome;
-                                    // disable selecting self or any descendant as parent
+                                    // disable selecting self or any descendant as parent and preselect current parent
                                     var sel = document.getElementById('edit_pasta_parent');
+                                    var wrapper = document.getElementById('edit_pasta_parent_wrapper');
                                     if (sel) {
                                         // build parent map and compute descendants
                                         var map = {};
@@ -664,6 +672,18 @@ try {
                                             var val = sel.options[i].value;
                                             sel.options[i].disabled = (String(val) === String(pastaId) || descendants.indexOf(parseInt(val)) !== -1);
                                         }
+                                        // hide parent select for root folders, otherwise preselect
+                                        try {
+                                            var found = (window.DOC_PASTAS || []).find(function(pp){ return String(pp.id) === String(pastaId); });
+                                            var isRoot = (found && (found.parent_id === null || found.parent_id == 0 || found.parent_id === '')) || (!found && (pastaId === null || pastaId == 0 || pastaId === ''));
+                                            if (wrapper) wrapper.style.display = isRoot ? 'none' : '';
+                                            if (!isRoot) {
+                                                var parentVal = (found && (found.parent_id !== null && found.parent_id != 0)) ? String(found.parent_id) : '';
+                                                sel.value = parentVal;
+                                            } else {
+                                                sel.value = '';
+                                            }
+                                        } catch (e) { if (wrapper) wrapper.style.display = ''; }
                                     }
                                     editModal.show();
                                     var m = bootstrap.Modal.getInstance(actionsModalEl); if (m) m.hide();
@@ -691,20 +711,26 @@ try {
                                 assocContainer.style.display = 'none';
 
                                 assocToggle.addEventListener('click', function () {
+                                    // validate pastaId before requesting
+                                    if (!pastaId || pastaId === '0' || pastaId === 0) { try { showToast('Pasta inválida', 'danger'); } catch(e){}; return; }
                                     if (assocContainer.style.display === 'none') {
                                         assocContainer.style.display = '';
+                                        try { console.debug('Loading associados for pasta', pastaId); } catch (e) {}
                                         loadPastaAssociadosIntoModal(pastaId, assocContainer);
                                     } else { assocContainer.style.display = 'none'; }
                                 });
                             }
 
                             // Link para ver fila de pendências filtrada (ancora local)
-                            var pendLink = document.createElement('button');
-                            pendLink.className = 'btn btn-outline-primary';
-                            pendLink.style.width = '100%';
-                            pendLink.textContent = 'Ver pendências desta pasta';
-                            pendLink.addEventListener('click', function (ev) { ev.preventDefault(); try { if (typeof window.filterPendenciasForPasta === 'function') { window.filterPendenciasForPasta(pastaId); } else { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); } } catch (e) { console.error(e); } });
-                            actionsWrapper.appendChild(pendLink);
+                            // Só adicionar este botão para subpastas (não para pastas raiz)
+                            if (!isRoot) {
+                                var pendLink = document.createElement('button');
+                                pendLink.className = 'btn btn-outline-primary';
+                                pendLink.style.width = '100%';
+                                pendLink.textContent = 'Ver pendências desta pasta';
+                                pendLink.addEventListener('click', function (ev) { ev.preventDefault(); try { if (typeof window.filterPendenciasForPasta === 'function') { window.filterPendenciasForPasta(pastaId); } else { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); } } catch (e) { console.error(e); } });
+                                actionsWrapper.appendChild(pendLink);
+                            }
 
                             // Delete form (AJAX)
                             var delForm = document.createElement('form'); delForm.method = 'POST';
@@ -822,23 +848,28 @@ try {
                     function loadPastaAssociadosIntoModal(pastaId, container) {
                         container.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Carregando...</span></div> Carregando...';
                         var url = (window.DOC_GET_PASTA_ASSOCIADOS || 'process/get_pasta_associados.php') + '?pasta_id=' + encodeURIComponent(pastaId);
+                        try { console.debug('loadPastaAssociadosIntoModal ->', url); } catch (e) {}
                         fetch(url, { credentials: 'same-origin' }).then(function(r){
                             if (!r.ok) {
-                                return r.text().then(function(txt){ container.innerHTML = '<div class="text-danger">Erro ao carregar usuários: HTTP ' + r.status + ' - ' + (txt || r.statusText) + '</div>'; throw new Error('HTTP ' + r.status); });
+                                return r.text().then(function(txt){ container.innerHTML = '<div class="text-danger">Erro ao carregar usuários: HTTP ' + r.status + ' - ' + (txt || r.statusText) + '</div>'; try { showToast('Erro ao carregar associados: HTTP ' + r.status, 'danger'); } catch(e){}; throw new Error('HTTP ' + r.status); });
                             }
-                return r.text().then(function(txt){ try { return JSON.parse(txt); } catch (e) { 
-                    // show raw server response to help debugging (escaped)
-                    var pre = document.createElement('pre'); pre.style.whiteSpace = 'pre-wrap'; pre.style.maxHeight = '300px'; pre.style.overflow = 'auto';
-                    // escape HTML
-                    var escaped = txt.replace(/&/g, '&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                    pre.innerHTML = escaped;
-                    container.innerHTML = '';
-                    var errDiv = document.createElement('div'); errDiv.className = 'text-danger'; errDiv.textContent = 'Resposta inválida do servidor (mostrada abaixo):';
-                    container.appendChild(errDiv);
-                    container.appendChild(pre);
-                    throw new Error('invalid-json'); } });
+                            return r.text().then(function(txt){
+                                try { return JSON.parse(txt); } catch (e) {
+                                    // show raw server response to help debugging (escaped)
+                                    var pre = document.createElement('pre'); pre.style.whiteSpace = 'pre-wrap'; pre.style.maxHeight = '300px'; pre.style.overflow = 'auto';
+                                    // escape HTML
+                                    var escaped = txt.replace(/&/g, '&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                                    pre.innerHTML = escaped;
+                                    container.innerHTML = '';
+                                    var errDiv = document.createElement('div'); errDiv.className = 'text-danger'; errDiv.textContent = 'Resposta inválida do servidor (mostrada abaixo):';
+                                    container.appendChild(errDiv);
+                                    container.appendChild(pre);
+                                    try { showToast('Erro: resposta inválida do servidor ao carregar associados (ver modal).', 'danger'); } catch (e) {}
+                                    throw new Error('invalid-json');
+                                }
+                            });
                         }).then(function(json){
-                            if (!json || !json.ok) { container.innerHTML = '<div class="text-danger">Erro ao carregar usuários: ' + (json && json.error ? json.error : 'Resposta inválida') + '</div>'; return; }
+                            if (!json || !json.ok) { container.innerHTML = '<div class="text-danger">Erro ao carregar usuários: ' + (json && json.error ? json.error : 'Resposta inválida') + '</div>'; try { showToast('Erro ao carregar associados: ' + (json && json.error ? json.error : 'Resposta inválida'), 'danger'); } catch(e){}; return; }
                             // build form
                             var form = document.createElement('form');
                             form.method = 'POST';

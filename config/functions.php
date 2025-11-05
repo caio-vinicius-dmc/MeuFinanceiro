@@ -7,7 +7,7 @@ $composerAutoload = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($composerAutoload)) {
     require_once $composerAutoload;
 }
-define('BASE_URL', 'http://localhost/DMC-Finanças/');
+define('BASE_URL', 'http://localhost/MeuFinanceiro/');
 //define('BASE_URL', 'https://jpconsultoriacontabil.dynamicmotioncentury.com.br/');
 
 // Função para gerar URLs absolutas
