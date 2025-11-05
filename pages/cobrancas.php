@@ -48,7 +48,10 @@ function getStatusInfo($cobranca) {
     }
 }
 
+global $pdo;
 $cobrancas = [];
+// detect company column name at runtime (empresa_id or id_empresa)
+$company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
 
 if (isClient()) {
     // --- LÓGICA DE FILTROS PARA CLIENTE ---
@@ -85,7 +88,7 @@ if (isClient()) {
         $params[] = $filtro_data_fim;
     }
     if ($filtro_empresa_id) {
-        $where_conditions_cliente[] = "cob.id_empresa = ?";
+        $where_conditions_cliente[] = "cob.`" . $company_col . "` = ?";
         $params[] = $filtro_empresa_id;
     }
     // filtro por data de pagamento
@@ -119,7 +122,7 @@ if (isClient()) {
     }
 
     // Paginação (cliente)
-    $count_sql = "SELECT COUNT(1) FROM cobrancas cob JOIN empresas emp ON cob.id_empresa = emp.id WHERE emp.id_cliente = ? " . (!empty($where_conditions_cliente) ? " AND " . implode(" AND ", $where_conditions_cliente) : "");
+    $count_sql = "SELECT COUNT(1) FROM cobrancas cob JOIN empresas emp ON cob.`" . $company_col . "` = emp.id WHERE emp.id_cliente = ? " . (!empty($where_conditions_cliente) ? " AND " . implode(" AND ", $where_conditions_cliente) : "");
     $stmt_count = $pdo->prepare($count_sql);
     $stmt_count->execute($params);
     $total_items = (int)$stmt_count->fetchColumn();
@@ -130,7 +133,7 @@ if (isClient()) {
 
     $sql = "SELECT cob.*, emp.razao_social, emp.cnpj, fp.nome as forma_pagamento_nome, fp.icone_bootstrap, tc.nome as tipo_cobranca_nome
         FROM cobrancas cob
-        JOIN empresas emp ON cob.id_empresa = emp.id
+        JOIN empresas emp ON cob.`" . $company_col . "` = emp.id
         JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
         LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id
         WHERE emp.id_cliente = ? " . (!empty($where_conditions_cliente) ? " AND " . implode(" AND ", $where_conditions_cliente) : "") . "
@@ -184,8 +187,15 @@ if (isClient()) {
     }
 
     if ($filtro_empresa_id) {
-        $where_conditions[] = "cob.id_empresa = ?";
+        $where_conditions[] = "cob.`" . $company_col . "` = ?";
         $params[] = $filtro_empresa_id;
+    }
+
+    // Aplicar scoping por empresa atual (se selecionada)
+    $company_clause = company_where_clause('cob');
+    if (!empty($company_clause['sql'])) {
+        $where_conditions[] = $company_clause['sql'];
+        $params = array_merge($params, $company_clause['params']);
     }
 
     // pagamento
@@ -221,7 +231,7 @@ if (isClient()) {
     }
 
     if ($filtro_empresa_id) {
-        $where_conditions[] = "cob.id_empresa = ?";
+        $where_conditions[] = "cob.`" . $company_col . "` = ?";
         $params[] = $filtro_empresa_id;
     }
 
@@ -247,7 +257,7 @@ if (isClient()) {
 
     $sql_cobrancas = "SELECT cob.*, emp.razao_social, emp.id_cliente, fp.nome as forma_pagamento_nome, fp.icone_bootstrap, tc.nome as tipo_cobranca_nome, cli.nome_responsavel as cliente_nome
                       FROM cobrancas cob
-                      JOIN empresas emp ON cob.id_empresa = emp.id
+                      JOIN empresas emp ON cob.`" . $company_col . "` = emp.id
                       JOIN clientes cli ON emp.id_cliente = cli.id
                       JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
                       LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id
@@ -589,7 +599,7 @@ if (isClient()) {
                                                 <button class="btn btn-sm btn-warning" title="Editar Cobrança"
                                                         data-bs-toggle="modal" data-bs-target="#modalEditarCobranca"
                                                         data-id="<?php echo $cobranca['id']; ?>"
-                                                        data-id-empresa="<?php echo $cobranca['id_empresa']; ?>"
+                                                        data-id-empresa="<?php echo $cobranca[$company_col]; ?>"
                                                         data-competencia="<?php echo $cobranca['data_competencia']; ?>"
                                                         data-vencimento="<?php echo $cobranca['data_vencimento']; ?>"
                                                         data-valor="<?php echo $cobranca['valor']; ?>"

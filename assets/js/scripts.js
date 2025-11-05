@@ -382,7 +382,7 @@ document.addEventListener("DOMContentLoaded", function() {
          modalEditarLancamento.addEventListener('show.bs.modal', function (event) {
             // Acessa os atributos diretamente de event.relatedTarget
             const id = event.relatedTarget.getAttribute('data-id');
-            const id_empresa = event.relatedTarget.getAttribute('data-id_empresa');
+            const id_empresa = event.relatedTarget.getAttribute('data-id-empresa');
             const descricao = event.relatedTarget.getAttribute('data-descricao');
             const valor = event.relatedTarget.getAttribute('data-valor');
             const tipo = event.relatedTarget.getAttribute('data-tipo');
@@ -428,7 +428,7 @@ document.addEventListener("DOMContentLoaded", function() {
     document.querySelectorAll('[data-bs-target="#modalEditarLancamento"]').forEach(function(btn) {
         btn.addEventListener('click', function () {
             const id = btn.getAttribute('data-id');
-            const id_empresa = btn.getAttribute('data-id_empresa');
+            const id_empresa = btn.getAttribute('data-id-empresa');
             const descricao = btn.getAttribute('data-descricao');
             const valor = btn.getAttribute('data-valor');
             const tipo = btn.getAttribute('data-tipo');

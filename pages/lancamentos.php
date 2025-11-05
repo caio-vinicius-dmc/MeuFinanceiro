@@ -1,6 +1,8 @@
 <?php
 // pages/lancamentos.php
 global $pdo;
+// detect company column name at runtime (empresa_id or id_empresa)
+$company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
 
 // Redireciona se o usuário não tiver acesso a lançamentos
 if (!hasLancamentosAccess()) {
@@ -74,8 +76,16 @@ elseif (isClient()) {
 
 // 2b. Filtros de Interface (Aplicados após a permissão)
 if (!empty($filtro_empresa_id)) {
-    $where_conditions[] = "l.id_empresa = ?";
+    $where_conditions[] = "l.`" . $company_col . "` = ?";
     $params[] = $filtro_empresa_id;
+}
+
+// 2c. Aplicar scoping por empresa, se houver empresa selecionada na sessão
+$company_clause = company_where_clause('l');
+if (!empty($company_clause['sql'])) {
+    // company_clause.sql vem sem 'AND' (ex: `l`.empresa_id = ?)
+    $where_conditions[] = $company_clause['sql'];
+    $params = array_merge($params, $company_clause['params']);
 }
 if (!empty($filtro_status)) {
     // Se o filtro for 'Vencido', ajustamos a lógica para cobrir registros que estão em aberto
@@ -146,7 +156,7 @@ if (!empty($where_conditions)) {
 }
 
 // --- 3. Consulta Principal de Lançamentos ---
-$count_sql = "SELECT COUNT(1) FROM lancamentos l JOIN empresas e ON l.id_empresa = e.id JOIN clientes c ON e.id_cliente = c.id " . $where_sql;
+$count_sql = "SELECT COUNT(1) FROM lancamentos l JOIN empresas e ON l.`" . $company_col . "` = e.id JOIN clientes c ON e.id_cliente = c.id " . $where_sql;
 $stmt_count = $pdo->prepare($count_sql);
 $stmt_count->execute($params);
 $total_items = (int)$stmt_count->fetchColumn();
@@ -165,7 +175,7 @@ try {
 if ($has_categorias_table) {
     $sql = "SELECT l.*, e.razao_social, e.id_cliente, c.nome_responsavel, cat.nome AS categoria_nome 
     FROM lancamentos l
-    JOIN empresas e ON l.id_empresa = e.id
+    JOIN empresas e ON l.`" . $company_col . "` = e.id
     JOIN clientes c ON e.id_cliente = c.id
     LEFT JOIN categorias_lancamento cat ON l.id_categoria = cat.id
     $where_sql
@@ -174,7 +184,7 @@ if ($has_categorias_table) {
 } else {
     $sql = "SELECT l.*, e.razao_social, e.id_cliente, c.nome_responsavel 
     FROM lancamentos l
-    JOIN empresas e ON l.id_empresa = e.id
+    JOIN empresas e ON l.`" . $company_col . "` = e.id
     JOIN clientes c ON e.id_cliente = c.id
     $where_sql
     ORDER BY l.data_vencimento DESC
@@ -529,7 +539,7 @@ if (!empty($activeFilters)): ?>
                                         data-bs-toggle="modal" 
                                         data-bs-target="#modalEditarLancamento"
                                         data-id="<?php echo $lanc['id']; ?>"
-                                        data-id_empresa="<?php echo $lanc['id_empresa']; ?>"
+                                        data-id-empresa="<?php echo $lanc[$company_col]; ?>"
                                         data-descricao="<?php echo htmlspecialchars($lanc['descricao']); ?>"
                                         data-valor="<?php echo htmlspecialchars($lanc['valor']); ?>"
                                         data-tipo="<?php echo htmlspecialchars($lanc['tipo']); ?>"
