@@ -113,6 +113,17 @@ if ($folder_id > 0) {
 ?>
 
 <div class="container-fluid">
+    <?php // Título padrão: usa o mapeamento já calculado em header.php via $title_text quando disponível
+    if (!function_exists('render_page_title')) {
+        // caso raro: inclui helpers
+        require_once __DIR__ . '/../config/functions.php';
+    }
+    // Só insere um título se a página ainda não definiu um título customizado
+    if (!isset($page_title)) {
+        // Exibe o título com ícone igual ao padrão usado em configuracoes_email.php
+        render_page_title('Documentos', '', 'bi-folder2-open');
+    }
+    ?>
     <div class="row">
         <div class="col-12">
             <div class="card">

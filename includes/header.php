@@ -270,3 +270,34 @@ global $page;
             <?php endif; ?>
         </div>
         <?php endif; ?>
+        <!-- Auto-insert page title for pages that don't render one explicitly.
+             This helps standardize the header across many pages without editing each file.
+             It will only insert a title if there is no h1/h2/h3 or element with class .page-title
+             inside the main container. The mapping below mirrors the $default_titles used
+             to build the <title> and can be extended if needed. -->
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                try {
+                    var main = document.querySelector('.main-content .container-fluid, .main-content .container, .main-content .doc-page, .container-fluid');
+                    if (!main) return;
+                    // If the page already has a heading or a page-title marker, don't insert anything
+                    if (main.querySelector('h1, h2, h3, .page-title')) return;
+
+                    var page = '<?php echo isset($page) ? addslashes($page) : ''; ?>';
+                    var mapping = <?php echo json_encode($default_titles ?? []); ?>;
+                    var titleText = mapping[page] || document.title.replace(/^DMC -\s*/i, '') || page || '';
+                    if (!titleText) return;
+
+                    // Choose a sensible default icon; pages can override by rendering their own title
+                    var icon = 'bi-file-earmark-text';
+                    var el = document.createElement('div');
+                    el.className = 'container-fluid my-3 page-title';
+                    el.innerHTML = '<div class="d-flex align-items-center"><i class="bi ' + icon + ' fs-3 me-2"></i><h3 class="mb-0">' + titleText + '</h3></div>';
+                    // insert at the top of the main container
+                    main.insertAdjacentElement('afterbegin', el);
+                } catch (e) {
+                    // silent fail - non-critical
+                    console && console.debug && console.debug('auto-title injection failed', e);
+                }
+            });
+        </script>

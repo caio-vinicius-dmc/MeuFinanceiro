@@ -349,4 +349,17 @@ function sendDocumentNotification($toEmail, $toName, $subject, $bodyHtml) {
 }
 
 // A função enviarEmailNotificacao antiga foi removida e substituída por sendNotificationEmail.
+
+/**
+ * Renderiza um título padrão para páginas administrativas.
+ * Uso: render_page_title('Título da Página', 'Uma descrição curta', 'bi-icon-class');
+ */
+function render_page_title($title, $subtitle = '', $icon = 'bi-info-circle') {
+    echo '<div class="mb-4">';
+    echo '<h3><i class="bi ' . htmlspecialchars($icon) . ' me-2"></i> ' . htmlspecialchars($title) . '</h3>';
+    if (!empty($subtitle)) {
+        echo '<p class="text-muted">' . htmlspecialchars($subtitle) . '</p>';
+    }
+    echo '</div>';
+}
 ?>

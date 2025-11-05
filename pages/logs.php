@@ -68,8 +68,7 @@ $stmt_logs->execute($params);
 $logs = $stmt_logs->fetchAll();
 ?>
 
-<h3>Logs do Sistema</h3>
-<p class="text-muted">Rastreie as atividades importantes no sistema.</p>
+<?php render_page_title('Logs do Sistema', 'Rastreie as atividades importantes no sistema.', 'bi-clock-history'); ?>
 
 <div class="card mb-4">
     <div class="card-header">

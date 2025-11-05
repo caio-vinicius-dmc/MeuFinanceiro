@@ -281,9 +281,8 @@ if (isClient()) {
 
     <?php if (isClient()): ?>
         <!-- Visão do Cliente -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>Minhas Cobranças</h3>
-            <div class="d-flex gap-2">
+        <?php render_page_title('Minhas Cobranças', 'Filtre e visualize cobranças do seu cliente.', 'bi-receipt'); ?>
+        <div class="d-flex gap-2">
                 <form method="GET" action="process/export_cobrancas.php" class="m-0">
                     <input type="hidden" name="page" value="cobrancas">
                     <input type="hidden" name="tipo_data" value="<?php echo htmlspecialchars($filtro_tipo_data ?? 'vencimento'); ?>">
@@ -476,9 +475,8 @@ if (isClient()) {
 
     <?php elseif (isAdmin() || isContador()): ?>
         <!-- Visão do Admin/Contador -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>Gerenciar Cobranças</h3>
-            <div class="d-flex gap-2">
+        <?php render_page_title('Gerenciar Cobranças', 'Filtre e gerencie cobranças do sistema.', 'bi-receipt'); ?>
+        <div class="d-flex gap-2">
                 <form method="GET" action="process/export_cobrancas.php" class="m-0">
                     <input type="hidden" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio); ?>">
                     <input type="hidden" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>">

@@ -55,7 +55,7 @@ if (isset($_SESSION['error_message'])) {
                 <div class="login-branding-overlay">
                     <img src="<?php echo base_url('assets/img/logo.png'); ?>" alt="Logo WorkFlow" style="max-width: 200px; filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));">
                     <h1 class="text-white mt-3 display-4 fw-bold">WorkFlow</h1>
-                    <p class="text-white-50 lead">Sua gestão financeira, simples e moderna.</p>
+                    <p class="text-white-50 lead">Sua gestão de empresas, simples e moderna.</p>
                 </div>
             </div>
 

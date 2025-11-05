@@ -333,9 +333,8 @@ if (!empty($_SESSION['import_errors']) && is_array($_SESSION['import_errors'])):
 endif;
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3>Lançamentos Financeiros</h3>
-    <div class="d-flex gap-2">
+<?php render_page_title('Lançamentos Financeiros', 'Registre e pesquise lançamentos de receitas e despesas.', 'bi-journal-text'); ?>
+<div class="d-flex gap-2">
         <!-- Botão de Importação CSV -->
         <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalImportarLancamentos">
             <i class="bi bi-upload"></i> Importar

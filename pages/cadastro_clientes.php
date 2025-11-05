@@ -14,8 +14,7 @@ $clientes = $stmt->fetchAll();
 
 ?>
 
-<h3>Cadastro de Clientes</h3>
-<p class="text-muted">Gerencie os clientes que utilizam o sistema.</p>
+<?php render_page_title('Cadastro de Clientes', 'Gerencie os clientes que utilizam o sistema.', 'bi-people'); ?>
 
 <div class="row g-4">
     <div class="col-lg-4">

@@ -6,27 +6,32 @@
         </main>
 
         <footer class="app-footer py-4">
+            <!-- Garantir que títulos renderizados acidentalmente dentro do footer não sejam exibidos.
+                 Alguns templates ou scripts antigos podem injetar h1/h2/h3 ou elementos com classe
+                 .page-title dentro do footer — ocultamos por segurança para manter o título apenas
+                 no conteúdo da página. -->
+            <style>
+                /* esconder títulos que possam aparecer dentro do rodapé */
+                .app-footer h1,
+                .app-footer h2,
+                .app-footer h3,
+                .app-footer .page-title,
+                .app-footer .page-heading {
+                    display: none !important;
+                }
+            </style>
             <div class="container-fluid">
                 <div class="row align-items-center gy-3">
-                    <div class="col-md-4 d-flex flex-column justify-content-center">
+                    <div class="col-md-6 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
                                 <img src="<?php echo base_url('assets/img/logo-dmc.jpg'); ?>" alt="DMC" class="footer-logo me-2" />
                             <div>
-                                <div class="fw-bold">DMC - Dynami Motion Century</div>
-                                <small class="text-muted">&copy; 2025. Todos os direitos reservados.</small>
+                                <div class="fw-bold">DMC (Dynamic Motion Century) - <small class="text-muted">&copy;2025. Todos os direitos reservados.</small></div> 
                             </div>
                         </div>
                     </div>
 
-                    <div class="col-md-4 d-flex justify-content-center">
-                        <nav class="footer-nav">
-                            <a href="#" class="footer-link me-3">Suporte</a>
-                            <a href="#" class="footer-link me-3">Política de Privacidade</a>
-                            <a href="#" class="footer-link">Termos de Uso</a>
-                        </nav>
-                    </div>
-
-                    <div class="col-md-4 d-flex justify-content-md-end justify-content-center">
+                    <div class="col-md-6 d-flex justify-content-md-end justify-content-center">
                         <div class="d-flex align-items-center gap-2">
                             <div class="footer-version text-muted me-3">v1</div>
                             <a href="https://www.instagram.com/dynamic.motion.century" class="btn btn-outline-secondary btn-sm rounded-circle social-btn" aria-label="Instagram"><i class="bi bi-instagram"></i></a>

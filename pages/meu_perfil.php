@@ -21,8 +21,7 @@ if (isClient()) {
 
 ?>
 
-<h3>Meu Perfil</h3>
-<p class="text-muted">Gerencie suas informações pessoais e de acesso.</p>
+<?php render_page_title('Meu Perfil', 'Gerencie suas informações pessoais e de acesso.', 'bi-person-circle'); ?>
 
 <div class="row g-4">
     <div class="col-lg-6">

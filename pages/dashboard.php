@@ -541,10 +541,7 @@ $status_chart_json = json_encode([
 ]);
 ?>
 
-<div class="mb-4">
-    <h3>Dashboard</h3>
-    <p class="text-muted">Resumo financeiro da sua operação.</p>
-</div>
+<?php render_page_title('Dashboard', 'Resumo financeiro da sua operação.', 'bi-speedometer2'); ?>
 
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">

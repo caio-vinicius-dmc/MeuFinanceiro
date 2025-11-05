@@ -14,7 +14,7 @@ $tipos_cobranca = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <div class="container-fluid">
-    <h1 class="h2 mb-4">Gerenciar Tipos de Cobrança</h1>
+    <?php render_page_title('Tipos de Cobrança', 'Gerencie os tipos usados para cobranças.', 'bi-list-check'); ?>
 
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">

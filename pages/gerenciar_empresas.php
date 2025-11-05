@@ -25,12 +25,12 @@ try {
 $page_title = 'Gerenciar Empresas';
 ?>
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>Gerenciar Empresas</h3>
-        <?php if (isAdmin()): ?>
+    <?php render_page_title('Gerenciar Empresas', '', 'bi-building'); ?>
+    <?php if (isAdmin()): ?>
+        <div class="mb-3 text-end">
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCreateEmpresa">Nova Empresa</button>
-        <?php endif; ?>
-    </div>
+        </div>
+    <?php endif; ?>
 
     <div class="card">
         <div class="card-body">

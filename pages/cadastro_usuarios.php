@@ -28,8 +28,7 @@ foreach ($all_associations_raw as $assoc) {
 
 ?>
 
-<h3>Cadastro de Usuários</h3>
-<p class="text-muted">Gerencie os acessos ao sistema (Admins, Contadores e Clientes).</p>
+<?php render_page_title('Cadastro de Usuários', 'Gerencie os acessos ao sistema (Admins, Contadores e Clientes).', 'bi-person-plus'); ?>
 
 <div class="row g-4">
     <div class="col-lg-5">

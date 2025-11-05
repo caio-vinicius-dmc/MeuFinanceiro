@@ -20,10 +20,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
 $smtp_password = ''; 
 ?>
 
-<div class="mb-4">
-    <h3><i class="bi bi-envelope-fill me-2"></i> Configurações de E-mail (SMTP)</h3>
-    <p class="text-muted">Configure o servidor de saída de e-mail para envio de notificações.</p>
-</div>
+<?php render_page_title('Configurações de E-mail (SMTP)', 'Configure o servidor de saída de e-mail para envio de notificações.', 'bi-envelope-fill'); ?>
 
 <?php if ($mensagem): ?>
     <div class="alert <?php echo $class_alerta; ?> alert-dismissible fade show" role="alert">

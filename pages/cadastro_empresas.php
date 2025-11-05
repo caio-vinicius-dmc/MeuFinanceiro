@@ -63,8 +63,7 @@ $empresas = $stmt_empresas->fetchAll();
 
 ?>
 
-<h3>Cadastro de Empresas</h3>
-<p class="text-muted">Gerencie as empresas e as vincule aos clientes.</p>
+<?php render_page_title('Cadastro de Empresas', 'Gerencie as empresas e as vincule aos clientes.', 'bi-building'); ?>
 
 <div class="row g-4">
     <div class="col-lg-5">

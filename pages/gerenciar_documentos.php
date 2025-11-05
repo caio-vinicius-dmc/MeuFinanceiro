@@ -52,6 +52,7 @@ try {
 ?>
 
 <div class="container-fluid my-3 doc-page p-3">
+    <?php render_page_title('Gerenciar Documentos', 'Crie pastas, associe usuários e aprove arquivos enviados.', 'bi-folder2-open'); ?>
     <style>
         /* Estilos locais para melhorar aparência da página de documentos (cards full-width e menor altura) */
         .doc-page { padding-left: 0.5rem; padding-right: 0.5rem; }

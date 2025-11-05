@@ -15,6 +15,7 @@ $formas_pagamento = $stmt->fetchAll();
 ?>
 
 <div class="container-fluid">
+    <?php render_page_title('Formas de Pagamento', 'Gerencie os meios de pagamento disponíveis no sistema.', 'bi-credit-card'); ?>
     <div class="row">
         <!-- Coluna do Formulário de Cadastro -->
         <div class="col-md-4">
