@@ -451,9 +451,7 @@ if (isClient()) {
                                                 <i class="bi bi-clipboard me-2"></i>Copiar Código de Pagamento
                                             </button>
                                             <?php if (stripos($cobranca['forma_pagamento_nome'], 'Boleto') !== false): ?>
-                                                <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalVerContexto" data-contexto="<?php echo htmlspecialchars($cobranca['contexto_pagamento']); ?>" data-titulo="Código de Barras">
-                                                    <i class="bi bi-upc-scan me-2"></i>Visualizar Código de Barras
-                                                </button>
+                                                <!-- Removido: preview e botão de visualização do código de barras (implementação anterior removida) -->
                                             <?php endif; ?>
                                         </div>
                                     <?php endif; ?>
@@ -852,75 +850,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (modalVerContexto) {
         modalVerContexto.addEventListener('show.bs.modal', function (event) {
             const button = event.relatedTarget;
-            const contexto = button.getAttribute('data-contexto');
-            const titulo = button.getAttribute('data-titulo');
-            const isBarcode = titulo.includes('Barras');
+            const contexto = button.getAttribute('data-contexto') || '';
+            const titulo = button.getAttribute('data-titulo') || 'Detalhes do Pagamento';
 
             const modalTitle = modalVerContexto.querySelector('.modal-title');
             const modalBody = modalVerContexto.querySelector('.contexto-pagamento-modal');
 
+            // Apenas mostrar o texto do contexto — removida toda a lógica de geração/preview de boleto
             modalTitle.textContent = titulo;
-            
-            if (isBarcode) {
-                console.log('Attempting to generate barcode.');
-                console.log('Contexto (barcode data):', contexto);
-
-                if (typeof JsBarcode === 'undefined') {
-                    console.error('JsBarcode is not defined. Make sure the library is loaded.');
-                    modalBody.innerHTML = '<p class="text-danger">Erro: Biblioteca JsBarcode não carregada.</p>';
-                    return;
-                }
-
-                // Validate contexto for ITF format
-                if (!contexto || typeof contexto !== 'string' || !/^\d+$/.test(contexto)) {
-                    console.error('Invalid barcode data for ITF format. Expected a string of digits.', contexto);
-                    modalBody.innerHTML = '<p class="text-danger">Erro: Dados do código de barras inválidos. Esperado uma sequência de dígitos.</p>';
-                    return;
-                }
-
-                let barcodeData = contexto;
-                if (barcodeData.length % 2 !== 0) {
-                    console.warn('Barcode data has an odd number of digits. Padding with a leading zero for ITF format.');
-                    barcodeData = '0' + barcodeData;
-                }
-
-                // Create a container for the SVG to handle overflow
-                const barcodeContainer = document.createElement('div');
-                barcodeContainer.style.overflowX = 'auto';
-                barcodeContainer.style.padding = '10px 0'; // Add some padding for better appearance
-                barcodeContainer.style.display = 'flex'; // Make it a flex container
-                barcodeContainer.style.justifyContent = 'center'; // Center items horizontally
-                barcodeContainer.style.alignItems = 'center'; // Center items vertically (though not strictly necessary for a single SVG)
-
-                // Create an SVG element for JsBarcode
-                const svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                svgElement.id = "barcode-svg";
-                svgElement.style.maxWidth = '100%'; // Ensure SVG scales down
-                svgElement.style.height = 'auto'; // Maintain aspect ratio
-
-                barcodeContainer.appendChild(svgElement);
-                modalBody.innerHTML = ''; // Clear previous content
-                modalBody.appendChild(barcodeContainer); // Append the container
-
-
-                try {
-                    // Generate the barcode
-                    JsBarcode("#barcode-svg", barcodeData, { // Use barcodeData here
-                        format: "ITF", // Interleaved 2 of 5 is common for Brazilian boletos
-                        displayValue: true, // Show the human-readable value below the barcode
-                        width: 2, // Adjust width of bars
-                        height: 100, // Adjust height of barcode
-                        margin: 10,
-                        fontSize: 18
-                    });
-                    console.log('Barcode generated successfully.');
-                } catch (error) {
-                    console.error('Error generating barcode:', error);
-                    modalBody.innerHTML = `<p class="text-danger">Erro ao gerar código de barras: ${error.message || 'Verifique o formato dos dados.'}</p>`;
-                }
-            } else {
-                modalBody.textContent = contexto;
-            }
+            modalBody.textContent = contexto;
         });
     }
 

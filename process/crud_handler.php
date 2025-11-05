@@ -1280,7 +1280,10 @@ switch ($action) {
         $stmt = $pdo->prepare($sql);
         if ($stmt->execute([$id_empresa, $data_competencia, $data_vencimento, $valor, $id_forma_pagamento, $id_tipo_cobranca, $descricao, $contexto_pagamento])) {
                     $_SESSION['success_message'] = "Cobrança gerada com sucesso!";
-                    logAction("Gerou Cobrança", "cobrancas", $pdo->lastInsertId(), "Valor: R$ $valor para empresa ID: $id_empresa");
+                    $newId = $pdo->lastInsertId();
+                    logAction("Gerou Cobrança", "cobrancas", $newId, "Valor: R$ $valor para empresa ID: $id_empresa");
+
+                    // Removida: geração automática de PNG de boleto ao criar cobrança (implementação anterior revertida)
                 } else {
                     $_SESSION['error_message'] = "Erro ao gerar cobrança.";
                 }
