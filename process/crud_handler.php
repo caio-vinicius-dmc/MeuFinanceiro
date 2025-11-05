@@ -4,6 +4,8 @@ require_once '../config/functions.php';
 requireLogin(); 
 
 global $pdo;
+// detect company column name at runtime (empresa_id or id_empresa)
+$company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
 // Permite receber 'action' via POST (formulários) ou GET (botão de email)
 $action = $_POST['action'] ?? $_GET['action'] ?? null;
 $user_id = $_SESSION['user_id'];
@@ -23,12 +25,12 @@ switch ($action) {
             }
 
             try {
-                // Busca dados da cobrança com empresa e cliente
-                $sql = "SELECT cob.*, emp.razao_social, emp.id_cliente, cli.nome_responsavel, cli.email_contato
-                        FROM cobrancas cob
-                        JOIN empresas emp ON cob.id_empresa = emp.id
-                        LEFT JOIN clientes cli ON emp.id_cliente = cli.id
-                        WHERE cob.id = ?";
+        // Busca dados da cobrança com empresa e cliente (usa coluna dinâmica de empresa)
+        $sql = "SELECT cob.*, emp.razao_social, emp.id_cliente, cli.nome_responsavel, cli.email_contato
+            FROM cobrancas cob
+            JOIN empresas emp ON cob.`" . $company_col . "` = emp.id
+            LEFT JOIN clientes cli ON emp.id_cliente = cli.id
+            WHERE cob.id = ?";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([$id_cobranca]);
                 $cob = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -218,40 +220,58 @@ switch ($action) {
             exit;
         }
 
-        $id_empresa = $_POST['id_empresa'] ?? null;
+        // Determine target company: prefer posted id_empresa, fallback to current selected company
+        $id_empresa = null;
+        if (!empty($_POST['id_empresa'])) $id_empresa = intval($_POST['id_empresa']);
+        if (empty($id_empresa)) {
+            $id_empresa = current_company_id();
+        }
+        // additional enforcement: ensure user may act on this company
+        if (!empty($id_empresa)) ensure_user_can_access_company($id_empresa);
         if (empty($id_empresa)) {
             $_SESSION['error_message'] = 'Selecione a empresa destino para a importação.';
             header('Location: ' . base_url('index.php?page=lancamentos'));
             exit;
         }
 
-        // Verifica permissão para a empresa selecionada (clientes e contadores)
+        // Verifica permissão para a empresa selecionada: allow global admin or user associated with company
         try {
             $stmtCheck = $pdo->prepare('SELECT id_cliente FROM empresas WHERE id = ?');
             $stmtCheck->execute([$id_empresa]);
             $empresa_cliente = $stmtCheck->fetchColumn();
-            if (!$empresa_cliente) {
+            if ($empresa_cliente === false) {
                 $_SESSION['error_message'] = 'Empresa selecionada não encontrada.';
                 header('Location: ' . base_url('index.php?page=lancamentos'));
                 exit;
             }
-            if (isClient()) {
-                $id_cliente_logado = $_SESSION['id_cliente_associado'] ?? null;
-                if ($id_cliente_logado != $empresa_cliente) {
-                    $_SESSION['error_message'] = 'Você não tem permissão para importar para esta empresa.';
-                    header('Location: ' . base_url('index.php?page=lancamentos'));
-                    exit;
+
+            if (!isAdmin()) {
+                // if client role exists in legacy app, keep client rules
+                if (isClient()) {
+                    $id_cliente_logado = $_SESSION['id_cliente_associado'] ?? null;
+                    if ($id_cliente_logado != $empresa_cliente) {
+                        $_SESSION['error_message'] = 'Você não tem permissão para importar para esta empresa.';
+                        header('Location: ' . base_url('index.php?page=lancamentos'));
+                        exit;
+                    }
                 }
-            }
-            if (isContador()) {
-                // contador só pode importar para empresas de clientes associados
-                $stmtAssoc = $pdo->prepare('SELECT id_cliente FROM contador_clientes_assoc WHERE id_usuario_contador = ?');
-                $stmtAssoc->execute([$_SESSION['user_id']]);
-                $assoc = $stmtAssoc->fetchAll(PDO::FETCH_COLUMN);
-                if (!in_array($empresa_cliente, $assoc)) {
-                    $_SESSION['error_message'] = 'Você não está associado ao cliente desta empresa.';
-                    header('Location: ' . base_url('index.php?page=lancamentos'));
-                    exit;
+                // For contador or other roles, require the user to be associated to the company
+                if (!user_has_any_role($_SESSION['user_id'], $id_empresa)) {
+                    // contador legacy rule: check contador_clientes_assoc if that table is used
+                    if (isContador()) {
+                        $stmtAssoc = $pdo->prepare('SELECT id_cliente FROM contador_clientes_assoc WHERE id_usuario_contador = ?');
+                        $stmtAssoc->execute([$_SESSION['user_id']]);
+                        $assoc = $stmtAssoc->fetchAll(PDO::FETCH_COLUMN);
+                        if (!in_array($empresa_cliente, $assoc)) {
+                            $_SESSION['error_message'] = 'Você não está associado ao cliente desta empresa.';
+                            header('Location: ' . base_url('index.php?page=lancamentos'));
+                            exit;
+                        }
+                    } else {
+                        $_SESSION['error_message'] = 'Você não tem permissão para importar para esta empresa.';
+                        header('Location: ' . base_url('index.php?page=lancamentos'));
+                        exit;
+                    }
                 }
             }
         } catch (Exception $e) {
@@ -393,7 +413,9 @@ switch ($action) {
             $has_categoria_col = $colStmt2->fetchColumn() > 0;
 
             // Monta SQL dinâmico conforme colunas disponíveis
-            $insertCols = ['id_empresa','descricao','valor','tipo','data_vencimento','data_competencia','data_pagamento','metodo_pagamento'];
+        // Use the configured company column name (empresa_id or id_empresa)
+        $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+        $insertCols = array_merge([$company_col], ['descricao','valor','tipo','data_vencimento','data_competencia','data_pagamento','metodo_pagamento']);
             if ($has_forma_col) $insertCols[] = 'id_forma_pagamento';
             if ($has_categoria_col) $insertCols[] = 'id_categoria';
             $insertCols[] = 'status';
@@ -550,6 +572,21 @@ switch ($action) {
     case 'cadastrar_lancamento':
         if (isAdmin() || isContador() || isClient()) {
             $id_empresa = $_POST['id_empresa'] ?? null;
+            // se não enviado, tenta usar a empresa atual da sessão
+            if (empty($id_empresa)) {
+                $id_empresa = current_company_id();
+            }
+            if (empty($id_empresa)) {
+                $_SESSION['error_message'] = 'Selecione a empresa para o lançamento.';
+                header('Location: ' . base_url('index.php?page=lancamentos'));
+                exit;
+            }
+            // Verifica se o usuário tem associação com a empresa (a menos que seja admin global)
+            if (!isAdmin() && !user_has_any_role($_SESSION['user_id'], $id_empresa)) {
+                $_SESSION['error_message'] = 'Você não tem permissão para criar lançamentos nessa empresa.';
+                header('Location: ' . base_url('index.php?page=lancamentos'));
+                exit;
+            }
             $descricao = $_POST['descricao'] ?? null;
             $valor = $_POST['valor'] ?? null;
             $tipo = $_POST['tipo'] ?? 'receita';
@@ -569,8 +606,9 @@ switch ($action) {
             $colStmt2->execute();
             $has_categoria_col = $colStmt2->fetchColumn() > 0;
 
-            // Monta colunas e params dinamicamente
-            $cols = ['id_empresa','descricao','valor','tipo','data_vencimento','data_competencia','data_pagamento','metodo_pagamento'];
+            // Monta colunas e params dinamicamente (usa coluna de empresa detectada dinamicamente)
+            $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+            $cols = array_merge([$company_col], ['descricao','valor','tipo','data_vencimento','data_competencia','data_pagamento','metodo_pagamento']);
             $params = [$id_empresa,$descricao,$valor,$tipo,$data_vencimento,$data_competencia ?: null,$data_pagamento ?: null,$metodo_pagamento];
             if ($has_forma_col) { $cols[] = 'id_forma_pagamento'; $params[] = $id_forma; }
             if ($has_categoria_col) { $cols[] = 'id_categoria'; $params[] = $id_categoria; }
@@ -619,24 +657,40 @@ switch ($action) {
 
             // 1. AUDITORIA: Busca dados antigos
             // Seleciona colunas antigas para auditoria (inclui id_forma_pagamento e id_categoria quando existirem)
-            $selectCols = ['id_empresa','descricao','valor','tipo','data_vencimento','data_competencia','metodo_pagamento','status'];
+            $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+            // alias company column to empresa_ref for consistent access
+            $selectCols = ["{$company_col} AS empresa_ref",'descricao','valor','tipo','data_vencimento','data_competencia','metodo_pagamento','status'];
             if ($has_forma_col) $selectCols[] = 'id_forma_pagamento';
             if ($has_categoria_col) $selectCols[] = 'id_categoria';
             $stmt_old = $pdo->prepare("SELECT " . implode(',', $selectCols) . " FROM lancamentos WHERE id = ?");
             $stmt_old->execute([$id]);
             $old_data = $stmt_old->fetch(PDO::FETCH_ASSOC);
+            // Security: ensure non-admin users can only edit lancamentos for companies they belong to
+            if (!isAdmin()) {
+                $empresa_antiga = $old_data['empresa_ref'] ?? null;
+                if ($empresa_antiga === null) {
+                    $_SESSION['error_message'] = 'Empresa vinculada ao lançamento não encontrada.';
+                    header('Location: ' . base_url('index.php?page=lancamentos'));
+                    exit;
+                }
+                if (!user_has_any_role($_SESSION['user_id'], $empresa_antiga)) {
+                    $_SESSION['error_message'] = 'Você não tem permissão para editar este lançamento.';
+                    header('Location: ' . base_url('index.php?page=lancamentos'));
+                    exit;
+                }
+            }
             
             // 2. AUDITORIA: Compara e monta a string de detalhes
             $detalhes_log = [];
             
-            if ($old_data['id_empresa'] !== $id_empresa_novo) {
-                 $stmt_empresa = $pdo->prepare("SELECT razao_social FROM empresas WHERE id = ?");
-                 $stmt_empresa->execute([$id_empresa_novo]);
-                 $nome_empresa_novo = $stmt_empresa->fetchColumn() ?? 'N/D';
-                 $stmt_empresa->execute([$old_data['id_empresa']]);
-                 $nome_empresa_antigo = $stmt_empresa->fetchColumn() ?? 'N/D';
-                 $detalhes_log[] = "Empresa: {$nome_empresa_antigo} -> {$nome_empresa_novo}";
-            }
+          if (($old_data['empresa_ref'] ?? null) !== $id_empresa_novo) {
+              $stmt_empresa = $pdo->prepare("SELECT razao_social FROM empresas WHERE id = ?");
+              $stmt_empresa->execute([$id_empresa_novo]);
+              $nome_empresa_novo = $stmt_empresa->fetchColumn() ?? 'N/D';
+              $stmt_empresa->execute([$old_data['empresa_ref'] ?? 0]);
+              $nome_empresa_antigo = $stmt_empresa->fetchColumn() ?? 'N/D';
+              $detalhes_log[] = "Empresa: {$nome_empresa_antigo} -> {$nome_empresa_novo}";
+          }
             if ($old_data['descricao'] !== $descricao_novo) {
                  $detalhes_log[] = "Descrição: {$old_data['descricao']} -> {$descricao_novo}";
             }
@@ -690,9 +744,10 @@ switch ($action) {
             $log_details_string = "Campos alterados: " . implode('; ', $detalhes_log);
 
             // 3. Atualiza o banco de dados
-            // Monta UPDATE dinâmico conforme colunas presentes
+            // Monta UPDATE dinâmico conforme colunas presentes (usa nome de coluna de empresa dinamicamente)
+            $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
             $update_fields = [
-                'id_empresa = ?', 'descricao = ?', 'valor = ?', 'tipo = ?', 'data_vencimento = ?', 'data_competencia = ?', 'metodo_pagamento = ?'
+                "{$company_col} = ?", 'descricao = ?', 'valor = ?', 'tipo = ?', 'data_vencimento = ?', 'data_competencia = ?', 'metodo_pagamento = ?'
             ];
             $update_params = [$id_empresa_novo, $descricao_novo, $valor_novo, $tipo_novo, $data_vencimento_novo, $data_competencia_novo, $metodo_pagamento_novo];
             if ($has_forma_col) {
@@ -722,14 +777,28 @@ switch ($action) {
         }
         break;
 
-    case 'excluir_lancamento': // Assuming this action already exists or needs to be added
-        if (isAdmin() || isContador() || isClient()) { // All can delete
-            $id = $_GET['id'] ?? null;
+    case 'excluir_lancamento': // Ensure company scoping before delete
+        if (isAdmin() || isContador() || isClient()) {
+            $id = intval($_GET['id'] ?? 0);
             if ($id) {
                 try {
-                    $sql = "DELETE FROM lancamentos WHERE id = ?";
+                    $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+                    $stmtC = $pdo->prepare("SELECT `" . $company_col . "` FROM lancamentos WHERE id = ?");
+                    $stmtC->execute([$id]);
+                    $empresa_ref = $stmtC->fetchColumn();
+                    if ($empresa_ref === false) {
+                        $_SESSION['error_message'] = 'Lançamento não encontrado.';
+                        header('Location: ' . base_url('index.php?page=lancamentos'));
+                        exit;
+                    }
+                    if (!isAdmin() && !user_has_any_role($_SESSION['user_id'], $empresa_ref)) {
+                        $_SESSION['error_message'] = 'Você não tem permissão para excluir este lançamento.';
+                        header('Location: ' . base_url('index.php?page=lancamentos'));
+                        exit;
+                    }
+                    $sql = "DELETE FROM lancamentos WHERE id = ? AND `" . $company_col . "` = ?";
                     $stmt = $pdo->prepare($sql);
-                    if ($stmt->execute([$id])) {
+                    if ($stmt->execute([$id, $empresa_ref])) {
                         $_SESSION['success_message'] = "Lançamento excluído com sucesso!";
                         logAction("Excluiu Lançamento", "lancamentos", $id);
                     } else {
@@ -755,9 +824,29 @@ switch ($action) {
             error_log("DEBUG: atualizar_status_lancamento - ID: $id, Novo Status Recebido: $novo_status");
 
             // Get current lancamento data for comparison and logging
-            $stmt_old_data = $pdo->prepare("SELECT status, data_vencimento, data_pagamento, metodo_pagamento FROM lancamentos WHERE id = ?");
+            // Fetch old lancamento data including company for permission checks
+            $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+            $stmt_old_data = $pdo->prepare("SELECT status, data_vencimento, data_pagamento, metodo_pagamento, `" . $company_col . "` AS empresa_ref FROM lancamentos WHERE id = ?");
             $stmt_old_data->execute([$id]);
             $old_lancamento_data = $stmt_old_data->fetch(PDO::FETCH_ASSOC);
+
+            if (!$old_lancamento_data) {
+                $_SESSION['error_message'] = "Lançamento não encontrado.";
+                break;
+            }
+
+            // Permission: non-admins must be associated to the company
+            if (!isAdmin()) {
+                $empresa_ref = $old_lancamento_data['empresa_ref'] ?? null;
+                if ($empresa_ref === null) {
+                    $_SESSION['error_message'] = 'Empresa vinculada ao lançamento não encontrada.';
+                    break;
+                }
+                if (!user_has_any_role($_SESSION['user_id'], $empresa_ref)) {
+                    $_SESSION['error_message'] = 'Você não tem permissão para alterar o status deste lançamento.';
+                    break;
+                }
+            }
 
             if (!$old_lancamento_data) {
                 $_SESSION['error_message'] = "Lançamento não encontrado.";
@@ -882,6 +971,7 @@ switch ($action) {
     case 'editar_empresa':
         if (isAdmin() || isContador()) {
              $id_empresa = $_POST['id_empresa'];
+             if (!empty($id_empresa)) ensure_user_can_access_company($id_empresa);
              $data_abertura = !empty($_POST['data_abertura']) ? $_POST['data_abertura'] : null;
 
              $sql_update = "UPDATE empresas SET id_cliente = ?, cnpj = ?, razao_social = ?, nome_fantasia = ?, data_abertura = ? WHERE id = ?";
@@ -899,6 +989,7 @@ switch ($action) {
     case 'deletar_empresa':
         if (isAdmin() || isContador()) {
              $id_empresa = $_POST['id_empresa'];
+             if (!empty($id_empresa)) ensure_user_can_access_company($id_empresa);
              $sql = "DELETE FROM empresas WHERE id = ?";
              $stmt = $pdo->prepare($sql);
              if ($stmt->execute([$id_empresa])) {
@@ -1158,19 +1249,36 @@ switch ($action) {
     case 'criar_cobranca':
         if (isAdmin() || isContador()) {
             $id_empresa = $_POST['id_empresa'];
+            if (!empty($id_empresa)) ensure_user_can_access_company($id_empresa);
             $data_competencia = $_POST['data_competencia'];
             $data_vencimento = $_POST['data_vencimento'];
             $valor = $_POST['valor'];
             $id_forma_pagamento = $_POST['id_forma_pagamento'];
-            $id_tipo_cobranca = $_POST['id_tipo_cobranca'] ?? null;
+                $id_tipo_cobranca = $_POST['id_tipo_cobranca'] ?? null;
+                $id_empresa = $_POST['id_empresa'] ?? null;
+                if (empty($id_empresa)) {
+                    $id_empresa = current_company_id();
+                }
+                if (empty($id_empresa)) {
+                    $_SESSION['error_message'] = 'Selecione a empresa para criar a cobrança.';
+                    header('Location: ' . base_url('index.php?page=cobrancas'));
+                    exit;
+                }
+                if (!isAdmin() && !user_has_any_role($_SESSION['user_id'], $id_empresa)) {
+                    $_SESSION['error_message'] = 'Você não tem permissão para criar cobranças nessa empresa.';
+                    header('Location: ' . base_url('index.php?page=cobrancas'));
+                    exit;
+                }
             $descricao = $_POST['descricao'];
             $contexto_pagamento = $_POST['contexto_pagamento'] ?? null;
 
             try {
-                $sql = "INSERT INTO cobrancas (id_empresa, data_competencia, data_vencimento, valor, id_forma_pagamento, id_tipo_cobranca, descricao, contexto_pagamento, status_pagamento) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pendente')";
-                $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$id_empresa, $data_competencia, $data_vencimento, $valor, $id_forma_pagamento, $id_tipo_cobranca, $descricao, $contexto_pagamento])) {
+        // use dynamic company column name
+        $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+        $sql = "INSERT INTO cobrancas ({$company_col}, data_competencia, data_vencimento, valor, id_forma_pagamento, id_tipo_cobranca, descricao, contexto_pagamento, status_pagamento) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pendente')";
+        $stmt = $pdo->prepare($sql);
+        if ($stmt->execute([$id_empresa, $data_competencia, $data_vencimento, $valor, $id_forma_pagamento, $id_tipo_cobranca, $descricao, $contexto_pagamento])) {
                     $_SESSION['success_message'] = "Cobrança gerada com sucesso!";
                     logAction("Gerou Cobrança", "cobrancas", $pdo->lastInsertId(), "Valor: R$ $valor para empresa ID: $id_empresa");
                 } else {
@@ -1184,12 +1292,26 @@ switch ($action) {
 
     case 'excluir_cobranca':
         if (isAdmin() || isContador()) {
-            $id = $_GET['id'] ?? null;
+            $id = intval($_GET['id'] ?? 0);
             if ($id) {
                 try {
-                    $sql = "DELETE FROM cobrancas WHERE id = ?";
+                    $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+                    $stmtC = $pdo->prepare("SELECT `" . $company_col . "` FROM cobrancas WHERE id = ?");
+                    $stmtC->execute([$id]);
+                    $empresa_ref = $stmtC->fetchColumn();
+                    if ($empresa_ref === false) {
+                        $_SESSION['error_message'] = 'Cobrança não encontrada.';
+                        header('Location: ' . base_url('index.php?page=cobrancas'));
+                        exit;
+                    }
+                    if (!isAdmin() && !user_has_any_role($_SESSION['user_id'], $empresa_ref)) {
+                        $_SESSION['error_message'] = 'Você não tem permissão para excluir esta cobrança.';
+                        header('Location: ' . base_url('index.php?page=cobrancas'));
+                        exit;
+                    }
+                    $sql = "DELETE FROM cobrancas WHERE id = ? AND `" . $company_col . "` = ?";
                     $stmt = $pdo->prepare($sql);
-                    if ($stmt->execute([$id])) {
+                    if ($stmt->execute([$id, $empresa_ref])) {
                         $_SESSION['success_message'] = "Cobrança excluída com sucesso!";
                         logAction("Excluiu Cobrança", "cobrancas", $id);
                     } else {
@@ -1206,6 +1328,7 @@ switch ($action) {
         if (isAdmin() || isContador()) {
             $id = $_POST['id_cobranca'];
             $id_empresa = $_POST['id_empresa'];
+            if (!empty($id_empresa)) ensure_user_can_access_company($id_empresa);
             $data_competencia = $_POST['data_competencia'];
             $data_vencimento = $_POST['data_vencimento'];
             $valor = $_POST['valor'];
@@ -1214,9 +1337,24 @@ switch ($action) {
             $descricao = $_POST['descricao'];
             $contexto_pagamento = $_POST['contexto_pagamento'] ?? null;
 
+            // If id_empresa not provided, fallback to current company
+            if (empty($id_empresa)) $id_empresa = current_company_id();
+            if (empty($id_empresa)) {
+                $_SESSION['error_message'] = 'Selecione a empresa para a cobrança.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+            // Permission: non-admin must be associated to the selected company
+            if (!isAdmin() && !user_has_any_role($_SESSION['user_id'], $id_empresa)) {
+                $_SESSION['error_message'] = 'Você não tem permissão para editar cobranças nesta empresa.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+
             try {
+                $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
                 $sql = "UPDATE cobrancas SET 
-                            id_empresa = ?, 
+                            {$company_col} = ?, 
                             data_competencia = ?, 
                             data_vencimento = ?, 
                             valor = ?, 
@@ -1254,14 +1392,28 @@ switch ($action) {
             }
 
             try {
-                // 1. Obter a data de vencimento da cobrança
-                $stmt_vencimento = $pdo->prepare("SELECT data_vencimento FROM cobrancas WHERE id = ?");
+                // 1. Obter a data de vencimento da cobrança e a empresa associada
+                $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+                $stmt_vencimento = $pdo->prepare("SELECT data_vencimento, `" . $company_col . "` AS empresa_ref FROM cobrancas WHERE id = ?");
                 $stmt_vencimento->execute([$id]);
                 $cobranca = $stmt_vencimento->fetch(PDO::FETCH_ASSOC);
 
                 if (!$cobranca) {
                     $_SESSION['error_message'] = "Erro: Cobrança não encontrada.";
                     break;
+                }
+
+                // Permission check
+                if (!isAdmin()) {
+                    $empresa_ref = $cobranca['empresa_ref'] ?? null;
+                    if ($empresa_ref === null) {
+                        $_SESSION['error_message'] = 'Empresa vinculada à cobrança não encontrada.';
+                        break;
+                    }
+                    if (!user_has_any_role($_SESSION['user_id'], $empresa_ref)) {
+                        $_SESSION['error_message'] = 'Você não tem permissão para dar baixa nesta cobrança.';
+                        break;
+                    }
                 }
 
                 $data_vencimento = new DateTime($cobranca['data_vencimento']);
@@ -1293,6 +1445,19 @@ switch ($action) {
         if (isAdmin() || isContador()) {
             $id = $_POST['id_cobranca'] ?? null;
             if ($id) {
+                // Check company permission before reverting
+                $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+                $stmtC = $pdo->prepare("SELECT `" . $company_col . "` FROM cobrancas WHERE id = ?");
+                $stmtC->execute([$id]);
+                $empresa_ref = $stmtC->fetchColumn();
+                if ($empresa_ref === false) {
+                    $_SESSION['error_message'] = 'Cobrança não encontrada.';
+                    break;
+                }
+                if (!isAdmin() && !user_has_any_role($_SESSION['user_id'], $empresa_ref)) {
+                    $_SESSION['error_message'] = 'Você não tem permissão para reverter a baixa desta cobrança.';
+                    break;
+                }
                 $sql = "UPDATE cobrancas SET status_pagamento = 'Pendente', data_pagamento = NULL WHERE id = ?";
                 $stmt = $pdo->prepare($sql);
                 if ($stmt->execute([$id])) {
