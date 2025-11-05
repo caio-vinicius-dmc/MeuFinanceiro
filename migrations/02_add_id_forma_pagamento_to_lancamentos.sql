@@ -6,8 +6,8 @@
 START TRANSACTION;
 
 -- 1) Adiciona coluna (nullable para evitar falha em registros existentes)
-ALTER TABLE lancamentos
-    ADD COLUMN id_forma_pagamento INT NULL;
+ALTER TABLE `lancamentos`
+    ADD COLUMN IF NOT EXISTS `id_forma_pagamento` INT NULL;
 
 -- 2) Tenta mapear o texto em metodo_pagamento para o id da forma de pagamento
 -- Usa comparação case-insensitive e trim
