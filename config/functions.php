@@ -2,12 +2,17 @@
 // config/functions.php
 session_start();
 require_once 'db.php'; // Assumindo que este arquivo contém $pdo global
+// Autoload de helpers de autenticação/empresa
+$authFile = __DIR__ . '/auth.php';
+if (file_exists($authFile)) {
+    require_once $authFile;
+}
 // Tentativa de carregar autoload do Composer (PHPMailer)
 $composerAutoload = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($composerAutoload)) {
     require_once $composerAutoload;
 }
-define('BASE_URL', 'http://localhost/MeuFinanceiro/');
+define('BASE_URL', 'http://localhost/DMC-finanças/');
 //define('BASE_URL', 'https://jpconsultoriacontabil.dynamicmotioncentury.com.br/');
 
 // Função para gerar URLs absolutas

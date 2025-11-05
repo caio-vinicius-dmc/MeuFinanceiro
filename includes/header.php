@@ -61,8 +61,8 @@ global $page;
         
         <div class="offcanvas-header">
             <a class="navbar-brand fw-bold text-white" href="<?php echo base_url('index.php?page=dashboard'); ?>">
-                <i class="bi bi-cash-coin me-2"></i> 
-                <span class="sidebar-brand-text">MeuFinanceiro</span>
+                <i class="bi bi-building-gear me-2"></i> 
+                <span class="sidebar-brand-text">WorkFlow</span>
             </a>
             
             <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu" aria-label="Close"></button>
@@ -228,7 +228,7 @@ global $page;
 
     <header class="navbar navbar-dark bg-primary sticky-top d-lg-none flex-md-nowrap p-0">
         <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6 text-white" href="#">
-            <i class="bi bi-cash-coin me-2"></i> MeuFinanceiro
+            <i class="bi bi-building-gear me-2"></i> WorkFlow
         </a>
         <button class="navbar-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>

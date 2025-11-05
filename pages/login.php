@@ -53,8 +53,8 @@ if (isset($_SESSION['error_message'])) {
         
             <div class="col-lg-7 d-none d-lg-block login-image-side">
                 <div class="login-branding-overlay">
-                    <img src="<?php echo base_url('assets/img/logo.png'); ?>" alt="Logo MeuFinanceiro" style="max-width: 200px; filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));">
-                    <h1 class="text-white mt-3 display-4 fw-bold">MeuFinanceiro</h1>
+                    <img src="<?php echo base_url('assets/img/logo.png'); ?>" alt="Logo WorkFlow" style="max-width: 200px; filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));">
+                    <h1 class="text-white mt-3 display-4 fw-bold">WorkFlow</h1>
                     <p class="text-white-50 lead">Sua gestão financeira, simples e moderna.</p>
                 </div>
             </div>
@@ -66,7 +66,7 @@ if (isset($_SESSION['error_message'])) {
                         
                         <div class="text-center mb-4 d-lg-none"> 
                             <img src="<?php echo base_url('assets/img/logo.png'); ?>" alt="Logo Mobile" id="mobile-login-logo" style="max-width: 150px; margin: 0 auto 1.5rem;">
-                            <h3 class="fw-bold mt-2 text-primary">MeuFinanceiro</h3>
+                            <h3 class="fw-bold mt-2 text-primary">WorkFlow</h3>
                         </div>
                         
                         <h2 class="fw-bold mb-3">Login</h2>
