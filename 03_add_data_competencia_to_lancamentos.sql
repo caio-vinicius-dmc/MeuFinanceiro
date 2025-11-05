@@ -1,1 +1,0 @@
-ALTER TABLE `lancamentos` ADD `data_competencia` DATE NULL AFTER `data_vencimento`;
