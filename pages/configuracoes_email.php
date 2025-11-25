@@ -32,7 +32,6 @@ $smtp_password = '';
 <div class="card shadow-sm">
     <div class="card-body">
         <form action="process/crud_handler.php" method="POST">
-            <input type="hidden" name="action" value="salvar_config_smtp">
             
             <h5 class="mb-3">Detalhes do Servidor</h5>
             <div class="row g-3 mb-4">
@@ -73,17 +72,41 @@ $smtp_password = '';
             </div>
 
             <hr class="mt-4">
+            <h5 class="mb-3">Templates de Mensagem</h5>
+            <div class="mb-3">
+                <label for="email_subject_template" class="form-label">Assunto (use placeholders: {toName}, {descricao}, {valor}, {data_vencimento}, {tipo})</label>
+                <input type="text" class="form-control" id="email_subject_template" name="email_subject_template" value="<?php echo htmlspecialchars($settings['email_subject_template'] ?? 'Novo Lançamento Financeiro Disponível: R$ {valor}'); ?>">
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="email_from_name" class="form-label">Nome do Remetente (From name)</label>
+                    <input type="text" class="form-control" id="email_from_name" name="email_from_name" value="<?php echo htmlspecialchars($settings['email_from_name'] ?? 'Sistema Financeiro'); ?>">
+                </div>
+                <div class="col-md-6">
+                    <label for="email_salutation" class="form-label">Saudação (ex: Prezado(a) {toName},)</label>
+                    <input type="text" class="form-control" id="email_salutation" name="email_salutation" value="<?php echo htmlspecialchars($settings['email_salutation'] ?? 'Prezado(a) {toName},'); ?>">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="email_intro" class="form-label">Texto introdutório</label>
+                <textarea class="form-control" id="email_intro" name="email_intro" rows="3"><?php echo htmlspecialchars($settings['email_intro'] ?? 'Informamos que um novo lançamento financeiro foi disponibilizado para sua empresa. Por favor, acesse o portal para visualizar os detalhes e a situação de pagamento.'); ?></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="email_closing" class="form-label">Texto de fechamento (assinatura)</label>
+                <textarea class="form-control" id="email_closing" name="email_closing" rows="2"><?php echo htmlspecialchars($settings['email_closing'] ?? "Atenciosamente,\nEquipe Financeira"); ?></textarea>
+            </div>
+
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" name="action" value="salvar_config_smtp" class="btn btn-primary">
                     <i class="bi bi-save me-2"></i> Salvar Configurações
                 </button>
 
-                <form action="process/crud_handler.php" method="POST" class="m-0">
-                    <input type="hidden" name="action" value="test_smtp">
-                    <button type="submit" class="btn btn-outline-secondary" title="Enviar e-mail de teste para o remetente configurado">
-                        <i class="bi bi-envelope-check me-2"></i> Testar Conexão SMTP
-                    </button>
-                </form>
+                <button type="submit" name="action" value="test_smtp" class="btn btn-outline-secondary" title="Enviar e-mail de teste para o remetente configurado">
+                    <i class="bi bi-envelope-check me-2"></i> Testar Conexão SMTP
+                </button>
             </div>
         </form>
     </div>

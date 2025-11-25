@@ -113,7 +113,13 @@ function getSmtpSettings() {
         'smtp_username' => '', 
         'smtp_password' => '', // Nunca exibe a senha real do DB
         'smtp_secure' => 'tls',
-        'email_from' => 'nao-responda@seuapp.com'
+        'email_from' => 'nao-responda@seuapp.com',
+        // Customizações de template
+        'email_subject_template' => 'Novo Lançamento Financeiro Disponível: R$ {valor}',
+        'email_from_name' => 'Sistema Financeiro',
+        'email_salutation' => 'Prezado(a) {toName},',
+        'email_intro' => 'Informamos que um novo lançamento financeiro foi disponibilizado para sua empresa. Por favor, acesse o portal para visualizar os detalhes e a situação de pagamento.',
+        'email_closing' => "Atenciosamente,\nEquipe Financeira"
     ];
 
     try {
@@ -269,53 +275,111 @@ function sendNotificationEmail($toEmail, $toName, $lancamento) {
 
     $valor = number_format($lancamento['valor'], 2, ',', '.');
     $data_vencimento = date('d/m/Y', strtotime($lancamento['data_vencimento']));
-    $tipo = ($lancamento['tipo'] == 'receita') ? 'Receita' : 'Despesa';
+    $tipo = $lancamento['tipo'] ?? '';
+    $forma_pagamento = $lancamento['forma_pagamento'] ?? '';
+    $contexto_pagamento = $lancamento['contexto_pagamento'] ?? '';
 
-    $subject = "Novo Lançamento Financeiro Disponível: R$ $valor";
+    // Monta assunto a partir do template configurado (substitui placeholders)
+    $subject_template = $settings['email_subject_template'] ?? "Novo Lançamento Financeiro Disponível: R$ {valor}";
+    $placeholders = [
+        '{toName}' => $toName,
+        '{descricao}' => $lancamento['descricao'] ?? '',
+        '{valor}' => $valor,
+        '{data_vencimento}' => $data_vencimento,
+        '{tipo}' => $tipo
+    ];
+    $subject = str_replace(array_keys($placeholders), array_values($placeholders), $subject_template);
+
+    // Determina origem do logo: prefere embutir arquivo local (CID), senão usa URL pública
+    $logo_path_fs = __DIR__ . '/../assets/img/logo.png';
+    $logo_src = file_exists($logo_path_fs) ? 'cid:logo_cid' : base_url('assets/img/logo.png');
+    // Saudação / intro / closing configuráveis
+    $salutation_template = $settings['email_salutation'] ?? 'Prezado(a) {toName},';
+    $email_intro = $settings['email_intro'] ?? 'Informamos que um novo lançamento financeiro foi disponibilizado para sua empresa. Por favor, acesse o portal para visualizar os detalhes e a situação de pagamento.';
+    $email_closing = $settings['email_closing'] ?? "Atenciosamente,\nEquipe Financeira";
+
+    $salutation = str_replace(array_keys($placeholders), array_values($placeholders), $salutation_template);
+
     $body = "
-        <p>Prezado(a) **{$toName}**,</p>
-        <p>Informamos que um novo lançamento financeiro foi disponibilizado para sua empresa. Por favor, acesse o portal para visualizar os detalhes e a situação de pagamento.</p>
+        <p>" . nl2br(htmlspecialchars($salutation)) . "</p>
+        <p>" . nl2br(htmlspecialchars($email_intro)) . "</p>
         <table style='border: 1px solid #ccc; border-collapse: collapse; width: 100%; font-family: Arial, sans-serif;'>
             <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0; width: 30%;'>Descrição</td><td style='padding: 8px; border: 1px solid #ccc;'>{$lancamento['descricao']}</td></tr>
-            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Valor</td><td style='padding: 8px; border: 1px solid #ccc;'>**R$ {$valor}**</td></tr>
-            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Vencimento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$data_vencimento}</td></tr>
-            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Tipo</td><td style='padding: 8px; border: 1px solid #ccc;'>{$tipo}</td></tr>
+            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Valor</td><td style='padding: 8px; border: 1px solid #ccc;'><b>R$ {$valor}</b></td></tr>
+            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Data de vencimento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$data_vencimento}</td></tr>
+            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Tipo da cobrança</td><td style='padding: 8px; border: 1px solid #ccc;'>{$tipo}</td></tr>
+            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Forma de Pagamento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$forma_pagamento}</td></tr>
+            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Contexto do Pagamento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$contexto_pagamento}</td></tr>
         </table>
-        <p>Atenciosamente,</p>
-        <p>Equipe Financeira</p>
+
+        <br>
+
+        <table style='width: 100%; font-family: Arial, sans-serif;'>
+            <tr>
+                <td style='width: 10%;'><img src='{$logo_src}' alt='Logo' style='width:100px; height: 100px;'></td>
+                <td>
+                    <p>" . nl2br(htmlspecialchars($email_closing)) . "</p>
+                </td>
+            </tr>
+        </table>
+
     ";
     
-    // --- Lógica de Envio (SUBSTITUIR PELO PHPMailer REAL) ---
-    // Simulação de sucesso para não quebrar a aplicação sem o PHPMailer:
-    $mail_success = true; 
-    
-    /*
-    // EXEMPLO DE CÓDIGO PHPMailer (DESCOMENTAR E USAR O REAL)
-    // Verifica se PHPMailer está disponível
-    if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+    // --- Lógica de Envio usando PHPMailer (recomendada) ---
+    $mail_success = false;
+
+    // Verifica se PHPMailer está disponível via autoload
+    if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
         error_log('PHPMailer não encontrado. Execute "composer install" no diretório do projeto para habilitar envio real de emails.');
-        // Retorna false para indicar que envio real não foi efetuado
         return false;
     }
 
     try {
-        $mail = new PHPMailer\\PHPMailer\\PHPMailer(true);
+        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+        // Garantir charset UTF-8 e codificação adequada para prevenir caracteres "quebrados"
+        $mail->CharSet = 'UTF-8';
+        $mail->Encoding = 'base64';
         $mail->isSMTP();
         $mail->Host = $settings['smtp_host'];
-        $mail->Port = $settings['smtp_port'];
+        $mail->Port = intval($settings['smtp_port']);
         $mail->SMTPAuth = true;
         $mail->Username = $settings['smtp_username'];
         $mail->Password = $settings['smtp_password'];
+
         // Mapear valores amigáveis para o que o PHPMailer espera
         $secure = strtolower(trim($settings['smtp_secure'] ?? ''));
         if ($secure === 'starttls') {
-            $secure = 'tls';
+            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        } elseif ($secure === 'tls') {
+            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        } elseif ($secure === 'ssl') {
+            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
         }
-        if (!empty($secure)) {
-            $mail->SMTPSecure = $secure;
-        }
+
+        // Ajustes opcionais: tempo limite
+        $mail->Timeout = 30;
+
         $mail->setFrom($settings['email_from'], 'Sistema Financeiro');
         $mail->addAddress($toEmail, $toName);
+
+        // Tenta embutir o logo localmente (CID) se existir
+        $logo_path_fs = __DIR__ . '/../assets/img/logo.png';
+        if (file_exists($logo_path_fs)) {
+            try {
+                $mail->addEmbeddedImage($logo_path_fs, 'logo_cid', 'logo.png');
+            } catch (Exception $e) {
+                error_log('Falha ao embutir logo (documentos): ' . $e->getMessage());
+            }
+        }
+
+        // Tenta embutir o logo localmente (CID). Se o arquivo existir, adiciona como embedded image.
+        if (file_exists($logo_path_fs)) {
+            try {
+                $mail->addEmbeddedImage($logo_path_fs, 'logo_cid', 'logo.png');
+            } catch (Exception $e) {
+                error_log('Falha ao embutir logo no e-mail: ' . $e->getMessage());
+            }
+        }
         $mail->Subject = $subject;
         $mail->Body = $body;
         $mail->isHTML(true);
@@ -325,8 +389,7 @@ function sendNotificationEmail($toEmail, $toName, $lancamento) {
         error_log("Erro no PHPMailer: " . $e->getMessage());
         $mail_success = false;
     }
-    */
-    
+
     return $mail_success;
 }
 
@@ -341,37 +404,44 @@ function sendDocumentNotification($toEmail, $toName, $subject, $bodyHtml) {
         return false;
     }
 
-    // Simulação de envio (mantemos comportamento seguro se PHPMailer não estiver instalado)
-    $mail_success = true;
+    // Use PHPMailer para envio real de e-mails de documentos
+    $mail_success = false;
 
-    /*
-    if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+    if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
         error_log('PHPMailer não encontrado. Execute "composer install" no diretório do projeto para habilitar envio real de emails.');
         return false;
     }
 
     try {
-        $mail = new PHPMailer\\PHPMailer\\PHPMailer(true);
+        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+        // Garantir charset UTF-8 e codificação adequada para prevenir caracteres "quebrados"
+        $mail->CharSet = 'UTF-8';
+        $mail->Encoding = 'base64';
         $mail->isSMTP();
         $mail->Host = $settings['smtp_host'];
-        $mail->Port = $settings['smtp_port'];
+        $mail->Port = intval($settings['smtp_port']);
         $mail->SMTPAuth = true;
         $mail->Username = $settings['smtp_username'];
         $mail->Password = $settings['smtp_password'];
+
         $secure = strtolower(trim($settings['smtp_secure'] ?? ''));
-        if ($secure === 'starttls') $secure = 'tls';
-        if (!empty($secure)) $mail->SMTPSecure = $secure;
+        if ($secure === 'starttls' || $secure === 'tls') {
+            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        } elseif ($secure === 'ssl') {
+            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+        }
+
         $mail->setFrom($settings['email_from'], 'Sistema Financeiro');
         $mail->addAddress($toEmail, $toName);
         $mail->Subject = $subject;
         $mail->Body = $bodyHtml;
         $mail->isHTML(true);
+
         $mail_success = $mail->send();
     } catch (Exception $e) {
         error_log("Erro no PHPMailer (Documentos): " . $e->getMessage());
         $mail_success = false;
     }
-    */
 
     return $mail_success;
 }

@@ -62,11 +62,36 @@ switch ($action) {
                 }
 
                 // Prepara dados no formato esperado pela função de notificação
+                // Resolve nome da forma de pagamento (id_forma_pagamento) e o tipo da cobrança (id_tipo_cobranca).
+                $forma_nome = '';
+                try {
+                    if (!empty($cob['id_forma_pagamento'])) {
+                        $stmtFp = $pdo->prepare('SELECT nome FROM formas_pagamento WHERE id = ? LIMIT 1');
+                        $stmtFp->execute([$cob['id_forma_pagamento']]);
+                        $forma_nome = $stmtFp->fetchColumn() ?: '';
+                    }
+                } catch (Exception $e) {
+                    $forma_nome = '';
+                }
+
+                $tipo_nome = 'receita'; // fallback
+                try {
+                    if (!empty($cob['id_tipo_cobranca'])) {
+                        $stmtTipo = $pdo->prepare('SELECT nome FROM tipos_cobranca WHERE id = ? LIMIT 1');
+                        $stmtTipo->execute([$cob['id_tipo_cobranca']]);
+                        $tipo_nome = $stmtTipo->fetchColumn() ?: $tipo_nome;
+                    }
+                } catch (Exception $e) {
+                    // mantém fallback
+                }
+
                 $lancamento_like = [
                     'descricao' => $cob['descricao'] ?? 'Cobrança',
                     'valor' => $cob['valor'],
                     'data_vencimento' => $cob['data_vencimento'],
-                    'tipo' => 'receita'
+                    'tipo' => $tipo_nome,
+                    'forma_pagamento' => $forma_nome,
+                    'contexto_pagamento' => $cob['contexto_pagamento'] ?? ''
                 ];
 
                 $sent = sendNotificationEmail($toEmail, $toName, $lancamento_like);
@@ -121,6 +146,68 @@ switch ($action) {
             header('Location: ' . base_url('index.php?page=configuracoes_email'));
             exit;
             break;
+
+    case 'salvar_config_smtp':
+        // Salva as configurações SMTP no banco (tabela system_settings)
+        if (!isAdmin()) {
+            $_SESSION['error_message'] = 'Apenas administradores podem alterar as configurações de e-mail.';
+            header('Location: ' . base_url('index.php?page=configuracoes_email'));
+            exit;
+        }
+
+        // Campos esperados
+        $smtp_host = trim($_POST['smtp_host'] ?? '');
+        $smtp_port = trim($_POST['smtp_port'] ?? '');
+        $smtp_secure = trim($_POST['smtp_secure'] ?? '');
+        $email_from = trim($_POST['email_from'] ?? '');
+        $smtp_username = trim($_POST['smtp_username'] ?? '');
+        $smtp_password = $_POST['smtp_password'] ?? ''; // senha pode ser vazia para manter atual
+
+        // Validações básicas
+        if ($smtp_host === '' || $smtp_port === '' || $smtp_username === '' || $email_from === '') {
+            $_SESSION['error_message'] = 'Host, porta, usuário e e-mail de remetente são obrigatórios.';
+            header('Location: ' . base_url('index.php?page=configuracoes_email'));
+            exit;
+        }
+
+        try {
+            $pdo->beginTransaction();
+
+            // Helper para upsert seguro usando ON DUPLICATE KEY UPDATE
+            $upsert = function($key, $value) use ($pdo) {
+                $sql = 'INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)';
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$key, $value]);
+            };
+
+            $upsert('smtp_host', $smtp_host);
+            $upsert('smtp_port', $smtp_port);
+            $upsert('smtp_secure', $smtp_secure);
+            $upsert('email_from', $email_from);
+            $upsert('smtp_username', $smtp_username);
+            // Campos de template e remetente
+            $upsert('email_subject_template', trim($_POST['email_subject_template'] ?? ''));
+            $upsert('email_from_name', trim($_POST['email_from_name'] ?? ''));
+            $upsert('email_salutation', trim($_POST['email_salutation'] ?? ''));
+            $upsert('email_intro', trim($_POST['email_intro'] ?? ''));
+            $upsert('email_closing', trim($_POST['email_closing'] ?? ''));
+
+            // Senha: só atualiza se foi enviada
+            if (trim($smtp_password) !== '') {
+                $upsert('smtp_password', $smtp_password);
+            }
+
+            $pdo->commit();
+            $_SESSION['success_message'] = 'Configurações SMTP salvas com sucesso.';
+            logAction('Atualizou Configurações SMTP', 'system_settings', null, 'Atualizou parâmetros SMTP');
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $_SESSION['error_message'] = 'Erro ao salvar configurações: ' . $e->getMessage();
+        }
+
+        header('Location: ' . base_url('index.php?page=configuracoes_email'));
+        exit;
+        break;
 
     case 'criar_categoria_lancamento':
         if (!isAdmin()) {
