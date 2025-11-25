@@ -116,7 +116,7 @@ function getSmtpSettings() {
         'email_from' => 'nao-responda@seuapp.com',
         // Customizações de template
         'email_subject_template' => 'Novo Lançamento Financeiro Disponível: R$ {valor}',
-        'email_from_name' => 'Sistema Financeiro',
+        'email_from_name' => 'DMC - Sistema Financeiro',
         'email_salutation' => 'Prezado(a) {toName},',
         'email_intro' => 'Informamos que um novo lançamento financeiro foi disponibilizado para sua empresa. Por favor, acesse o portal para visualizar os detalhes e a situação de pagamento.',
         'email_closing' => "Atenciosamente,\nEquipe Financeira"
@@ -359,7 +359,7 @@ function sendNotificationEmail($toEmail, $toName, $lancamento) {
         // Ajustes opcionais: tempo limite
         $mail->Timeout = 30;
 
-        $mail->setFrom($settings['email_from'], 'Sistema Financeiro');
+        $mail->setFrom($settings['email_from'], $settings['email_from_name']);
         $mail->addAddress($toEmail, $toName);
 
         // Tenta embutir o logo localmente (CID) se existir

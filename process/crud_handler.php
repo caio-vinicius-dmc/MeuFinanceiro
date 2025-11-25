@@ -160,11 +160,12 @@ switch ($action) {
         $smtp_port = trim($_POST['smtp_port'] ?? '');
         $smtp_secure = trim($_POST['smtp_secure'] ?? '');
         $email_from = trim($_POST['email_from'] ?? '');
+        $email_from_name = trim($_POST['email_from_name'] ?? '');
         $smtp_username = trim($_POST['smtp_username'] ?? '');
         $smtp_password = $_POST['smtp_password'] ?? ''; // senha pode ser vazia para manter atual
 
         // Validações básicas
-        if ($smtp_host === '' || $smtp_port === '' || $smtp_username === '' || $email_from === '') {
+        if ($smtp_host === '' || $smtp_port === '' || $smtp_username === '' || $email_from === '' || $email_from_name === '') {
             $_SESSION['error_message'] = 'Host, porta, usuário e e-mail de remetente são obrigatórios.';
             header('Location: ' . base_url('index.php?page=configuracoes_email'));
             exit;
@@ -1478,6 +1479,9 @@ switch ($action) {
         if (isAdmin() || isContador()) {
             $id = $_POST['id_cobranca'] ?? null;
             $data_pagamento = $_POST['data_pagamento'] ?? null;
+            // Novos campos permitidos na confirmação: forma de pagamento e contexto
+            $id_forma_pagamento = isset($_POST['id_forma_pagamento']) ? ($_POST['id_forma_pagamento'] === '' ? null : $_POST['id_forma_pagamento']) : null;
+            $contexto_pagamento = isset($_POST['contexto_pagamento']) ? trim($_POST['contexto_pagamento']) : null;
 
             if (!$id || !$data_pagamento) {
                 $_SESSION['error_message'] = "Erro: ID da cobrança ou data de pagamento não fornecidos.";
@@ -1514,12 +1518,15 @@ switch ($action) {
 
                 $status_pagamento = 'Pago';
 
-                // 2. Atualizar a cobrança com a data de pagamento e o status determinado
-                $sql = "UPDATE cobrancas SET status_pagamento = ?, data_pagamento = ? WHERE id = ?";
+                // 2. Atualizar a cobrança com a data de pagamento, status e opcionalmente forma/contexto
+                $sql = "UPDATE cobrancas SET status_pagamento = ?, data_pagamento = ?, id_forma_pagamento = ?, contexto_pagamento = ? WHERE id = ?";
                 $stmt = $pdo->prepare($sql);
-                if ($stmt->execute([$status_pagamento, $data_pagamento, $id])) {
+                if ($stmt->execute([$status_pagamento, $data_pagamento, $id_forma_pagamento, $contexto_pagamento, $id])) {
                     $_SESSION['success_message'] = "Cobrança marcada como $status_pagamento em " . date('d/m/Y', strtotime($data_pagamento)) . "!";
-                    logAction("Baixa Cobrança", "cobrancas", $id, "Status: $status_pagamento, Data Pagamento: $data_pagamento");
+                    $log_details = "Status: $status_pagamento, Data Pagamento: $data_pagamento";
+                    if ($id_forma_pagamento !== null) $log_details .= ", Forma Pagamento ID: $id_forma_pagamento";
+                    if (!empty($contexto_pagamento)) $log_details .= ", Contexto: " . substr($contexto_pagamento, 0, 200);
+                    logAction("Baixa Cobrança", "cobrancas", $id, $log_details);
                 } else {
                     $errorInfo = $stmt->errorInfo();
                     $_SESSION['error_message'] = "Erro ao dar baixa na cobrança: " . ($errorInfo[2] ?? "Erro desconhecido.");

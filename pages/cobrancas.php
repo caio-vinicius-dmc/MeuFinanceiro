@@ -619,7 +619,9 @@ if (isClient()) {
                                                 <button type="button" class="btn btn-sm btn-success" title="Marcar como Pago"
                                                         data-bs-toggle="modal" data-bs-target="#modalConfirmarPagamento"
                                                         data-id-cobranca="<?php echo $cobranca['id']; ?>"
-                                                        data-data-vencimento="<?php echo $cobranca['data_vencimento']; ?>">
+                                                        data-data-vencimento="<?php echo $cobranca['data_vencimento']; ?>"
+                                                        data-id-forma-pagamento="<?php echo $cobranca['id_forma_pagamento']; ?>"
+                                                        data-contexto-pagamento="<?php echo htmlspecialchars($cobranca['contexto_pagamento'] ?? ''); ?>">
                                                     <i class="bi bi-check-circle-fill"></i>
                                                 </button>
                                             <?php endif; ?>
@@ -813,6 +815,20 @@ if (isClient()) {
                         <label for="data_pagamento" class="form-label">Data do Pagamento</label>
                         <input type="date" class="form-control" id="data_pagamento" name="data_pagamento" required>
                     </div>
+                    <div class="mb-3">
+                        <label for="confirm_id_forma_pagamento" class="form-label">Forma de Pagamento</label>
+                        <select class="form-select" id="confirm_id_forma_pagamento" name="id_forma_pagamento" required>
+                            <option value="" disabled>Selecione a forma de pagamento...</option>
+                            <?php foreach ($formas_pagamento as $fp): ?>
+                                <option value="<?php echo $fp['id']; ?>"><?php echo htmlspecialchars($fp['nome']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="confirm_contexto_pagamento" class="form-label">Contexto do Pagamento (opcional)</label>
+                        <textarea class="form-control" id="confirm_contexto_pagamento" name="contexto_pagamento" rows="3" placeholder="Cole a chave PIX, código do boleto, link, etc."></textarea>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -870,13 +886,33 @@ document.addEventListener('DOMContentLoaded', function () {
             const dataVencimento = button.getAttribute('data-data-vencimento');
 
             modalConfirmarPagamento.querySelector('#confirm_id_cobranca').value = idCobranca;
-            
+
             // Set default date to today
             const today = new Date();
             const yyyy = today.getFullYear();
             const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months start at 0!
             const dd = String(today.getDate()).padStart(2, '0');
             modalConfirmarPagamento.querySelector('#data_pagamento').value = `${yyyy}-${mm}-${dd}`;
+
+            // Pre-fill forma de pagamento and contexto if provided on the triggering button
+            const idForma = button.getAttribute('data-id-forma-pagamento');
+            const contexto = button.getAttribute('data-contexto-pagamento') || '';
+            const selectForma = modalConfirmarPagamento.querySelector('#confirm_id_forma_pagamento');
+            if (selectForma && idForma) {
+                // Try to set the value; if option doesn't exist, append it (fallback)
+                const opt = selectForma.querySelector(`option[value="${idForma}"]`);
+                if (opt) {
+                    selectForma.value = idForma;
+                } else {
+                    const appended = document.createElement('option');
+                    appended.value = idForma;
+                    appended.text = 'Forma (não encontrada)';
+                    selectForma.appendChild(appended);
+                    selectForma.value = idForma;
+                }
+            }
+            const txtContexto = modalConfirmarPagamento.querySelector('#confirm_contexto_pagamento');
+            if (txtContexto) txtContexto.value = contexto;
         });
     }
 
