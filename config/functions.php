@@ -66,10 +66,38 @@ function logAction($acao, $tabela = null, $id_registro = null, $detalhes = null)
     
     $id_usuario = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
 
+    // Normaliza valores não numéricos para NULL (previne inserir string vazia)
+    if ($id_usuario === '' || $id_usuario === 0 || $id_usuario === '0') {
+        $id_usuario = null;
+    }
+
+    // Se houver um id de usuário, valida se ele realmente existe na tabela `usuarios`.
+    // Caso contrário, força NULL para não violar a FK.
+    if ($id_usuario !== null) {
+        try {
+            $check = $pdo->prepare('SELECT 1 FROM usuarios WHERE id = ? LIMIT 1');
+            $check->execute([$id_usuario]);
+            if (!$check->fetchColumn()) {
+                $id_usuario = null;
+            }
+        } catch (Exception $e) {
+            // Em caso de erro ao checar, evita falhar o fluxo principal: assume NULL
+            $id_usuario = null;
+        }
+    }
+
     $sql = "INSERT INTO logs (id_usuario, acao, tabela_afetada, id_registro_afetado, detalhes) 
             VALUES (?, ?, ?, ?, ?)";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$id_usuario, $acao, $tabela, $id_registro, $detalhes]);
+
+    // Faz bind explícito para garantir que NULL seja enviado corretamente ao MySQL
+    $stmt->bindValue(1, $id_usuario, $id_usuario === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+    $stmt->bindValue(2, $acao, PDO::PARAM_STR);
+    $stmt->bindValue(3, $tabela, PDO::PARAM_STR);
+    $stmt->bindValue(4, $id_registro, $id_registro === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+    $stmt->bindValue(5, $detalhes, PDO::PARAM_STR);
+
+    $stmt->execute();
 }
 
 /**
