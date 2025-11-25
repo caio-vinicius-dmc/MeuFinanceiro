@@ -99,9 +99,9 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                 <textarea class="form-control" id="recibo_footer" name="recibo_footer" rows="2"><?php echo htmlspecialchars($doc_templates['recibo_footer'] ?? '<p>Documento gerado em {date}</p>'); ?></textarea>
             </div>
 
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-2"></i> Salvar Templates</button>
-                <a href="index.php?page=configuracoes_email" class="btn btn-outline-secondary">Voltar Configurações de E-mail</a>
+            <div class="d-grid gap-2 d-md-flex">
+                <button type="submit" class="btn btn-primary btn-full-mobile"><i class="bi bi-save me-2"></i> Salvar Templates</button>
+                <a href="index.php?page=configuracoes_email" class="btn btn-outline-secondary btn-full-mobile">Voltar Configurações de E-mail</a>
             </div>
         </form>
     </div>

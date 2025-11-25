@@ -99,12 +99,12 @@ $smtp_password = '';
                 <textarea class="form-control" id="email_closing" name="email_closing" rows="2"><?php echo htmlspecialchars($settings['email_closing'] ?? "Atenciosamente,\nEquipe Financeira"); ?></textarea>
             </div>
 
-            <div class="d-flex gap-2">
-                <button type="submit" name="action" value="salvar_config_smtp" class="btn btn-primary">
+            <div class="d-grid gap-2 d-md-flex">
+                <button type="submit" name="action" value="salvar_config_smtp" class="btn btn-primary btn-full-mobile">
                     <i class="bi bi-save me-2"></i> Salvar Configurações
                 </button>
 
-                <button type="submit" name="action" value="test_smtp" class="btn btn-outline-secondary" title="Enviar e-mail de teste para o remetente configurado">
+                <button type="submit" name="action" value="test_smtp" class="btn btn-outline-secondary btn-full-mobile" title="Enviar e-mail de teste para o remetente configurado">
                     <i class="bi bi-envelope-check me-2"></i> Testar Conexão SMTP
                 </button>
             </div>

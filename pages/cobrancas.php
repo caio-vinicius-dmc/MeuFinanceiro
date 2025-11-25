@@ -320,7 +320,7 @@ if (isClient()) {
     <?php if (isClient()): ?>
         <!-- Visão do Cliente -->
         <?php render_page_title('Minhas Cobranças', 'Filtre e visualize cobranças do seu cliente.', 'bi-receipt'); ?>
-        <div class="d-flex gap-2">
+        <div class="d-grid gap-2 d-md-flex">
                 <form method="GET" action="process/export_cobrancas.php" class="m-0">
                     <input type="hidden" name="page" value="cobrancas">
                     <input type="hidden" name="tipo_data" value="<?php echo htmlspecialchars($filtro_tipo_data ?? 'vencimento'); ?>">
@@ -332,7 +332,7 @@ if (isClient()) {
                     <input type="hidden" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>">
                     <input type="hidden" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>">
                     <input type="hidden" name="forma_pagamento" value="<?php echo htmlspecialchars($filtro_forma_pag ?? ''); ?>">
-                    <button type="submit" class="btn btn-outline-success" title="Exportar CSV com as cobranças filtradas para suas empresas">
+                    <button type="submit" class="btn btn-outline-success btn-full-mobile" title="Exportar CSV com as cobranças filtradas para suas empresas">
                         <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
                     </button>
                 </form>
@@ -423,7 +423,7 @@ if (isClient()) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="col-12 mt-3 d-flex gap-2">
+                    <div class="col-12 mt-3 d-grid gap-2 d-md-flex">
                         <button type="submit" class="btn btn-primary"><i class="bi bi-search me-2"></i>Filtrar</button>
                         <a href="index.php?page=cobrancas" class="btn btn-outline-secondary">Limpar Filtros</a>
                     </div>
@@ -526,7 +526,7 @@ if (isClient()) {
     <?php elseif (isAdmin() || isContador()): ?>
         <!-- Visão do Admin/Contador -->
         <?php render_page_title('Gerenciar Cobranças', 'Filtre e gerencie cobranças do sistema.', 'bi-receipt'); ?>
-        <div class="d-flex gap-2">
+        <div class="d-grid gap-2 d-md-flex">
             <form method="GET" action="process/export_cobrancas.php" class="m-0">
                     <input type="hidden" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio); ?>">
                     <input type="hidden" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>">
@@ -537,13 +537,12 @@ if (isClient()) {
                     <input type="hidden" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>">
                     <input type="hidden" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>">
                     <input type="hidden" name="forma_pagamento" value="<?php echo htmlspecialchars($filtro_forma_pag ?? ''); ?>">
-                    <button type="submit" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV</button>
+                    <button type="submit" class="btn btn-outline-success btn-full-mobile"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV</button>
                     </form>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaCobranca"><i class="bi bi-plus-circle me-2"></i>Gerar Nova Cobrança</button>
                 
                     <!-- Form para gerar Termo de Quitação para cliente específico (Admin/Contador) -->
                                         <?php if (isAdmin() || isContador()): ?>
-                                                <button type="button" id="btn-termo" class="btn btn-outline-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#termoModal">Termo de Quitação</button>
+                                                <button type="button" id="btn-termo" class="btn btn-outline-primary btn-full-mobile" data-bs-toggle="modal" data-bs-target="#termoModal"><i class="bi bi-file-earmark-text"></i>Termo de Quitação</button>
 
                                                 <!-- Modal Termo de Quitação -->
                                                 <div class="modal fade" id="termoModal" tabindex="-1" aria-labelledby="termoModalLabel" aria-hidden="true">
@@ -654,6 +653,7 @@ if (isClient()) {
                                                 });
                                                 </script>
                                         <?php endif; ?>
+                                        <button class="btn btn-primary btn-full-mobile" data-bs-toggle="modal" data-bs-target="#modalNovaCobranca"><i class="bi bi-plus-circle me-2"></i> Gerar Nova Cobrança</button>
             </div>
         </div>
 

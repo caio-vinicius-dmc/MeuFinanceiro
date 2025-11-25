@@ -362,16 +362,16 @@ endif;
 ?>
 
 <?php render_page_title('Lançamentos Financeiros', 'Registre e pesquise lançamentos de receitas e despesas.', 'bi-journal-text'); ?>
-<div class="d-flex gap-2">
+<div class="d-grid gap-2 d-md-flex">
         <!-- Botão de Importação CSV -->
-        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalImportarLancamentos">
+        <button class="btn btn-outline-success btn-full-mobile" data-bs-toggle="modal" data-bs-target="#modalImportarLancamentos">
             <i class="bi bi-upload"></i> Importar
         </button>
-        <button id="btn-exportar" class="btn btn-outline-success" title="Exportar dados filtrados para CSV">
+        <button id="btn-exportar" class="btn btn-outline-success btn-full-mobile" title="Exportar dados filtrados para CSV">
             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar
         </button>
         <?php // Todos com acesso podem criar lançamentos ?>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoLancamento">
+        <button class="btn btn-primary btn-full-mobile" data-bs-toggle="modal" data-bs-target="#modalNovoLancamento">
             <i class="bi bi-plus-circle"></i> Novo Lançamento
         </button>
     </div>

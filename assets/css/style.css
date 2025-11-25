@@ -398,6 +398,18 @@ body.sidebar-collapsed .sidebar-logo {
     border-radius: 999px;
 }
 
+/* Utility: Full width buttons on small screens, revert to auto on md+ */
+.btn-full-mobile {
+    display: block !important;
+    width: 100% !important;
+}
+@media (min-width: 768px) {
+    .btn-full-mobile {
+        display: inline-block !important;
+        width: auto !important;
+    }
+}
+
 /* Collapse behavior for dashboard sections */
 .dashboard-section.collapsed .section-body {
     display: none;
