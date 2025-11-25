@@ -12,6 +12,8 @@ $composerAutoload = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($composerAutoload)) {
     require_once $composerAutoload;
 }
+// Define timezone padrão para o sistema (evita horários incorretos ao usar date()/DateTime)
+date_default_timezone_set('America/Sao_Paulo');
 define('BASE_URL', 'http://localhost/DMC-finanças/');
 //define('BASE_URL', 'https://jpconsultoriacontabil.dynamicmotioncentury.com.br/');
 
@@ -174,6 +176,34 @@ function getDocumentUploadPolicy() {
     }
 
     return $policy;
+}
+
+/**
+ * Carrega templates de documentos (termo, recibo) a partir de `system_settings`.
+ * Retorna um array com chaves para 'termo' e 'recibo', cada uma contendo 'header','body','footer'.
+ */
+function getDocumentTemplates() {
+    global $pdo;
+
+    $defaults = [
+        'termo_header' => '<div style="text-align:left">{logo}<h2>Termo de Quitação</h2></div>',
+        'termo_body' => '<p>Lista de pagamentos confirmados até {date}:</p>{payments_table}<p>Declaro ter recebido a quantia acima referida, estando quitadas as cobranças listadas.</p>',
+        'termo_footer' => '<p>Documento gerado em {date}</p>',
+
+        'recibo_header' => '<div style="text-align:left">{logo}<h2>Recibo de Pagamento</h2></div>',
+        'recibo_body' => '<p><strong>Empresa:</strong> {empresa} ({cnpj})</p><p><strong>Cliente/Responsável:</strong> {cliente} &lt;{cliente_email}&gt;</p><p><strong>Descrição:</strong> {descricao}</p><p><strong>Valor:</strong> R$ {valor}</p><p><strong>Data de Pagamento:</strong> {data_pagamento}</p>',
+        'recibo_footer' => '<p>Documento gerado em {date}</p>'
+    ];
+
+    try {
+        $stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings");
+        $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        // merge defaults with rows from DB (rows override defaults)
+        $merged = array_merge($defaults, $rows);
+        return $merged;
+    } catch (Exception $e) {
+        return $defaults;
+    }
 }
 
 /**

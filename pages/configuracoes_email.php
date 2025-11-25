@@ -108,6 +108,8 @@ $smtp_password = '';
                     <i class="bi bi-envelope-check me-2"></i> Testar Conexão SMTP
                 </button>
             </div>
+
+            <!-- Document templates moved to separate page -->
         </form>
     </div>
 </div>

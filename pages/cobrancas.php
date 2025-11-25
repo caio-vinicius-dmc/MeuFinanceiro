@@ -298,6 +298,7 @@ if (isClient()) {
                         <i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV
                     </button>
                 </form>
+                <!-- Botão de Termo de Quitação removido da visão do cliente: somente Admin/Contador podem gerar -->
             </div>
         </div>
         <!-- Filtros ativos (admin/contador) -->
@@ -443,6 +444,11 @@ if (isClient()) {
                                         <div class="text-center text-success">
                                             <i class="bi bi-check-circle-fill h4"></i>
                                             <p class="mb-0">Pagamento confirmado!</p>
+                                            <div class="mt-2">
+                                                <a href="process/crud_handler.php?action=recibo_pagamento&id=<?php echo $cobranca['id']; ?>" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                                    <i class="bi bi-receipt"></i> Recibo
+                                                </a>
+                                            </div>
                                         </div>
                                     <?php elseif (!empty($cobranca['contexto_pagamento']) && $cobranca['status_pagamento'] === 'Pendente'): ?>
                                         <div class="d-grid gap-2">
@@ -475,7 +481,7 @@ if (isClient()) {
         <!-- Visão do Admin/Contador -->
         <?php render_page_title('Gerenciar Cobranças', 'Filtre e gerencie cobranças do sistema.', 'bi-receipt'); ?>
         <div class="d-flex gap-2">
-                <form method="GET" action="process/export_cobrancas.php" class="m-0">
+            <form method="GET" action="process/export_cobrancas.php" class="m-0">
                     <input type="hidden" name="data_inicio" value="<?php echo htmlspecialchars($filtro_data_inicio); ?>">
                     <input type="hidden" name="data_fim" value="<?php echo htmlspecialchars($filtro_data_fim); ?>">
                     <input type="hidden" name="cliente_id" value="<?php echo htmlspecialchars($filtro_cliente_id); ?>">
@@ -486,8 +492,122 @@ if (isClient()) {
                     <input type="hidden" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>">
                     <input type="hidden" name="forma_pagamento" value="<?php echo htmlspecialchars($filtro_forma_pag ?? ''); ?>">
                     <button type="submit" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Exportar CSV</button>
-                </form>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaCobranca"><i class="bi bi-plus-circle me-2"></i>Gerar Nova Cobrança</button>
+                    </form>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaCobranca"><i class="bi bi-plus-circle me-2"></i>Gerar Nova Cobrança</button>
+                
+                    <!-- Form para gerar Termo de Quitação para cliente específico (Admin/Contador) -->
+                                        <?php if (isAdmin() || isContador()): ?>
+                                                <button type="button" id="btn-termo" class="btn btn-outline-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#termoModal">Termo de Quitação</button>
+
+                                                <!-- Modal Termo de Quitação -->
+                                                <div class="modal fade" id="termoModal" tabindex="-1" aria-labelledby="termoModalLabel" aria-hidden="true">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title" id="termoModalLabel">Gerar Termo de Quitação <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" data-bs-placement="right" title="Ao selecionar Cliente, o termo será gerado com todas as empresas associadas ao cliente selecionado. Ao selecionar Empresa, escolha uma única empresa para gerar o termo somente dela.">?</button></h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <form id="termoForm" method="GET" action="process/crud_handler.php" target="_blank">
+                                                                    <input type="hidden" name="action" value="termo_quitacao">
+
+                                                                    <div class="mb-2">
+                                                                        <label class="form-label">Gerar por:</label>
+                                                                        <div>
+                                                                            <div class="form-check form-check-inline">
+                                                                                <input class="form-check-input" type="radio" name="termo_scope" id="termo_radio_cliente" value="cliente" checked>
+                                                                                <label class="form-check-label" for="termo_radio_cliente">Cliente (todas as empresas do cliente)</label>
+                                                                            </div>
+                                                                            <div class="form-check form-check-inline">
+                                                                                <input class="form-check-input" type="radio" name="termo_scope" id="termo_radio_empresa" value="empresa">
+                                                                                <label class="form-check-label" for="termo_radio_empresa">Empresa específica</label>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="mb-2" id="termo_cliente_group">
+                                                                        <label class="form-label">Selecionar Cliente</label>
+                                                                        <select name="cliente_id" id="termo_cliente_select" class="form-select form-select-sm">
+                                                                            <option value="">Selecione um cliente</option>
+                                                                            <?php foreach ($clientes_filtro as $cf): ?>
+                                                                                <option value="<?php echo $cf['id']; ?>"><?php echo htmlspecialchars($cf['nome_responsavel']); ?></option>
+                                                                            <?php endforeach; ?>
+                                                                        </select>
+                                                                    </div>
+
+                                                                    <div class="mb-2" id="termo_empresa_group" style="display:none;">
+                                                                        <label class="form-label">Selecionar Empresa</label>
+                                                                        <select name="empresa_id" id="termo_empresa_select" class="form-select form-select-sm">
+                                                                            <option value="">Selecione uma empresa</option>
+                                                                            <?php foreach ($empresas as $em): ?>
+                                                                                <option value="<?php echo $em['id']; ?>"><?php echo htmlspecialchars($em['razao_social']); ?></option>
+                                                                            <?php endforeach; ?>
+                                                                        </select>
+                                                                    </div>
+
+                                                                    <div class="text-end">
+                                                                        <button type="button" class="btn btn-secondary btn-sm me-2" data-bs-dismiss="modal">Fechar</button>
+                                                                        <button type="submit" class="btn btn-primary btn-sm">Gerar Termo</button>
+                                                                    </div>
+                                                                </form>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <script>
+                                                document.addEventListener('DOMContentLoaded', function(){
+                                                    var radioCliente = document.getElementById('termo_radio_cliente');
+                                                    var radioEmpresa = document.getElementById('termo_radio_empresa');
+                                                    var grupoCliente = document.getElementById('termo_cliente_group');
+                                                    var grupoEmpresa = document.getElementById('termo_empresa_group');
+                                                    var form = document.getElementById('termoForm');
+
+                                                    function toggleGroups(){
+                                                        if(radioEmpresa.checked){
+                                                            grupoEmpresa.style.display = 'block';
+                                                            grupoCliente.style.display = 'none';
+                                                        } else {
+                                                            grupoEmpresa.style.display = 'none';
+                                                            grupoCliente.style.display = 'block';
+                                                        }
+                                                    }
+
+                                                    if(radioCliente && radioEmpresa){
+                                                        radioCliente.addEventListener('change', toggleGroups);
+                                                        radioEmpresa.addEventListener('change', toggleGroups);
+                                                        toggleGroups();
+                                                    }
+
+                                                    if(form){
+                                                        form.addEventListener('submit', function(e){
+                                                            // validação simples antes de submeter
+                                                            if(radioEmpresa.checked){
+                                                                var emp = document.getElementById('termo_empresa_select');
+                                                                if(!emp.value){
+                                                                    e.preventDefault(); alert('Selecione uma empresa para gerar o termo.'); return false;
+                                                                }
+                                                            } else {
+                                                                var cli = document.getElementById('termo_cliente_select');
+                                                                if(!cli.value){
+                                                                    e.preventDefault(); alert('Selecione um cliente para gerar o termo.'); return false;
+                                                                }
+                                                            }
+                                                            // se tudo ok, deixa submeter (abre em nova aba)
+                                                        });
+                                                    }
+
+                                                    // Inicializa tooltips do Bootstrap (se presente)
+                                                    try {
+                                                        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                                                        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                                                            return new bootstrap.Tooltip(tooltipTriggerEl);
+                                                        });
+                                                    } catch (err) {
+                                                        // Falhar silenciosamente se bootstrap não estiver disponível
+                                                    }
+                                                });
+                                                </script>
+                                        <?php endif; ?>
             </div>
         </div>
 

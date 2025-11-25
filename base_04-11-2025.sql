@@ -179,6 +179,7 @@ CREATE TABLE `empresas` (
   `razao_social` varchar(255) NOT NULL,
   `nome_fantasia` varchar(255) DEFAULT NULL,
   `data_abertura` date DEFAULT NULL,
+  `data_contratacao` DATE DEFAULT NULL,
   `endereco` text DEFAULT NULL,
   `telefone_comercial` varchar(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

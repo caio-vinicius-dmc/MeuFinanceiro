@@ -112,6 +112,10 @@ switch ($action) {
             exit;
             break;
 
+    // 'recibo_pagamento' implementation moved later in the file (single implementation using templates)
+
+    // 'termo_quitacao' implementation moved later in the file (single implementation)
+
         case 'test_smtp':
             // Testar envio SMTP usando as configurações salvas
             if (!isAdmin()) {
@@ -207,6 +211,41 @@ switch ($action) {
         }
 
         header('Location: ' . base_url('index.php?page=configuracoes_email'));
+        exit;
+        break;
+
+    case 'salvar_config_documentos':
+        // Salva templates para Termo e Recibo
+        if (!isAdmin()) {
+            $_SESSION['error_message'] = 'Apenas administradores podem alterar templates de documentos.';
+            header('Location: ' . base_url('index.php?page=configuracoes_documentos'));
+            exit;
+        }
+
+        try {
+            $pdo->beginTransaction();
+            $upsert = function($key, $value) use ($pdo) {
+                $sql = 'INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)';
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$key, $value]);
+            };
+
+            $upsert('termo_header', trim($_POST['termo_header'] ?? ''));
+            $upsert('termo_body', trim($_POST['termo_body'] ?? ''));
+            $upsert('termo_footer', trim($_POST['termo_footer'] ?? ''));
+            $upsert('recibo_header', trim($_POST['recibo_header'] ?? ''));
+            $upsert('recibo_body', trim($_POST['recibo_body'] ?? ''));
+            $upsert('recibo_footer', trim($_POST['recibo_footer'] ?? ''));
+
+            $pdo->commit();
+            $_SESSION['success_message'] = 'Templates de documentos salvos com sucesso.';
+            logAction('Atualizou Templates de Documentos', 'system_settings', null, 'Templates termo/recibo atualizados');
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $_SESSION['error_message'] = 'Erro ao salvar templates: ' . $e->getMessage();
+        }
+
+        header('Location: ' . base_url('index.php?page=configuracoes_documentos'));
         exit;
         break;
 
@@ -1718,6 +1757,213 @@ switch ($action) {
                     $_SESSION['error_message'] = "Erro no banco de dados: " . $e->getMessage();
                 }
             }
+        }
+        break;
+
+    // --- Geração de PDFs (Recibo e Termo de Quitação) ---
+    case 'recibo_pagamento':
+        // Gera PDF com recibo da cobrança específica (apenas se pago)
+        $id_cobranca = $_GET['id'] ?? $_POST['id'] ?? null;
+        if (!$id_cobranca) {
+            $_SESSION['error_message'] = 'ID da cobrança ausente.';
+            header('Location: ' . base_url('index.php?page=cobrancas'));
+            exit;
+        }
+        try {
+            $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+            $sql = "SELECT cob.*, emp.razao_social, emp.cnpj, emp.id_cliente AS empresa_cliente, cli.nome_responsavel, cli.email_contato, fp.nome as forma_nome, tc.nome as tipo_nome
+                    FROM cobrancas cob
+                    JOIN empresas emp ON cob.`" . $company_col . "` = emp.id
+                    LEFT JOIN clientes cli ON emp.id_cliente = cli.id
+                    LEFT JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
+                    LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id
+                    WHERE cob.id = ? LIMIT 1";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$id_cobranca]);
+            $cob = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$cob) {
+                $_SESSION['error_message'] = 'Cobrança não encontrada.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+
+            // Somente pode gerar recibo se estiver marcada como Pago
+            if (($cob['status_pagamento'] ?? '') !== 'Pago') {
+                $_SESSION['error_message'] = 'Recibo disponível apenas para cobranças marcadas como Pagas.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+
+            // Permissões: admin/contador podem; clientes apenas do seu cliente associado
+            if (isClient()) {
+                $id_cliente_logado = $_SESSION['id_cliente_associado'] ?? null;
+                $empresa_cliente = $cob['empresa_cliente'] ?? null;
+                if ($id_cliente_logado == null || $empresa_cliente == null || intval($id_cliente_logado) !== intval($empresa_cliente)) {
+                    $_SESSION['error_message'] = 'Você não tem permissão para acessar este recibo.';
+                    header('Location: ' . base_url('index.php?page=cobrancas'));
+                    exit;
+                }
+            }
+
+            // Monta HTML do recibo com espaço para assinatura
+            $logo_path = __DIR__ . '/../assets/img/logo.png';
+            $logo_img = '';
+            if (file_exists($logo_path)) {
+                $data = base64_encode(file_get_contents($logo_path));
+                $logo_img = '<img src="data:image/png;base64,' . $data . '" style="max-height:80px;margin-bottom:10px;">';
+            }
+
+            // Usa templates configuráveis para recibo (header, body, footer)
+            $templates = getDocumentTemplates();
+            $recibo_header = $templates['recibo_header'] ?? '';
+            $recibo_body = $templates['recibo_body'] ?? '';
+            $recibo_footer = $templates['recibo_footer'] ?? '';
+
+            // Prepara valores para substituição
+            $replacements = [
+                '{logo}' => $logo_img,
+                '{empresa}' => htmlspecialchars($cob['razao_social'] ?? ''),
+                '{cnpj}' => htmlspecialchars($cob['cnpj'] ?? ''),
+                '{cliente}' => htmlspecialchars($cob['nome_responsavel'] ?? ''),
+                '{cliente_email}' => htmlspecialchars($cob['email_contato'] ?? ''),
+                '{descricao}' => nl2br(htmlspecialchars($cob['descricao'] ?? '')),
+                '{valor}' => number_format($cob['valor'], 2, ',', '.'),
+                '{data_pagamento}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_pagamento'] ?? ''))),
+                '{data_vencimento}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_vencimento'] ?? ''))),
+                '{data_competencia}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_competencia'] ?? ''))),
+                '{date}' => date('d/m/Y H:i'),
+                '{tipo}' => htmlspecialchars($cob['tipo_nome'] ?? ''),
+                '{forma}' => htmlspecialchars($cob['forma_nome'] ?? ''),
+                '{contexto}' => nl2br(htmlspecialchars($cob['contexto_pagamento'] ?? ''))
+            ];
+
+            $html = '<html><head><meta charset="utf-8"><style>body{font-family: Arial, Helvetica, sans-serif; color:#222} .assinatura{margin-top:40px;display:flex;justify-content:space-between}.assinatura .box{width:45%;text-align:center;padding-top:60px;border-top:1px solid #000}</style></head><body>';
+            $html .= strtr($recibo_header, $replacements);
+            $html .= strtr($recibo_body, $replacements);
+       
+            $html .= strtr($recibo_footer, $replacements);
+            $html .= '</body></html>';
+
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            $dompdf->stream('recibo_cobranca_' . $cob['id'] . '.pdf', ['Attachment' => false]);
+            exit;
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Erro ao gerar recibo: ' . $e->getMessage();
+            header('Location: ' . base_url('index.php?page=cobrancas'));
+            exit;
+        }
+        break;
+
+    case 'termo_quitacao':
+        // Gera PDF com termo de quitação — somente para Admin/Contador mediante seleção de cliente ou empresa
+        if (!isAdmin() && !isContador()) {
+            $_SESSION['error_message'] = 'Acesso negado. Apenas administradores ou contadores podem gerar este termo.';
+            header('Location: ' . base_url('index.php?page=cobrancas'));
+            exit;
+        }
+        try {
+            $cliente_id = $_GET['cliente_id'] ?? $_POST['cliente_id'] ?? null;
+            $empresa_id = $_GET['empresa_id'] ?? $_POST['empresa_id'] ?? null;
+            if (empty($cliente_id) && empty($empresa_id)) {
+                $_SESSION['error_message'] = 'Selecione um cliente ou uma empresa para gerar o termo de quitação.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+
+            // Se contador, validar associação ao cliente (quando fornecido)
+            if (isContador() && $cliente_id) {
+                $stmt_assoc = $pdo->prepare('SELECT 1 FROM contador_clientes_assoc WHERE id_usuario_contador = ? AND id_cliente = ? LIMIT 1');
+                $stmt_assoc->execute([$_SESSION['user_id'], $cliente_id]);
+                if (!$stmt_assoc->fetchColumn()) {
+                    $_SESSION['error_message'] = 'Você não tem permissão para gerar termo para este cliente.';
+                    header('Location: ' . base_url('index.php?page=cobrancas'));
+                    exit;
+                }
+            }
+            // Monta query de acordo com seleção
+            if (!empty($empresa_id)) {
+                $sql = "SELECT cob.*, emp.razao_social, emp.cnpj, fp.nome as forma_nome
+                        FROM cobrancas cob
+                        JOIN empresas emp ON cob.`" . $company_col . "` = emp.id
+                        LEFT JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
+                        WHERE emp.id = ? AND cob.status_pagamento = 'Pago'
+                        ORDER BY cob.data_pagamento ASC";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$empresa_id]);
+            } else {
+                $sql = "SELECT cob.*, emp.razao_social, emp.cnpj, fp.nome as forma_nome
+                        FROM cobrancas cob
+                        JOIN empresas emp ON cob.`" . $company_col . "` = emp.id
+                        LEFT JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
+                        WHERE emp.id_cliente = ? AND cob.status_pagamento = 'Pago'
+                        ORDER BY cob.data_pagamento ASC";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$cliente_id]);
+            }
+            $pagas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Monta HTML com espaço para assinaturas
+            $logo_path = __DIR__ . '/../assets/img/logo.png';
+            $logo_img = '';
+            if (file_exists($logo_path)) {
+                $data = base64_encode(file_get_contents($logo_path));
+                $logo_img = '<img src="data:image/png;base64,' . $data . '" style="max-height:80px;margin-bottom:10px;">';
+            }
+
+            // Usa templates configuráveis para termo
+            $templates = getDocumentTemplates();
+            $termo_header = $templates['termo_header'] ?? '';
+            $termo_body = $templates['termo_body'] ?? '';
+            $termo_footer = $templates['termo_footer'] ?? '';
+
+            $html = '<html><head><meta charset="utf-8"><style>body{font-family: Arial, Helvetica, sans-serif; color:#222} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:8px;text-align:left} th{background:#f5f5f5} .assinatura{margin-top:30px;display:flex;justify-content:space-between}.assinatura .box{width:45%;text-align:center;padding-top:60px;border-top:1px solid #000}</style></head><body>';
+            // substituições para o termo
+            $payments_table_html = '<table><thead><tr><th>#</th><th>Empresa</th><th>Descrição</th><th>Data Pagamento</th><th>Forma</th><th>Valor</th></tr></thead><tbody>';
+            $total = 0;
+            foreach ($pagas as $p) {
+                $payments_table_html .= '<tr>';
+                $payments_table_html .= '<td>' . htmlspecialchars($p['id']) . '</td>';
+                $payments_table_html .= '<td>' . htmlspecialchars($p['razao_social'] ?? '') . '</td>';
+                $payments_table_html .= '<td>' . htmlspecialchars($p['descricao'] ?? '') . '</td>';
+                $payments_table_html .= '<td>' . htmlspecialchars(date('d/m/Y', strtotime($p['data_pagamento'] ?? ''))) . '</td>';
+                $payments_table_html .= '<td>' . htmlspecialchars($p['forma_nome'] ?? '') . '</td>';
+                $payments_table_html .= '<td>R$ ' . number_format($p['valor'], 2, ',', '.') . '</td>';
+                $payments_table_html .= '</tr>';
+                $total += (float)$p['valor'];
+            }
+            $payments_table_html .= '</tbody><tfoot><tr><th colspan="5">Total</th><th>R$ ' . number_format($total, 2, ',', '.') . '</th></tr></tfoot></table>';
+
+            $replacements_term = [
+                '{logo}' => $logo_img,
+                '{date}' => date('d/m/Y'),
+                '{payments_table}' => $payments_table_html,
+                '{total}' => 'R$ ' . number_format($total, 2, ',', '.')
+            ];
+
+            $html .= strtr($termo_header, $replacements_term);
+            $html .= strtr($termo_body, $replacements_term);
+            // caso o corpo padrão não contenha a tabela, insere abaixo
+            if (strpos($termo_body, '{payments_table}') === false) {
+                $html .= $payments_table_html;
+            }
+            
+            $html .= strtr($termo_footer, array_merge($replacements_term, ['{date}' => date('d/m/Y H:i')]));
+            $html .= '</body></html>';
+
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            $filename = 'termo_quitacao_' . ($empresa_id ?: $cliente_id) . '.pdf';
+            $dompdf->stream($filename, ['Attachment' => false]);
+            exit;
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Erro ao gerar termo de quitação: ' . $e->getMessage();
+            header('Location: ' . base_url('index.php?page=cobrancas'));
+            exit;
         }
         break;
 

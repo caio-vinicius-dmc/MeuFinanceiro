@@ -26,6 +26,7 @@ global $page;
         'logs' => 'Logs',
         'meu_perfil' => 'Meu Perfil',
         'configuracoes_email' => 'Configurações de Email',
+        'configuracoes_documentos' => 'Configurar Termo e Recibo',
         'gerenciar_formas_pagamento' => 'Formas de Pagamento',
         'gerenciar_tipos_cobranca' => 'Tipos de Cobrança',
     ];
@@ -164,6 +165,12 @@ global $page;
                                     <a class="nav-link <?php echo ($page == 'configuracoes_email') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=configuracoes_email'); ?>">
                                         <i class="bi bi-envelope me-2"></i>
                                         <span class="sidebar-link-text">Config. Email</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo ($page == 'configuracoes_documentos') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=configuracoes_documentos'); ?>">
+                                        <i class="bi bi-journal-check me-2"></i>
+                                        <span class="sidebar-link-text">Config. Termo/Recibo</span>
                                     </a>
                                 </li>
                                 <li class="nav-item">
