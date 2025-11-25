@@ -73,9 +73,23 @@ if (isClient()) {
     $filtro_empresa_id = $_GET['id_empresa'] ?? null;
     $filtro_pag_inicio = $_GET['pag_inicio'] ?? null; // data de pagamento inicio
     $filtro_pag_fim = $_GET['pag_fim'] ?? null;       // data de pagamento fim
-    $filtro_comp_inicio = $_GET['comp_inicio'] ?? null; // data de competencia inicio
-    $filtro_comp_fim = $_GET['comp_fim'] ?? null;       // data de competencia fim
+    $filtro_comp_inicio = $_GET['comp_inicio'] ?? null; // data de competencia inicio (aceita YYYY-MM)
+    $filtro_comp_fim = $_GET['comp_fim'] ?? null;       // data de competencia fim (aceita YYYY-MM)
     $filtro_forma_pag = $_GET['forma_pagamento'] ?? null; // forma de pagamento
+
+    // Normaliza valores para inputs do tipo "month" (YYYY-MM)
+    $comp_inicio_input = '';
+    $comp_fim_input = '';
+    if (!empty($filtro_comp_inicio)) {
+        if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_inicio)) $comp_inicio_input = $filtro_comp_inicio;
+        elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtro_comp_inicio)) $comp_inicio_input = substr($filtro_comp_inicio,0,7);
+        else $comp_inicio_input = $filtro_comp_inicio;
+    }
+    if (!empty($filtro_comp_fim)) {
+        if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_fim)) $comp_fim_input = $filtro_comp_fim;
+        elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtro_comp_fim)) $comp_fim_input = substr($filtro_comp_fim,0,7);
+        else $comp_fim_input = $filtro_comp_fim;
+    }
 
     // Constrói a query dinâmica
     $params = [$id_cliente_logado];
@@ -103,7 +117,17 @@ if (isClient()) {
         $where_conditions_cliente[] = "cob.data_pagamento <= ?";
         $params[] = $filtro_pag_fim;
     }
-    // filtro por competencia
+    // filtro por competencia (aceita YYYY-MM no input). Normaliza para datas completas
+    if (!empty($filtro_comp_inicio)) {
+        if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_inicio)) {
+            $filtro_comp_inicio = $filtro_comp_inicio . '-01';
+        }
+    }
+    if (!empty($filtro_comp_fim)) {
+        if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_fim)) {
+            $filtro_comp_fim = date('Y-m-t', strtotime($filtro_comp_fim . '-01'));
+        }
+    }
     if (!empty($filtro_comp_inicio) && !empty($filtro_comp_fim)) {
         $where_conditions_cliente[] = "cob.data_competencia BETWEEN ? AND ?";
         $params[] = $filtro_comp_inicio;
@@ -168,6 +192,20 @@ if (isClient()) {
     $filtro_pag_fim = $_GET['pag_fim'] ?? null;
     $filtro_comp_inicio = $_GET['comp_inicio'] ?? null;
     $filtro_comp_fim = $_GET['comp_fim'] ?? null;
+
+    // Normaliza valores para inputs do tipo "month" (YYYY-MM) — Admin/Contador
+    $comp_inicio_input = '';
+    $comp_fim_input = '';
+    if (!empty($filtro_comp_inicio)) {
+        if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_inicio)) $comp_inicio_input = $filtro_comp_inicio;
+        elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtro_comp_inicio)) $comp_inicio_input = substr($filtro_comp_inicio,0,7);
+        else $comp_inicio_input = $filtro_comp_inicio;
+    }
+    if (!empty($filtro_comp_fim)) {
+        if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_fim)) $comp_fim_input = $filtro_comp_fim;
+        elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtro_comp_fim)) $comp_fim_input = substr($filtro_comp_fim,0,7);
+        else $comp_fim_input = $filtro_comp_fim;
+    }
     $filtro_forma_pag = $_GET['forma_pagamento'] ?? null;
     $filtro_empresa_id = $_GET['id_empresa'] ?? null; // novo filtro por empresa
 
@@ -304,11 +342,19 @@ if (isClient()) {
         <!-- Filtros ativos (admin/contador) -->
         <?php
         $activeFiltersAdmin = [];
+        // Helper para exibir competência no formato MM/YYYY
+        function _fmt_comp_cob($v) {
+            if (empty($v)) return '-';
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) return date('m/Y', strtotime($v));
+            if (preg_match('/^\d{4}-\d{2}$/', $v)) return date('m/Y', strtotime($v . '-01'));
+            $t = strtotime($v);
+            return $t ? date('m/Y', $t) : $v;
+        }
         if (!empty($filtro_cliente_id)) $activeFiltersAdmin[] = 'Cliente: ' . htmlspecialchars(array_column($clientes_filtro, 'nome_responsavel', 'id')[$filtro_cliente_id] ?? $filtro_cliente_id);
         if (!empty($filtro_empresa_id)) $activeFiltersAdmin[] = 'Empresa: ' . htmlspecialchars(array_column($empresas, 'razao_social', 'id')[$filtro_empresa_id] ?? $filtro_empresa_id);
         if (!empty($filtro_data_inicio) || !empty($filtro_data_fim)) $activeFiltersAdmin[] = 'Vencimento: ' . htmlspecialchars($filtro_data_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_data_fim ?? '-');
         if (!empty($filtro_pag_inicio) || !empty($filtro_pag_fim)) $activeFiltersAdmin[] = 'Pagamento: ' . htmlspecialchars($filtro_pag_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_pag_fim ?? '-');
-        if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFiltersAdmin[] = 'Competência: ' . htmlspecialchars($filtro_comp_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_comp_fim ?? '-');
+        if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFiltersAdmin[] = 'Mês de competência: ' . htmlspecialchars(_fmt_comp_cob($filtro_comp_inicio) ?? '-') . ' → ' . htmlspecialchars(_fmt_comp_cob($filtro_comp_fim) ?? '-');
         if (!empty($filtro_forma_pag)) $activeFiltersAdmin[] = 'Forma: ' . htmlspecialchars(array_column($formas_pagamento, 'nome', 'id')[$filtro_forma_pag] ?? $filtro_forma_pag);
         if (!empty($activeFiltersAdmin)): ?>
             <div class="mb-3">
@@ -333,7 +379,7 @@ if (isClient()) {
                         <label for="tipo_data" class="form-label">Filtrar por Data de</label>
                         <select class="form-select" id="tipo_data" name="tipo_data">
                             <option value="vencimento" <?php echo ($filtro_tipo_data == 'vencimento') ? 'selected' : ''; ?>>Vencimento</option>
-                            <option value="competencia" <?php echo ($filtro_tipo_data == 'competencia') ? 'selected' : ''; ?>>Competência</option>
+                            <option value="competencia" <?php echo ($filtro_tipo_data == 'competencia') ? 'selected' : ''; ?>>Mês de competência</option>
                         </select>
                     </div>
                     <div class="col-md-6">
@@ -361,13 +407,13 @@ if (isClient()) {
                             <input type="date" class="form-control" name="pag_fim" value="<?php echo htmlspecialchars($filtro_pag_fim ?? ''); ?>">
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Competência (entre)</label>
-                        <div class="input-group">
-                            <input type="date" class="form-control" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>">
-                            <input type="date" class="form-control" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>">
-                        </div>
-                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Mês de competência (entre)</label>
+                                        <div class="input-group">
+                                            <input type="month" class="form-control" name="comp_inicio" value="<?php echo htmlspecialchars($comp_inicio_input ?? ''); ?>">
+                                            <input type="month" class="form-control" name="comp_fim" value="<?php echo htmlspecialchars($comp_fim_input ?? ''); ?>">
+                                        </div>
+                                    </div>
                     <div class="col-md-3">
                         <label class="form-label">Forma de Pagamento</label>
                         <select class="form-select" name="forma_pagamento">
@@ -391,7 +437,7 @@ if (isClient()) {
         if (!empty($filtro_data_inicio) || !empty($filtro_data_fim)) $activeFilters[] = 'Vencimento: ' . htmlspecialchars($filtro_data_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_data_fim ?? '-');
         if (!empty($filtro_empresa_id)) $activeFilters[] = 'Empresa: ' . htmlspecialchars(array_column($empresas_cliente, 'razao_social', 'id')[$filtro_empresa_id] ?? $filtro_empresa_id);
         if (!empty($filtro_pag_inicio) || !empty($filtro_pag_fim)) $activeFilters[] = 'Pagamento: ' . htmlspecialchars($filtro_pag_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_pag_fim ?? '-');
-        if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFilters[] = 'Competência: ' . htmlspecialchars($filtro_comp_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_comp_fim ?? '-');
+        if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFilters[] = 'Mês de competência: ' . htmlspecialchars(_fmt_comp_cob($filtro_comp_inicio) ?? '-') . ' → ' . htmlspecialchars(_fmt_comp_cob($filtro_comp_fim) ?? '-');
         if (!empty($filtro_forma_pag)) $activeFilters[] = 'Forma: ' . htmlspecialchars(array_column($formas_pagamento, 'nome', 'id')[$filtro_forma_pag] ?? $filtro_forma_pag);
         if (!empty($activeFilters)): ?>
             <div class="mb-3">
@@ -434,7 +480,7 @@ if (isClient()) {
                                         <div><?php echo date('d/m/Y', strtotime($cobranca['data_vencimento'])); ?></div>
                                     </div>
                                     <div class="col-6">
-                                        <i class="bi bi-calendar-check me-1"></i> <strong>Competência</strong>
+                                        <i class="bi bi-calendar-check me-1"></i> <strong>Mês de competência</strong>
                                         <div><?php echo date('m/Y', strtotime($cobranca['data_competencia'])); ?></div>
                                     </div>
                                 </div>
@@ -655,10 +701,10 @@ if (isClient()) {
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Competência (entre)</label>
+                        <label class="form-label">Mês de competência (entre)</label>
                         <div class="input-group">
-                            <input type="date" class="form-control" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>">
-                            <input type="date" class="form-control" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>">
+                            <input type="month" class="form-control" name="comp_inicio" value="<?php echo htmlspecialchars($comp_inicio_input ?? ''); ?>">
+                            <input type="month" class="form-control" name="comp_fim" value="<?php echo htmlspecialchars($comp_fim_input ?? ''); ?>">
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -790,7 +836,7 @@ if (isClient()) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-3 mb-3"><label for="data_competencia" class="form-label">Data de Competência</label><input type="date" class="form-control" id="data_competencia" name="data_competencia" required></div>
+                        <div class="col-md-3 mb-3"><label for="data_competencia" class="form-label">Mês de competência</label><input type="month" class="form-control" id="data_competencia" name="data_competencia" required value="<?php echo date('Y-m'); ?>"></div>
                         <div class="col-md-3 mb-3"><label for="data_vencimento" class="form-label">Data de Vencimento</label><input type="date" class="form-control" id="data_vencimento" name="data_vencimento" required></div>
                     </div>
                     <div class="row">
@@ -875,7 +921,7 @@ if (isClient()) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-3 mb-3"><label for="edit_data_competencia" class="form-label">Data de Competência</label><input type="date" class="form-control" id="edit_data_competencia" name="data_competencia" required></div>
+                        <div class="col-md-3 mb-3"><label for="edit_data_competencia" class="form-label">Mês de competência</label><input type="month" class="form-control" id="edit_data_competencia" name="data_competencia" required></div>
                         <div class="col-md-3 mb-3"><label for="edit_data_vencimento" class="form-label">Data de Vencimento</label><input type="date" class="form-control" id="edit_data_vencimento" name="data_vencimento" required></div>
                     </div>
                     <div class="row">
@@ -1053,7 +1099,20 @@ document.addEventListener('DOMContentLoaded', function () {
         // Popula o formulário
         modalEditarCobranca.querySelector('#edit_id_cobranca').value = id;
         modalEditarCobranca.querySelector('#edit_id_empresa').value = id_empresa;
-        modalEditarCobranca.querySelector('#edit_data_competencia').value = data_competencia;
+        // Normalize competencia for month input (YYYY-MM expected)
+        try {
+            var editCompEl = modalEditarCobranca.querySelector('#edit_data_competencia');
+            if (editCompEl) {
+                var compVal = '';
+                if (data_competencia) {
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(data_competencia)) compVal = data_competencia.substr(0,7);
+                    else if (/^\d{4}-\d{2}$/.test(data_competencia)) compVal = data_competencia;
+                }
+                editCompEl.value = compVal;
+            }
+        } catch (e) {
+            console.warn('Erro ao popular data_competencia no modal de cobrança:', e);
+        }
         modalEditarCobranca.querySelector('#edit_data_vencimento').value = data_vencimento;
         modalEditarCobranca.querySelector('#edit_valor').value = valor;
         modalEditarCobranca.querySelector('#edit_id_forma_pagamento').value = id_forma_pagamento;

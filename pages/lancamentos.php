@@ -43,12 +43,26 @@ $filtro_venc_inicio = $_GET['venc_inicio'] ?? null;
 $filtro_venc_fim = $_GET['venc_fim'] ?? null;
 $filtro_pag_inicio = $_GET['pag_inicio'] ?? null; // novo filtro: data de pagamento inicio
 $filtro_pag_fim = $_GET['pag_fim'] ?? null;     // novo filtro: data de pagamento fim
-$filtro_comp_inicio = $_GET['comp_inicio'] ?? null; // novo filtro: data de competência inicio
-$filtro_comp_fim = $_GET['comp_fim'] ?? null;       // novo filtro: data de competência fim
+$filtro_comp_inicio = $_GET['comp_inicio'] ?? null; // novo filtro: data de competência inicio (aceita YYYY-MM ou YYYY-MM-DD)
+$filtro_comp_fim = $_GET['comp_fim'] ?? null;       // novo filtro: data de competência fim (aceita YYYY-MM or YYYY-MM-DD)
 $filtro_forma_pag = $_GET['forma_pagamento'] ?? null; // novo filtro: forma de pagamento (nome)
 $filtro_categoria = $_GET['categoria'] ?? null;
 $filtro_valor_min = $_GET['valor_min'] ?? null;
 $filtro_valor_max = $_GET['valor_max'] ?? null;
+
+// Prepara valores para inputs do tipo month (YYYY-MM)
+$comp_inicio_input = '';
+$comp_fim_input = '';
+if (!empty($filtro_comp_inicio)) {
+    if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_inicio)) $comp_inicio_input = $filtro_comp_inicio;
+    elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtro_comp_inicio)) $comp_inicio_input = substr($filtro_comp_inicio,0,7);
+    else $comp_inicio_input = $filtro_comp_inicio;
+}
+if (!empty($filtro_comp_fim)) {
+    if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_fim)) $comp_fim_input = $filtro_comp_fim;
+    elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtro_comp_fim)) $comp_fim_input = substr($filtro_comp_fim,0,7);
+    else $comp_fim_input = $filtro_comp_fim;
+}
 
 // --- 2. Lógica de Permissão e Construção WHERE/PARAMS ---
 $where_conditions = [];
@@ -120,6 +134,20 @@ if (!empty($filtro_pag_inicio) && !empty($filtro_pag_fim)) {
 }
 
 // filtro por data de competencia
+// Normaliza filtros de competência: aceita YYYY-MM (input month) ou YYYY-MM-DD
+if (!empty($filtro_comp_inicio)) {
+    if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_inicio)) {
+        // mês informado -> converte para primeiro dia do mês
+        $filtro_comp_inicio = $filtro_comp_inicio . '-01';
+    }
+}
+if (!empty($filtro_comp_fim)) {
+    if (preg_match('/^\d{4}-\d{2}$/', $filtro_comp_fim)) {
+        // mês informado -> converte para último dia do mês
+        $filtro_comp_fim = date('Y-m-t', strtotime($filtro_comp_fim . '-01'));
+    }
+}
+
 if (!empty($filtro_comp_inicio) && !empty($filtro_comp_fim)) {
     $where_conditions[] = "l.data_competencia BETWEEN ? AND ?";
     $params[] = $filtro_comp_inicio;
@@ -398,10 +426,10 @@ endif;
             </div>
 
             <div class="col-md-3">
-                <label class="form-label">Competência (entre)</label>
+                <label class="form-label">Mês de competência (entre)</label>
                 <div class="input-group">
-                    <input type="date" class="form-control" name="comp_inicio" value="<?php echo htmlspecialchars($filtro_comp_inicio ?? ''); ?>" title="Competência Início">
-                    <input type="date" class="form-control" name="comp_fim" value="<?php echo htmlspecialchars($filtro_comp_fim ?? ''); ?>" title="Competência Fim">
+                    <input type="month" class="form-control" name="comp_inicio" value="<?php echo htmlspecialchars($comp_inicio_input ?? ''); ?>" title="Competência Início">
+                    <input type="month" class="form-control" name="comp_fim" value="<?php echo htmlspecialchars($comp_fim_input ?? ''); ?>" title="Competência Fim">
                 </div>
             </div>
 
@@ -446,11 +474,20 @@ endif;
 <!-- Filtros ativos (pills) -->
 <?php
 $activeFilters = [];
+// Helper para exibir competência no formato MM/YYYY
+function _fmt_comp($v) {
+    if (empty($v)) return '-';
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) return date('m/Y', strtotime($v));
+    if (preg_match('/^\d{4}-\d{2}$/', $v)) return date('m/Y', strtotime($v . '-01'));
+    // tentativa fallback
+    $t = strtotime($v);
+    return $t ? date('m/Y', $t) : $v;
+}
 if (!empty($filtro_empresa_id)) $activeFilters[] = 'Empresa: ' . htmlspecialchars(getEmpresaNome($filtro_empresa_id) ?? $filtro_empresa_id);
 if (!empty($filtro_status)) $activeFilters[] = 'Status: ' . htmlspecialchars($filtro_status);
 if (!empty($filtro_venc_inicio) || !empty($filtro_venc_fim)) $activeFilters[] = 'Vencimento: ' . htmlspecialchars($filtro_venc_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_venc_fim ?? '-');
 if (!empty($filtro_pag_inicio) || !empty($filtro_pag_fim)) $activeFilters[] = 'Pagamento: ' . htmlspecialchars($filtro_pag_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_pag_fim ?? '-');
-if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFilters[] = 'Competência: ' . htmlspecialchars($filtro_comp_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_comp_fim ?? '-');
+if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFilters[] = 'Mês de competência: ' . htmlspecialchars(_fmt_comp($filtro_comp_inicio) ?? '-') . ' → ' . htmlspecialchars(_fmt_comp($filtro_comp_fim) ?? '-');
 if (!empty($filtro_forma_pag)) $activeFilters[] = 'Forma: ' . htmlspecialchars(getFormaPagamentoNome($filtro_forma_pag) ?? $filtro_forma_pag);
 if (!empty($filtro_categoria)) $activeFilters[] = 'Categoria: ' . htmlspecialchars(getCategoriaNome($filtro_categoria) ?? $filtro_categoria);
 if (!empty($filtro_valor_min) || !empty($filtro_valor_max)) $activeFilters[] = 'Valor: ' . htmlspecialchars($filtro_valor_min ?? '-') . ' → ' . htmlspecialchars($filtro_valor_max ?? '-');
@@ -468,7 +505,7 @@ if (!empty($activeFilters)): ?>
                 <thead class="table-light">
                     <tr>
                         <th>Vencimento</th>
-                        <th>Competência</th>
+                        <th>Mês de competência</th>
                         <th>Pagamento</th>
                         <th>Forma Pgto.</th>
                         <th>Categoria</th>
@@ -494,7 +531,7 @@ if (!empty($activeFilters)): ?>
                         ?>
                         <tr>
                             <td><?php echo date('d/m/Y', strtotime($lanc['data_vencimento'])); ?></td>
-                            <td><?php echo $lanc['data_competencia'] ? date('d/m/Y', strtotime($lanc['data_competencia'])) : '-'; ?></td>
+                            <td><?php echo $lanc['data_competencia'] ? date('m/Y', strtotime($lanc['data_competencia'])) : '-'; ?></td>
                             <td><?php echo $lanc['data_pagamento'] ? date('d/m/Y', strtotime($lanc['data_pagamento'])) : '-'; ?></td>
                             <td><?php echo htmlspecialchars($lanc['metodo_pagamento'] ?? '-'); ?></td>
                             <td><?php echo htmlspecialchars($lanc['categoria_nome'] ?? '-'); ?></td>
@@ -771,6 +808,52 @@ if (!empty($activeFilters)): ?>
                                                 </div>
 
                         
+                                                    <script>
+                                                    document.addEventListener('DOMContentLoaded', function(){
+                                                        var modalConfirmar = document.getElementById('modalConfirmarPagamento');
+                                                        if (!modalConfirmar) return;
+                                                        modalConfirmar.addEventListener('show.bs.modal', function(event){
+                                                            var button = event.relatedTarget;
+                                                            if (!button) return;
+                                                            var idLanc = button.getAttribute('data-id_lancamento') || button.getAttribute('data-id');
+                                                            var inputId = modalConfirmar.querySelector('#confirm_id_lancamento');
+                                                            if (inputId) inputId.value = idLanc || '';
+
+                                                            // Preenche data de pagamento com hoje, se o campo estiver presente
+                                                            var dp = modalConfirmar.querySelector('#confirm_data_pagamento');
+                                                            if (dp) {
+                                                                var today = new Date();
+                                                                var yyyy = today.getFullYear();
+                                                                var mm = String(today.getMonth() + 1).padStart(2, '0');
+                                                                var dd = String(today.getDate()).padStart(2, '0');
+                                                                dp.value = yyyy + '-' + mm + '-' + dd;
+                                                            }
+
+                                                            // Reset id_forma_pagamento hidden input
+                                                            var hidForma = modalConfirmar.querySelector('#confirm_id_forma_pagamento');
+                                                            if (hidForma) hidForma.value = '';
+                                                            // If select has a preselected option, sync its data-id
+                                                            var sel = modalConfirmar.querySelector('#confirm_metodo_pagamento');
+                                                            if (sel) {
+                                                                var opt = sel.options[sel.selectedIndex];
+                                                                if (opt && opt.dataset && opt.dataset.id) {
+                                                                    if (hidForma) hidForma.value = opt.dataset.id;
+                                                                }
+                                                            }
+                                                        });
+
+                                                        // Keep hidden id_forma_pagamento in sync when user changes the select
+                                                        var selectForma = document.getElementById('confirm_metodo_pagamento');
+                                                        if (selectForma) {
+                                                            selectForma.addEventListener('change', function(e){
+                                                                var opt = this.options[this.selectedIndex];
+                                                                var hid = document.getElementById('confirm_id_forma_pagamento');
+                                                                if (hid) hid.value = (opt && opt.dataset && opt.dataset.id) ? opt.dataset.id : '';
+                                                            });
+                                                        }
+                                                    });
+                                                    </script>
+
 
                                                 <div class="col-md-12">
 
@@ -826,9 +909,9 @@ if (!empty($activeFilters)): ?>
 
                                                 <div class="col-md-4">
 
-                                                    <label for="novo_data_competencia" class="form-label">Data Competência</label>
+                                                    <label for="novo_data_competencia" class="form-label">Mês de competência</label>
 
-                                                    <input type="date" class="form-control" id="novo_data_competencia" name="data_competencia">
+                                                    <input type="month" class="form-control" id="novo_data_competencia" name="data_competencia" value="<?php echo date('Y-m'); ?>">
 
                                                 </div>
 
@@ -991,9 +1074,9 @@ if (!empty($activeFilters)): ?>
 
                                                 <div class="col-md-4">
 
-                                                    <label for="edit_data_competencia" class="form-label">Data Competência</label>
+                                                    <label for="edit_data_competencia" class="form-label">Mês de competência</label>
 
-                                                    <input type="date" class="form-control" id="edit_data_competencia" name="data_competencia">
+                                                    <input type="month" class="form-control" id="edit_data_competencia" name="data_competencia">
 
                                                 </div>
 

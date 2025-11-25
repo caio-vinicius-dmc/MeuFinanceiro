@@ -719,6 +719,19 @@ switch ($action) {
             $tipo = $_POST['tipo'] ?? 'receita';
             $data_vencimento = $_POST['data_vencimento'] ?? null;
             $data_competencia = $_POST['data_competencia'] ?? null;
+            // Normaliza valor vindo de input type="month" (YYYY-MM) para data completa YYYY-MM-01
+            if (!empty($data_competencia)) {
+                if (preg_match('/^\d{4}-\d{2}$/', $data_competencia)) {
+                    $data_competencia = $data_competencia . '-01';
+                } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $data_competencia)) {
+                    // já está em formato completo
+                } else {
+                    $ts = strtotime($data_competencia);
+                    $data_competencia = $ts ? date('Y-m-d', $ts) : null;
+                }
+            } else {
+                $data_competencia = null;
+            }
             $data_pagamento = $_POST['data_pagamento'] ?? null;
             $metodo_pagamento = $_POST['metodo_pagamento'] ?? null;
             $id_forma = isset($_POST['id_forma_pagamento']) ? ($_POST['id_forma_pagamento'] !== '' ? $_POST['id_forma_pagamento'] : null) : null;
@@ -769,6 +782,19 @@ switch ($action) {
             $tipo_novo = $_POST['tipo'];
             $data_vencimento_novo = $_POST['data_vencimento'];
             $data_competencia_novo = $_POST['data_competencia'] ?? null;
+            // Normaliza valor vindo de input type="month" (YYYY-MM) para data completa YYYY-MM-01
+            if (!empty($data_competencia_novo)) {
+                if (preg_match('/^\d{4}-\d{2}$/', $data_competencia_novo)) {
+                    $data_competencia_novo = $data_competencia_novo . '-01';
+                } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $data_competencia_novo)) {
+                    // já está em formato completo
+                } else {
+                    $ts = strtotime($data_competencia_novo);
+                    $data_competencia_novo = $ts ? date('Y-m-d', $ts) : null;
+                }
+            } else {
+                $data_competencia_novo = null;
+            }
             $metodo_pagamento_novo = $_POST['metodo_pagamento'] ?? null;
             $id_forma_pagamento_novo = isset($_POST['id_forma_pagamento']) ? ($_POST['id_forma_pagamento'] !== '' ? $_POST['id_forma_pagamento'] : null) : null;
             $id_categoria_novo = isset($_POST['id_categoria']) ? ($_POST['id_categoria'] !== '' ? $_POST['id_categoria'] : null) : null;
@@ -831,7 +857,7 @@ switch ($action) {
                  $detalhes_log[] = "Vencimento: " . date('d/m/Y', strtotime($old_data['data_vencimento'])) . " -> " . date('d/m/Y', strtotime($data_vencimento_novo));
             }
             if (($old_data['data_competencia'] ?? null) !== ($data_competencia_novo ?? null)) {
-                $detalhes_log[] = "Competência: " . ($old_data['data_competencia'] ? date('d/m/Y', strtotime($old_data['data_competencia'])) : 'N/D') . " -> " . ($data_competencia_novo ? date('d/m/Y', strtotime($data_competencia_novo)) : 'N/D');
+                $detalhes_log[] = "Competência: " . ($old_data['data_competencia'] ? date('m/Y', strtotime($old_data['data_competencia'])) : 'N/D') . " -> " . ($data_competencia_novo ? date('m/Y', strtotime($data_competencia_novo)) : 'N/D');
             }
             if (($old_data['metodo_pagamento'] ?? null) !== ($metodo_pagamento_novo ?? null) || ($has_forma_col && (($old_data['id_forma_pagamento'] ?? null) !== ($id_forma_pagamento_novo ?? null)))) {
                 $det_old = ($old_data['metodo_pagamento'] ?? 'N/D') . ($has_forma_col ? (' (id: ' . ($old_data['id_forma_pagamento'] ?? 'N/D') . ')') : '');
@@ -1380,7 +1406,21 @@ switch ($action) {
         if (isAdmin() || isContador()) {
             $id_empresa = $_POST['id_empresa'];
             if (!empty($id_empresa)) ensure_user_can_access_company($id_empresa);
-            $data_competencia = $_POST['data_competencia'];
+            $data_competencia = $_POST['data_competencia'] ?? null;
+            // Normaliza valor vindo de input type="month" (YYYY-MM) para data completa YYYY-MM-01
+            if (!empty($data_competencia)) {
+                if (preg_match('/^\d{4}-\d{2}$/', $data_competencia)) {
+                    $data_competencia = $data_competencia . '-01';
+                } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $data_competencia)) {
+                    // já está em formato completo
+                } else {
+                    // tenta normalizar usando strtotime; se falhar, zera para null
+                    $ts = strtotime($data_competencia);
+                    $data_competencia = $ts ? date('Y-m-d', $ts) : null;
+                }
+            } else {
+                $data_competencia = null;
+            }
             $data_vencimento = $_POST['data_vencimento'];
             $valor = $_POST['valor'];
             $id_forma_pagamento = $_POST['id_forma_pagamento'];
@@ -1462,7 +1502,20 @@ switch ($action) {
             $id = $_POST['id_cobranca'];
             $id_empresa = $_POST['id_empresa'];
             if (!empty($id_empresa)) ensure_user_can_access_company($id_empresa);
-            $data_competencia = $_POST['data_competencia'];
+            $data_competencia = $_POST['data_competencia'] ?? null;
+            // Normaliza valor vindo de input type="month" (YYYY-MM) para data completa YYYY-MM-01
+            if (!empty($data_competencia)) {
+                if (preg_match('/^\d{4}-\d{2}$/', $data_competencia)) {
+                    $data_competencia = $data_competencia . '-01';
+                } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $data_competencia)) {
+                    // já está em formato completo
+                } else {
+                    $ts = strtotime($data_competencia);
+                    $data_competencia = $ts ? date('Y-m-d', $ts) : null;
+                }
+            } else {
+                $data_competencia = null;
+            }
             $data_vencimento = $_POST['data_vencimento'];
             $valor = $_POST['valor'];
             $id_forma_pagamento = $_POST['id_forma_pagamento'];

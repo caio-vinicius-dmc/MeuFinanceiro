@@ -403,7 +403,20 @@ document.addEventListener("DOMContentLoaded", function() {
             modalForm.querySelector('#edit_valor').value = valor;
             modalForm.querySelector('#edit_tipo').value = tipo;
             modalForm.querySelector('#edit_data_vencimento').value = vencimento;
-            modalForm.querySelector('#edit_data_competencia').value = data_competencia;
+            // Normalize competencia for month input (YYYY-MM expected)
+            try {
+                var compInput = modalForm.querySelector('#edit_data_competencia');
+                if (compInput) {
+                    var compVal = '';
+                    if (data_competencia) {
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(data_competencia)) compVal = data_competencia.substr(0,7);
+                        else if (/^\d{4}-\d{2}$/.test(data_competencia)) compVal = data_competencia;
+                    }
+                    compInput.value = compVal;
+                }
+            } catch (e) {
+                console.warn('Erro ao normalizar data_competencia para o modal:', e);
+            }
             modalForm.querySelector('#edit_data_pagamento').value = data_pagamento;
             modalForm.querySelector('#edit_metodo_pagamento').value = metodo_pagamento;
             modalForm.querySelector('#edit_status').value = status;
@@ -447,7 +460,19 @@ document.addEventListener("DOMContentLoaded", function() {
             modalForm.querySelector('#edit_valor').value = valor;
             modalForm.querySelector('#edit_tipo').value = tipo;
             modalForm.querySelector('#edit_data_vencimento').value = vencimento;
-            modalForm.querySelector('#edit_data_competencia').value = data_competencia;
+            try {
+                var compInput2 = modalForm.querySelector('#edit_data_competencia');
+                if (compInput2) {
+                    var compVal2 = '';
+                    if (data_competencia) {
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(data_competencia)) compVal2 = data_competencia.substr(0,7);
+                        else if (/^\d{4}-\d{2}$/.test(data_competencia)) compVal2 = data_competencia;
+                    }
+                    compInput2.value = compVal2;
+                }
+            } catch (e) {
+                console.warn('Erro ao normalizar data_competencia (fallback):', e);
+            }
             modalForm.querySelector('#edit_data_pagamento').value = data_pagamento;
             modalForm.querySelector('#edit_metodo_pagamento').value = metodo_pagamento;
             modalForm.querySelector('#edit_status').value = status;

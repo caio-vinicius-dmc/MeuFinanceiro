@@ -98,7 +98,7 @@ $header = [
     'Descricao',
     'Tipo Cobranca',
     'Forma Pagamento',
-    'Data Competencia',
+    'Mês de competência',
     'Data Vencimento',
     'Data Pagamento',
     'Valor (R$)',
@@ -110,7 +110,7 @@ fputcsv($out, $header, ';');
 
 foreach ($rows as $r) {
     $r['valor'] = number_format($r['valor'], 2, ',', '.');
-    $line = [
+        $line = [
         $r['id'],
         $r['empresa'],
         $r['empresa_cnpj'],
@@ -118,7 +118,7 @@ foreach ($rows as $r) {
         $r['descricao'],
         $r['tipo_cobranca_nome'] ?? '',
         $r['forma_pagamento_nome'] ?? '',
-        $r['data_competencia'],
+        (!empty($r['data_competencia']) ? date('m/Y', strtotime($r['data_competencia'])) : ''),
         $r['data_vencimento'],
         $r['data_pagamento'],
         $r['valor'],

@@ -1,4 +1,4 @@
-﻿Descrição;Valor;Tipo;Data vencimento;Data competência;Data pagamento;Status;Forma de pagamento;Categoria
+﻿Descrição;Valor;Tipo;Data vencimento;Mês de competência;Data pagamento;Status;Forma de pagamento;Categoria
 Venda Produto A;1500.00;receita;10/11/2025;01/11/2025;;Em aberto;Transferência Bancária;Venda
 Pagamento Fornecedor X;750,5;despesa;10/11/2025;01/11/2025;12/11/2025;Pago;Boleto Bancário;Compra
 Assinatura Cliente Y;299,9;receita;15/11/2025;01/11/2025;;Em aberto;Cartão de Crédito;Venda
