@@ -1041,11 +1041,13 @@ switch ($action) {
             $cnpj = $_POST['cnpj'];
             $razao_social = $_POST['razao_social'];
             $data_abertura = !empty($_POST['data_abertura']) ? $_POST['data_abertura'] : null;
+            $data_contratacao = !empty($_POST['data_contratacao']) ? $_POST['data_contratacao'] : null;
 
             $sql = "INSERT INTO empresas (id_cliente, cnpj, razao_social, nome_fantasia, data_abertura) 
-                    VALUES (?, ?, ?, ?, ?)";
+                    VALUES (?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO empresas (id_cliente, cnpj, razao_social, nome_fantasia, data_abertura, data_contratacao) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
-            if ($stmt->execute([$id_cliente, $cnpj, $_POST['razao_social'], $_POST['nome_fantasia'], $data_abertura])) {
+            if ($stmt->execute([$id_cliente, $cnpj, $_POST['razao_social'], $_POST['nome_fantasia'], $data_abertura, $data_contratacao])) {
                 $id_novo = $pdo->lastInsertId();
                 $_SESSION['success_message'] = "Empresa cadastrada com sucesso!";
                 logAction("Cadastro Empresa", "empresas", $id_novo, "CNPJ: $cnpj"); 
@@ -1060,11 +1062,12 @@ switch ($action) {
              $id_empresa = $_POST['id_empresa'];
              if (!empty($id_empresa)) ensure_user_can_access_company($id_empresa);
              $data_abertura = !empty($_POST['data_abertura']) ? $_POST['data_abertura'] : null;
+             $data_contratacao = !empty($_POST['data_contratacao']) ? $_POST['data_contratacao'] : null;
 
-             $sql_update = "UPDATE empresas SET id_cliente = ?, cnpj = ?, razao_social = ?, nome_fantasia = ?, data_abertura = ? WHERE id = ?";
+             $sql_update = "UPDATE empresas SET id_cliente = ?, cnpj = ?, razao_social = ?, nome_fantasia = ?, data_abertura = ?, data_contratacao = ? WHERE id = ?";
              $stmt_update = $pdo->prepare($sql_update);
              
-             if ($stmt_update->execute([$_POST['id_cliente'], $_POST['cnpj'], $_POST['razao_social'], $_POST['nome_fantasia'], $data_abertura, $id_empresa])) {
+             if ($stmt_update->execute([$_POST['id_cliente'], $_POST['cnpj'], $_POST['razao_social'], $_POST['nome_fantasia'], $data_abertura, $data_contratacao, $id_empresa])) {
                  $_SESSION['success_message'] = "Empresa atualizada com sucesso!";
                  logAction("Edição Empresa", "empresas", $id_empresa, "CNPJ: " . $_POST['cnpj']);
              } else {

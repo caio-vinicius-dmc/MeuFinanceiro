@@ -107,6 +107,11 @@ $empresas = $stmt_empresas->fetchAll();
                         </div>
 
                         <div class="col-md-12">
+                            <label for="data_contratacao" class="form-label">Data de Contratação</label>
+                            <input type="date" class="form-control" id="data_contratacao" name="data_contratacao">
+                        </div>
+
+                        <div class="col-md-12">
                             <label for="razao_social" class="form-label">Razão Social</label>
                             <input type="text" class="form-control" id="razao_social" name="razao_social" required>
                         </div>
@@ -162,6 +167,7 @@ $empresas = $stmt_empresas->fetchAll();
                                             data-razao_social="<?php echo htmlspecialchars($empresa['razao_social']); ?>"
                                             data-nome_fantasia="<?php echo htmlspecialchars($empresa['nome_fantasia'] ?? ''); ?>"
                                             data-data_abertura="<?php echo htmlspecialchars($empresa['data_abertura'] ?? ''); ?>"
+                                            data-data_contratacao="<?php echo htmlspecialchars($empresa['data_contratacao'] ?? ''); ?>"
                                             title="Editar">
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -218,6 +224,11 @@ $empresas = $stmt_empresas->fetchAll();
                         <div class="col-md-5">
                             <label for="edit_data_abertura" class="form-label">Data de Abertura</label>
                             <input type="date" class="form-control" id="edit_data_abertura" name="data_abertura">
+                        </div>
+
+                        <div class="col-md-12">
+                            <label for="edit_data_contratacao" class="form-label">Data de Contratação</label>
+                            <input type="date" class="form-control" id="edit_data_contratacao" name="data_contratacao">
                         </div>
 
                         <div class="col-md-12">

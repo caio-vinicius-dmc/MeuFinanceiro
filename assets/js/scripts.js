@@ -322,6 +322,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const razao_social = button.getAttribute('data-razao_social');
             const nome_fantasia = button.getAttribute('data-nome_fantasia');
             const data_abertura = button.getAttribute('data-data_abertura');
+            const data_contratacao = button.getAttribute('data-data_contratacao');
             
             const modalForm = modalEditarEmpresa.querySelector('form');
             modalForm.querySelector('#edit_id_empresa').value = id;
@@ -330,6 +331,7 @@ document.addEventListener("DOMContentLoaded", function() {
             modalForm.querySelector('#edit_razao_social').value = razao_social;
             modalForm.querySelector('#edit_nome_fantasia').value = nome_fantasia;
             modalForm.querySelector('#edit_data_abertura').value = data_abertura;
+            if (modalForm.querySelector('#edit_data_contratacao')) modalForm.querySelector('#edit_data_contratacao').value = data_contratacao;
             // Se o CNPJ já estiver completo, tenta popular automaticamente
             try {
                 const digits = (cnpj || '').toString().replace(/\D/g, '');
