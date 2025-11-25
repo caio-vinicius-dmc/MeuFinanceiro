@@ -546,7 +546,11 @@ $status_chart_json = json_encode([
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-filter me-2"></i> Filtros</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapseDashboard" aria-expanded="false" aria-controls="filtersCollapseDashboard">
+            <i class="bi bi-chevron-down"></i>
+        </button>
     </div>
+    <div id="filtersCollapseDashboard" class="collapse">
     <div class="card-body">
     <form id="form-filtros-dashboard" method="GET" class="row g-3 align-items-end">
             <input type="hidden" name="page" value="dashboard">
@@ -612,6 +616,15 @@ $status_chart_json = json_encode([
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    try {
+        var el = document.getElementById('filtersCollapseDashboard');
+        if (el && window.innerWidth < 768) el.classList.add('show');
+    } catch(e){ console.warn(e); }
+});
+</script>
 
 <?php if (hasLancamentosAccess()): ?>
 <section id="dashboard-lancamentos-section" class="dashboard-section dashboard-section-lancamentos collapsed">

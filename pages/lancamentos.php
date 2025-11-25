@@ -378,9 +378,13 @@ endif;
 </div>
 
 <div class="card mb-4">
-    <div class="card-header">
-        <i class="bi bi-funnel me-2"></i> Filtros
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-funnel me-2"></i> Filtros</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapseLancamentos" aria-expanded="false" aria-controls="filtersCollapseLancamentos">
+            <i class="bi bi-chevron-down"></i>
+        </button>
     </div>
+    <div id="filtersCollapseLancamentos" class="collapse">
     <div class="card-body">
         <form id="form-filtros" method="GET" class="row g-3">
             <input type="hidden" name="page" value="lancamentos">
@@ -470,7 +474,19 @@ endif;
             </div>
         </form>
     </div>
+    </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    try {
+        var el = document.getElementById('filtersCollapseLancamentos');
+        if (el && window.innerWidth < 768) {
+            el.classList.add('show');
+        }
+    } catch(e) { console.warn(e); }
+});
+</script>
 <!-- Filtros ativos (pills) -->
 <?php
 $activeFilters = [];
@@ -498,7 +514,11 @@ if (!empty($activeFilters)): ?>
         <?php endforeach; ?>
     </div>
 <?php endif; ?>
+
 <div class="card shadow-sm">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Histórico de Lançamentos</h5>
+    </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-hover align-middle">

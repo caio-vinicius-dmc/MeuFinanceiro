@@ -367,13 +367,14 @@ if (isClient()) {
         <!-- Card de Filtros do Cliente -->
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-filter me-2"></i>Filtros</span>
-                <button type="button" class="btn btn-outline-primary btn-sm mobile-filters-toggle ms-auto" data-bs-toggle="modal" data-bs-target="#mobileFiltersModal">
-                    <i class="bi bi-funnel-fill"></i> Filtros
+                <span><i class="bi bi-filter me-2"></i> Filtros</span>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapseCobrancasCliente" aria-expanded="false" aria-controls="filtersCollapseCobrancasCliente">
+                    <i class="bi bi-chevron-down"></i>
                 </button>
             </div>
+            <div id="filtersCollapseCobrancasCliente" class="collapse">
             <div class="card-body">
-            <form id="form-filtros-cobrancas" method="GET" class="row g-3 align-items-end">
+            <form id="form-filtros-cobrancas-cliente" method="GET" class="row g-3 align-items-end">
                     <input type="hidden" name="page" value="cobrancas">
                     <div class="col-md-3">
                         <label for="tipo_data" class="form-label">Filtrar por Data de</label>
@@ -429,7 +430,19 @@ if (isClient()) {
                     </div>
                 </form>
             </div>
+            </div>
         </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    try {
+        var el = document.getElementById('filtersCollapseCobrancasCliente');
+        if (el && window.innerWidth < 768) {
+            el.classList.add('show');
+        }
+    } catch(e) { console.warn(e); }
+});
+</script>
         <!-- Filtros ativos (cliente) -->
         <?php
         $activeFilters = [];
@@ -447,13 +460,15 @@ if (isClient()) {
             </div>
         <?php endif; ?>
 
-        <div class="row gy-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="row gy-4">
             <?php if (empty($cobrancas)): ?>
-                <div class="col-12">
-                    <div class="alert alert-info text-center">Nenhuma cobrança encontrada para você no momento.</div>
-                </div>
-            <?php else: ?>
-                <?php foreach ($cobrancas as $cobranca): ?>
+                    <div class="col-12">
+                        <div class="alert alert-info text-center">Nenhuma cobrança encontrada para você no momento.</div>
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($cobrancas as $cobranca): ?>
                     <?php $status = getStatusInfo($cobranca); ?>
                     <div class="col-md-6 col-lg-4">
                         <div class="card h-100 shadow-sm cobranca-card-new">
@@ -521,6 +536,8 @@ if (isClient()) {
                     </div>
                 <?php endforeach; ?>
             <?php endif; ?>
+                </div>
+            </div>
         </div>
 
     <?php elseif (isAdmin() || isContador()): ?>
@@ -660,13 +677,14 @@ if (isClient()) {
         <!-- Card de Filtros -->
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-filter me-2"></i>Filtros</span>
-                <button type="button" class="btn btn-outline-primary btn-sm mobile-filters-toggle ms-auto" data-bs-toggle="modal" data-bs-target="#mobileFiltersModal">
-                    <i class="bi bi-funnel-fill"></i> Filtros
+                <span><i class="bi bi-filter me-2"></i> Filtros</span>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapseCobrancas" aria-expanded="false" aria-controls="filtersCollapseCobrancas">
+                    <i class="bi bi-chevron-down"></i>
                 </button>
             </div>
+            <div id="filtersCollapseCobrancas" class="collapse">
             <div class="card-body">
-                <form id="form-filtros-cobrancas" method="GET" class="row g-3 align-items-end">
+                <form id="form-filtros-cobrancas-admin" method="GET" class="row g-3 align-items-end">
                     <input type="hidden" name="page" value="cobrancas">
                     <div class="col-md-6">
                         <label class="form-label">Vencimento (entre)</label>
@@ -722,7 +740,19 @@ if (isClient()) {
                 </form>
             </div>
         </div>
-        <div class="card mt-4">
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            try {
+                var el = document.getElementById('filtersCollapseCobrancas');
+                if (el && window.innerWidth < 768) {
+                    el.classList.add('show');
+                }
+            } catch(e) { console.warn(e); }
+        });
+        </script>
+        
+        <div class="card shadow-sm">
             <div class="card-header">
                 <h5 class="card-title mb-0">Histórico de Cobranças</h5>
             </div>

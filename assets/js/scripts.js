@@ -526,7 +526,7 @@ document.addEventListener("DOMContentLoaded", function() {
 // =========================
 document.addEventListener('DOMContentLoaded', function() {
     const BREAKPOINT = 1367;
-    const FORM_SELECTORS = ['#form-filtros', '#form-filtros-dashboard', '#form-filtros-cobrancas'];
+    const FORM_SELECTORS = ['#form-filtros', '#form-filtros-dashboard', '#form-filtros-cobrancas-cliente', '#form-filtros-cobrancas-admin'];
     const modalEl = document.getElementById('mobileFiltersModal');
     const modalBody = document.getElementById('mobile-filters-modal-body');
     if (!modalEl || !modalBody) return;
