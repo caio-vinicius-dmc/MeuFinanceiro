@@ -8,8 +8,7 @@ if (!isAdmin()) {
     exit;
 }
 
-// Buscar usuários existentes
-$stmt_users = $pdo->query("SELECT id, nome, email, telefone, tipo, ativo, id_cliente_associado, acesso_lancamentos FROM usuarios ORDER BY nome");
+$stmt_users = $pdo->query("SELECT id, nome, email, telefone, tipo, ativo, id_cliente_associado, acesso_lancamentos, COALESCE(is_super_admin,0) AS is_super_admin FROM usuarios ORDER BY nome");
 $usuarios = $stmt_users->fetchAll();
 
 // Buscar clientes para os selects (usado no form de 'Novo' e no 'Modal de Edição')
@@ -136,7 +135,11 @@ foreach ($all_associations_raw as $assoc) {
                                 $user_assoc_ids = $all_associations[$usuario['id']] ?? [];
                             ?>
                             <tr>
-                                <td class="fw-bold"><?php echo htmlspecialchars($usuario['nome']); ?></td>
+                                <td class="fw-bold"><?php echo htmlspecialchars($usuario['nome']); ?>
+                                    <?php if (!empty($usuario['is_super_admin'])): ?>
+                                        <span class="badge bg-dark ms-2">Super Admin</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <?php echo htmlspecialchars($usuario['email']); ?>
                                     <br>
@@ -147,7 +150,7 @@ foreach ($all_associations_raw as $assoc) {
                                     <?php echo ($usuario['ativo']) ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-danger">Inativo</span>'; ?>
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-secondary" 
+                                        <button class="btn btn-sm btn-outline-secondary" 
                                             data-bs-toggle="modal" 
                                             data-bs-target="#modalEditarUsuario"
                                             data-id="<?php echo $usuario['id']; ?>"
@@ -156,17 +159,18 @@ foreach ($all_associations_raw as $assoc) {
                                             data-telefone="<?php echo htmlspecialchars($usuario['telefone'] ?? ''); ?>"
                                             data-tipo="<?php echo $usuario['tipo']; ?>"
                                             data-ativo="<?php echo $usuario['ativo']; ?>"
+                                            data-is-super="<?php echo intval($usuario['is_super_admin']); ?>"
                                             data-id_cliente_associado="<?php echo $usuario['id_cliente_associado']; ?>"
                                             data-acesso_lancamentos="<?php echo $usuario['acesso_lancamentos']; ?>"
                                             data-assoc_clientes='<?php echo json_encode($user_assoc_ids); ?>'
-                                            title="Editar">
+                                            title="Editar" <?php echo !empty($usuario['is_super_admin']) ? 'disabled' : ''; ?>>
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     
                                     <form action="process/crud_handler.php" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir este usuário?');">
                                         <input type="hidden" name="action" value="deletar_usuario">
                                         <input type="hidden" name="id_usuario" value="<?php echo $usuario['id']; ?>">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir" <?php echo ($usuario['id'] == $_SESSION['user_id']) ? 'disabled' : ''; ?>>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir" <?php echo ($usuario['id'] == $_SESSION['user_id'] || !empty($usuario['is_super_admin'])) ? 'disabled' : ''; ?>>
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
@@ -314,6 +318,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const editTipoUsuarioSelect = modalEditarUsuario.querySelector('#edit_tipo_usuario');
         editTipoUsuarioSelect.value = tipo;
+        const isSuper = button.getAttribute('data-is-super') === '1';
 
         const editAssocClienteDiv = modalEditarUsuario.querySelector('#edit_assoc_cliente_div');
         const editAssocContadorDiv = modalEditarUsuario.querySelector('#edit_assoc_contador_div');
@@ -336,6 +341,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Set ativo state (aplica para qualquer tipo)
         editAtivoCheckbox.checked = (ativo == 1);
+        // Se for Super Admin, desabilita todo o formulário de edição para evitar qualquer alteração
+        if (isSuper) {
+            // Disable inputs and show a small notice
+            const formElements = modalEditarUsuario.querySelectorAll('input, select, button');
+            formElements.forEach(el => {
+                // keep the modal close button enabled
+                if (el.getAttribute('data-bs-dismiss') === 'modal') return;
+                el.disabled = true;
+            });
+            // Show notice at top of modal
+            let notice = modalEditarUsuario.querySelector('#super_admin_notice');
+            if (!notice) {
+                notice = document.createElement('div');
+                notice.id = 'super_admin_notice';
+                notice.className = 'alert alert-dark mb-3';
+                notice.textContent = 'Conta Super Admin — Edição desabilitada por segurança.';
+                modalEditarUsuario.querySelector('.modal-body').insertBefore(notice, modalEditarUsuario.querySelector('.modal-body').firstChild);
+            }
+        } else {
+            // Ensure fields are enabled for non-super users
+            const formElements = modalEditarUsuario.querySelectorAll('input, select, button');
+            formElements.forEach(el => el.disabled = false);
+            // Re-apply certain protections (cannot disable own user)
+            if (id == '<?php echo $_SESSION['user_id']; ?>') {
+                editAtivoCheckbox.checked = true;
+                editAtivoCheckbox.disabled = true;
+            }
+            const existingNotice = modalEditarUsuario.querySelector('#super_admin_notice');
+            if (existingNotice) existingNotice.remove();
+        }
         // Evita desativar o próprio usuário logado para não travar o acesso
         if (id == '<?php echo $_SESSION['user_id']; ?>') {
             editAtivoCheckbox.checked = true;

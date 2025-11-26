@@ -1505,6 +1505,14 @@ switch ($action) {
     case 'editar_usuario':
         if (isAdmin()) {
             $id_usuario_edit = $_POST['id_usuario'];
+            // Impedir edição da conta Super Admin por segurança
+            $chkSuper = $pdo->prepare('SELECT is_super_admin FROM usuarios WHERE id = ? LIMIT 1');
+            $chkSuper->execute([$id_usuario_edit]);
+            $isSuperUser = intval($chkSuper->fetchColumn() ?? 0);
+            if ($isSuperUser) {
+                $_SESSION['error_message'] = 'Ação não permitida: esta conta é Super Admin e não pode ser editada via interface.';
+                break;
+            }
             $nome = $_POST['nome'];
             $email = $_POST['email'];
             $telefone = $_POST['telefone'] ?? null;
@@ -1565,6 +1573,13 @@ switch ($action) {
             if ($id == $user_id) {
                 $_SESSION['error_message'] = "Você não pode excluir seu próprio usuário.";
                 break; 
+            }
+            // Impedir exclusão da conta Super Admin
+            $chkSuperDel = $pdo->prepare('SELECT is_super_admin FROM usuarios WHERE id = ? LIMIT 1');
+            $chkSuperDel->execute([$id]);
+            if (intval($chkSuperDel->fetchColumn() ?? 0)) {
+                $_SESSION['error_message'] = 'Ação não permitida: esta conta é Super Admin e não pode ser excluída.';
+                break;
             }
             
             $sql = "DELETE FROM usuarios WHERE id = ?";

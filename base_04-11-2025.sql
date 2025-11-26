@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS tb_confg_emailCliente (
     INDEX idx_permissao (permissao)
 );
 
-
+ALTER TABLE usuarios ADD COLUMN is_super_admin TINYINT(1) NOT NULL DEFAULT 0;
 
 --
 -- Despejando dados para a tabela `empresas`
@@ -328,16 +328,17 @@ CREATE TABLE `usuarios` (
   `tipo` enum('admin','contador','cliente') NOT NULL,
   `id_cliente_associado` int(11) DEFAULT NULL,
   `acesso_lancamentos` tinyint(1) NOT NULL DEFAULT 0,
-  `ativo` tinyint(1) DEFAULT 1
+  `ativo` tinyint(1) DEFAULT 1,
+  `is_super_admin` TINYINT(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Despejando dados para a tabela `usuarios`
 --
 
-INSERT INTO `usuarios` (`id`, `nome`, `email`, `telefone`, `senha`, `tipo`, `id_cliente_associado`, `acesso_lancamentos`, `ativo`) VALUES
-(2, 'Caio Vinícius', 'caio@dynamicmotioncentury.com.br', '81983656068', '$2y$10$33uB5eMzzl1ScCDQ4IBh/eApsREwPqfWeANhjZnn4ik6vf23Kgz.i', 'admin', NULL, 0, 1),
-(6, 'Jailson Pereira', 'escritoriojpcontabil@gmail.com', '81 99918-0003', '$2y$10$yju5dmZWhOjUgTCSbZ6FCOVnmKO9c86fPP8BvCWJghQpp2ehfWJgS', 'admin', NULL, 0, 1);
+INSERT INTO `usuarios` (`id`, `nome`, `email`, `telefone`, `senha`, `tipo`, `id_cliente_associado`, `acesso_lancamentos`, `ativo`, `is_super_admin`) VALUES
+(2, 'Caio Vinícius', 'caio@dynamicmotioncentury.com.br', '81983656068', '$2y$10$33uB5eMzzl1ScCDQ4IBh/eApsREwPqfWeANhjZnn4ik6vf23Kgz.i', 'admin', NULL, 0, 1,1),
+(6, 'Jailson Pereira', 'escritoriojpcontabil@gmail.com', '81 99918-0003', '$2y$10$yju5dmZWhOjUgTCSbZ6FCOVnmKO9c86fPP8BvCWJghQpp2ehfWJgS', 'admin', NULL, 0, 1,0);
 
 --
 -- Índices para tabelas despejadas
