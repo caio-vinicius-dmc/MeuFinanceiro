@@ -95,7 +95,7 @@ $smtp_password = '';
 <!-- Card separado: Modelos de Template (assunto/intro/closing) -->
 <div class="card shadow-sm mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Cobrança gerada - Template de Email</h5>
+        <h4 class="mb-0"><code>Cobrança gerada - Template de Email </code></h4>
         <div>
             <button class="btn btn-sm btn-outline-secondary me-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_cobranca" aria-expanded="true" aria-controls="collapse_cobranca">
                 <i class="bi bi-chevron-down"></i>
@@ -145,7 +145,7 @@ $smtp_password = '';
 <!-- Recibo de Pagamento: personalização de email (exibir placeholders e dicas) -->
 <div class="card shadow-sm mt-3">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Recibo de Pagamento — Template de Email</h5>
+        <h4 class="mb-0"><code>Recibo de Pagamento — Template de Email</code></h4>
         <div>
             <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_recibo" aria-expanded="true" aria-controls="collapse_recibo">
                 <i class="bi bi-chevron-down"></i>

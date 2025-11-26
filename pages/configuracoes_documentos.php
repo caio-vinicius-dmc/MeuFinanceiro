@@ -27,10 +27,16 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
     </div>
 <?php endif; ?>
 
-<!-- Seção única explicando todos os placeholders disponíveis -->
+<!-- Placeholders (collapsible) -->
 <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Placeholders disponíveis</h6>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_placeholders" aria-expanded="true" aria-controls="collapse_placeholders">
+            <i class="bi bi-chevron-down"></i>
+        </button>
+    </div>
+    <div id="collapse_placeholders" class="collapse show">
     <div class="card-body">
-        <h6 class="card-title">Placeholders disponíveis</h6>
         <p class="text-muted small">Use os códigos abaixo diretamente nos campos de Cabeçalho, Corpo ou Rodapé. Insira exatamente entre chaves, por exemplo <code>{date}</code> ou <code>{empresa}</code>.</p>
         <div class="row">
             <div class="col-md-6">
@@ -59,14 +65,24 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
         </div>
         <p class="mt-2 small text-muted">Observação: os campos aceitam HTML; evite scripts. Para incluir hora no rodapé do Termo, use o placeholder <code>{date_time}</code> (implementado como <code>d/m/Y H:i</code> pelo gerador).</p>
     </div>
+    </div>
 </div>
 
-<div class="card shadow-sm">
+<!-- Termo de Quitação (separado, com collapse) -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><code>Termo de Quitação</code></h5>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_termo" aria-expanded="true" aria-controls="collapse_termo">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+    </div>
+    <div id="collapse_termo" class="collapse show">
     <div class="card-body">
         <form action="process/crud_handler.php" method="POST">
             <input type="hidden" name="action" value="salvar_config_documentos">
 
-            <h4 class="mb-3"><code>Termo de Quitação</code></h4>
             <div class="mb-3">
                 <label for="termo_header" class="form-label"><strong>Termo - Cabeçalho</strong></label>
                 <textarea class="form-control" id="termo_header" name="termo_header" rows="3"><?php echo htmlspecialchars($doc_templates['termo_header'] ?? '<div>{logo}<h2>Termo de Quitação</h2></div>'); ?></textarea>
@@ -82,8 +98,29 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                 <textarea class="form-control" id="termo_footer" name="termo_footer" rows="2"><?php echo htmlspecialchars($doc_templates['termo_footer'] ?? '<p>Documento gerado em {date}</p>'); ?></textarea>
             </div>
 
-            <hr>
-            <h4 class="mb-3"><code>Recibo de Pagamento</code></h4>
+            <div class="d-grid gap-2 d-md-flex">
+                <button type="submit" class="btn btn-primary btn-full-mobile"><i class="bi bi-save me-2"></i> Salvar Termo</button>
+            </div>
+        </form>
+    </div>
+    </div>
+</div>
+
+<!-- Recibo de Pagamento (separado, com collapse) -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><code>Recibo de Pagamento</code></h5>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_recibo" aria-expanded="true" aria-controls="collapse_recibo">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+    </div>
+    <div id="collapse_recibo" class="collapse show">
+    <div class="card-body">
+        <form action="process/crud_handler.php" method="POST">
+            <input type="hidden" name="action" value="salvar_config_documentos">
+
             <div class="mb-3">
                 <label for="recibo_header" class="form-label"><strong>Recibo - Cabeçalho</strong></label>
                 <textarea class="form-control" id="recibo_header" name="recibo_header" rows="3"><?php echo htmlspecialchars($doc_templates['recibo_header'] ?? '<div>{logo}<h2>Recibo de Pagamento</h2></div>'); ?></textarea>
@@ -100,9 +137,10 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             </div>
 
             <div class="d-grid gap-2 d-md-flex">
-                <button type="submit" class="btn btn-primary btn-full-mobile"><i class="bi bi-save me-2"></i> Salvar Templates</button>
+                <button type="submit" class="btn btn-primary btn-full-mobile"><i class="bi bi-save me-2"></i> Salvar Recibo</button>
                 <a href="index.php?page=configuracoes_email" class="btn btn-outline-secondary btn-full-mobile">Voltar Configurações de E-mail</a>
             </div>
         </form>
+    </div>
     </div>
 </div>
