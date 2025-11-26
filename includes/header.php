@@ -52,6 +52,12 @@ global $page;
     <link rel="icon" type="image/png" href="<?php echo base_url('assets/img/favicon.png'); ?>">
     <link rel="shortcut icon" href="<?php echo base_url('assets/img/favicon.png'); ?>">
     <link rel="apple-touch-icon" sizes="180x180" href="<?php echo base_url('assets/img/favicon.png'); ?>">
+    <!-- PWA manifest & mobile meta -->
+    <link rel="manifest" href="<?php echo base_url('manifest.json'); ?>">
+    <meta name="theme-color" content="#0d6efd">
+    <link rel="apple-touch-icon" sizes="152x152" href="<?php echo base_url('assets/img/icons/icon-152x152.svg'); ?>">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body class="bg-light-subtle">
 

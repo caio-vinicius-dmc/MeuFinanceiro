@@ -1182,3 +1182,132 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     } catch (e) { console.warn('Erro no auto-open de collapses:', e); }
 });
+
+
+// === PWA: Registrar Service Worker (se suportado) ===
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(function(reg) { console.log('ServiceWorker registrado:', reg); })
+            .catch(function(err) { console.warn('Falha ao registrar ServiceWorker:', err); });
+    });
+}
+
+// Forçar atualização do service worker registrado (se existir) para aplicar rapidamente o novo cache
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        try {
+            navigator.serviceWorker.getRegistration().then(function(reg) {
+                if (reg) {
+                    reg.update().then(function() { console.log('ServiceWorker: update() chamado'); }).catch(()=>{});
+                }
+            }).catch(()=>{});
+        } catch (e) { console.warn('Erro ao chamar update() no SW', e); }
+    });
+}
+
+// === PWA: custom install prompt handler (beforeinstallprompt) ===
+(function() {
+    let deferredPrompt = null;
+    function createInstallBanner() {
+        // banner simples no canto inferior direito
+        const banner = document.createElement('div');
+        banner.id = 'pwa-install-banner';
+        banner.style.position = 'fixed';
+        banner.style.right = '12px';
+        banner.style.bottom = '12px';
+        banner.style.zIndex = '1080';
+        banner.style.background = '#fff';
+        banner.style.border = '1px solid rgba(0,0,0,0.08)';
+        banner.style.boxShadow = '0 6px 18px rgba(0,0,0,0.08)';
+        banner.style.padding = '10px 12px';
+        banner.style.borderRadius = '8px';
+        banner.style.display = 'flex';
+        banner.style.alignItems = 'center';
+        banner.style.gap = '8px';
+
+        const text = document.createElement('div');
+        text.style.fontSize = '14px';
+        text.style.color = '#212529';
+        text.textContent = 'Instalar MeuFinanceiro';
+
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-sm btn-primary';
+        btn.textContent = 'Instalar';
+        btn.addEventListener('click', function() {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(function(choiceResult) {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('Usuário aceitou instalar PWA');
+                } else {
+                    console.log('Usuário recusou instalar PWA');
+                }
+                deferredPrompt = null;
+                removeBanner();
+            });
+        });
+
+        const close = document.createElement('button');
+        close.className = 'btn btn-sm btn-outline-secondary';
+        close.textContent = 'Fechar';
+        close.addEventListener('click', function() { removeBanner(); deferredPrompt = null; });
+
+        banner.appendChild(text);
+        banner.appendChild(btn);
+        banner.appendChild(close);
+        document.body.appendChild(banner);
+    }
+
+    function removeBanner() {
+        const b = document.getElementById('pwa-install-banner');
+        if (b && b.parentNode) b.parentNode.removeChild(b);
+    }
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+        // Prevent the mini-info bar from appearing on Mobile Chrome
+        e.preventDefault();
+        deferredPrompt = e;
+        // also expose globally so other UI can access it
+        window.deferredPWAInstallPrompt = e;
+        // show our custom install banner
+        if (document.readyState === 'complete') createInstallBanner();
+        else window.addEventListener('load', createInstallBanner);
+    });
+
+    window.addEventListener('appinstalled', function(evt) {
+        console.log('PWA instalado');
+        removeBanner();
+        deferredPrompt = null;
+        window.deferredPWAInstallPrompt = null;
+    });
+})();
+
+// Persistent mobile install button removed per user request.
+// The custom PWA install banner (beforeinstallprompt) remains in place.
+
+// Ensure any residual floating install button (from cached JS) is removed.
+(function(){
+    function removePwaButtonOnce() {
+        try {
+            var b = document.getElementById('pwa-install-action');
+            if (b && b.parentNode) b.parentNode.removeChild(b);
+            if (window.__pwaRemoveInterval) { clearInterval(window.__pwaRemoveInterval); window.__pwaRemoveInterval = null; }
+            if (window.__pwaRemoveTimerRef) { clearTimeout(window.__pwaRemoveTimerRef); window.__pwaRemoveTimerRef = null; }
+        } catch(e) { console.warn('Erro ao remover botão PWA residual', e); }
+    }
+
+    // Try once on DOMContentLoaded
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', removePwaButtonOnce);
+    else removePwaButtonOnce();
+
+    // Poll briefly (5s) for dynamically added buttons and remove them
+    try {
+        var __removePoll = setInterval(function(){
+            var b = document.getElementById('pwa-install-action');
+            if (!b) return;
+            removePwaButtonOnce();
+        }, 500);
+        setTimeout(function(){ try { clearInterval(__removePoll); } catch(e){} }, 5000);
+    } catch(e) { /* ignore */ }
+})();
