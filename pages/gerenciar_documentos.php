@@ -976,36 +976,4 @@ try {
                     }
                 });
                 </script>
-                <!-- Configuração de Email do Recibo (personalização rápida) -->
-                <div class="container-fluid my-3">
-                    <div class="card mb-3">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="card-title mb-0">Personalização - Email do Recibo</h5>
-                        </div>
-                        <div class="card-body">
-                            <form method="POST" action="process/crud_handler.php">
-                                <input type="hidden" name="action" value="salvar_config_documentos">
-                                <div class="mb-3">
-                                    <label class="form-label">Assunto do Email</label>
-                                    <input type="text" name="recibo_email_subject" class="form-control" value="<?php echo htmlspecialchars($doc_templates['recibo_email_subject'] ?? 'Recibo de Pagamento - Cobrança #{id}'); ?>" placeholder="Ex: Recibo de Pagamento - Cobrança #{id}">
-                                    <div class="form-text small">Use placeholders como <code>{id}</code>, <code>{empresa}</code>, <code>{cliente}</code>, <code>{valor}</code>.</div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label">Título (opcional)</label>
-                                    <input type="text" name="recibo_email_title" class="form-control" value="<?php echo htmlspecialchars($doc_templates['recibo_email_title'] ?? 'Recibo de Pagamento'); ?>" placeholder="Título exibido no corpo do email (opcional)">
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label">Mensagem padrão do Email (HTML)</label>
-                                    <textarea name="recibo_email_body" rows="5" class="form-control"><?php echo htmlspecialchars($doc_templates['recibo_email_body'] ?? '<p>Prezados,</p><p>Em anexo segue o recibo de pagamento referente à cobrança #{id}.</p><p>Atenciosamente,</p>'); ?></textarea>
-                                    <div class="form-text small">Aceita HTML e placeholders listados acima.</div>
-                                </div>
-
-                                <div class="d-grid gap-2 d-md-flex">
-                                    <button type="submit" class="btn btn-primary btn-full-mobile"><i class="bi bi-save me-2"></i> Salvar Personalização</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
+                <!-- Personalização do email de recibo removida desta tela por solicitação -->
