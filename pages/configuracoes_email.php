@@ -185,7 +185,7 @@ $smtp_password = '';
     <div class="card-header d-flex justify-content-between align-items-center">
         <h4 class="mb-0"><code>Cobrança gerada - Template de Email </code></h4>
         <div>
-            <button class="btn btn-sm btn-outline-secondary me-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_cobranca" aria-expanded="true" aria-controls="collapse_cobranca">
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_cobranca" aria-expanded="true" aria-controls="collapse_cobranca">
                 <i class="bi bi-chevron-down"></i>
             </button>
         </div>
@@ -284,44 +284,4 @@ $smtp_password = '';
 </div>
 
 <!-- Associação de Contador: templates de notificação -->
-<div class="card shadow-sm mt-3">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h4 class="mb-0"><code>Notificações - Solicitações de Associação</code></h4>
-        <div>
-            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_assoc" aria-expanded="true" aria-controls="collapse_assoc">
-                <i class="bi bi-chevron-down"></i>
-            </button>
-        </div>
-    </div>
-    <div id="collapse_assoc" class="collapse show">
-    <div class="card-body">
-        <p class="small text-muted">Mensagens enviadas ao contador quando sua solicitação de associação for aprovada ou recusada. Use placeholders: <code>{toName}</code>, <code>{id_cliente}</code>, <code>{date}</code>.</p>
-
-        <form action="process/crud_handler.php" method="POST">
-            <input type="hidden" name="action" value="salvar_templates_email">
-            <div class="mb-3">
-                <label class="form-label">Assunto — Aprovação</label>
-                <input type="text" name="assoc_approved_subject" class="form-control" value="<?php echo htmlspecialchars($settings['assoc_approved_subject'] ?? 'Solicitação de Associação Aprovada'); ?>">
-            </div>
-                <div class="mb-3">
-                <label class="form-label">Mensagem (HTML) — Aprovação</label>
-                <textarea id="assoc_approved_body" name="assoc_approved_body" rows="4" class="form-control tinymce"><?php echo htmlspecialchars($settings['assoc_approved_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi aprovada.</p><p>Atenciosamente,</p>'); ?></textarea>
-            </div>
-
-            <div class="mb-3">
-                <label class="form-label">Assunto — Recusa</label>
-                <input type="text" name="assoc_rejected_subject" class="form-control" value="<?php echo htmlspecialchars($settings['assoc_rejected_subject'] ?? 'Solicitação de Associação Recusada'); ?>">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Mensagem (HTML) — Recusa</label>
-                <textarea id="assoc_rejected_body" name="assoc_rejected_body" rows="4" class="form-control tinymce"><?php echo htmlspecialchars($settings['assoc_rejected_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi recusada pelo administrador.</p><p>Atenciosamente,</p>'); ?></textarea>
-            </div>
-
-            <div class="d-grid gap-2 d-md-flex">
-                <button type="submit" name="action" value="salvar_templates_email" class="btn btn-primary btn-full-mobile"><i class="bi bi-save me-2"></i> Salvar Notificações</button>
-            </div>
-        </form>
-    </div>
-</div>
-    </div>
-</div>
+<!-- (Seção de notificações de associação removida conforme solicitado) -->
