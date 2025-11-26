@@ -1221,10 +1221,51 @@ switch ($action) {
     
     case 'cadastrar_cliente':
          if (isAdmin() || isContador()) {
+            // Flags de preferência de envio de e-mail
+            $receber_cobrancas = isset($_POST['receber_novas_cobrancas_email']) ? 1 : 0;
+            $receber_recibos = isset($_POST['receber_recibos_email']) ? 1 : 0;
+
+            // 1) Insere cliente
             $sql = "INSERT INTO clientes (nome_responsavel, email_contato, telefone) VALUES (?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             if ($stmt->execute([$_POST['nome_responsavel'], $_POST['email_contato'], $_POST['telefone']])) {
                 $id_novo = $pdo->lastInsertId();
+
+                // 2) Garante existência da tabela simples de configuração e insere as flags
+                try {
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS tb_confg_emailCliente (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        id_client INT NOT NULL,
+                        permissao VARCHAR(100) NULL,
+                        descricao TEXT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        INDEX idx_id_client (id_client),
+                        INDEX idx_permissao (permissao)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+                    // Insert mapping rows according to checked flags (avoid duplicates by checking existence)
+                    if ($receber_cobrancas) {
+                        $chk = $pdo->prepare("SELECT 1 FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ? LIMIT 1");
+                        $chk->execute([$id_novo, 'receber_novas_cobrancas']);
+                        if (!$chk->fetchColumn()) {
+                            $ins = $pdo->prepare("INSERT INTO tb_confg_emailCliente (id_client, permissao, descricao) VALUES (?, ?, ?)");
+                            $ins->execute([$id_novo, 'receber_novas_cobrancas', 'Envia cobrança via email do cliente de forma automática']);
+                        }
+                    }
+                    if ($receber_recibos) {
+                        $chk = $pdo->prepare("SELECT 1 FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ? LIMIT 1");
+                        $chk->execute([$id_novo, 'receber_recibos']);
+                        if (!$chk->fetchColumn()) {
+                            $ins = $pdo->prepare("INSERT INTO tb_confg_emailCliente (id_client, permissao, descricao) VALUES (?, ?, ?)");
+                            $ins->execute([$id_novo, 'receber_recibos', 'Envia recibo de pagamento via email do cliente de forma automática']);
+                        }
+                    }
+                } catch (Exception $e) {
+                    // Se falhar (permissões), apenas logamos e continuamos sem bloquear a criação do cliente
+                    error_log('Falha ao criar/atualizar tb_confg_emailCliente: ' . $e->getMessage());
+                }
+
                 $_SESSION['success_message'] = "Cliente cadastrado com sucesso!";
                 logAction("Cadastro Cliente", "clientes", $id_novo, "Nome: " . $_POST['nome_responsavel']);
             } else {
@@ -1239,9 +1280,14 @@ switch ($action) {
             $nome_novo = $_POST['nome_responsavel'];
             $email_novo = $_POST['email_contato'];
             $telefone_novo = $_POST['telefone'];
+            $receber_cobrancas_novo = isset($_POST['receber_novas_cobrancas_email']) ? 1 : 0;
+            $receber_recibos_novo = isset($_POST['receber_recibos_email']) ? 1 : 0;
 
-            // 1. AUDITORIA: Busca dados antigos
-            $stmt_old = $pdo->prepare("SELECT nome_responsavel, email_contato, telefone FROM clientes WHERE id = ?");
+            // 1. AUDITORIA: Busca dados antigos do cliente e das preferências na tabela separada
+            $stmt_old = $pdo->prepare("SELECT c.nome_responsavel, c.email_contato, c.telefone,
+                (SELECT 1 FROM tb_confg_emailCliente ec WHERE ec.id_client = c.id AND ec.permissao = 'receber_novas_cobrancas' LIMIT 1) AS receber_novas_cobrancas_email,
+                (SELECT 1 FROM tb_confg_emailCliente ec2 WHERE ec2.id_client = c.id AND ec2.permissao = 'receber_recibos' LIMIT 1) AS receber_recibos_email
+                FROM clientes c WHERE c.id = ?");
             $stmt_old->execute([$id]);
             $old_data = $stmt_old->fetch(PDO::FETCH_ASSOC);
 
@@ -1256,6 +1302,12 @@ switch ($action) {
             if (($old_data['telefone'] ?? '') !== ($telefone_novo ?? '')) {
                  $detalhes_log[] = "Telefone: " . ($old_data['telefone'] ?? 'N/D') . " -> " . ($telefone_novo ?? 'N/D');
             }
+            if (intval($old_data['receber_novas_cobrancas_email'] ?? 0) !== $receber_cobrancas_novo) {
+                $detalhes_log[] = "Receber novas cobranças por email: " . intval($old_data['receber_novas_cobrancas_email'] ?? 0) . " -> " . $receber_cobrancas_novo;
+            }
+            if (intval($old_data['receber_recibos_email'] ?? 0) !== $receber_recibos_novo) {
+                $detalhes_log[] = "Receber recibos por email: " . intval($old_data['receber_recibos_email'] ?? 0) . " -> " . $receber_recibos_novo;
+            }
             
             // Se nada mudou, cancela o log e a atualização
             if (empty($detalhes_log)) {
@@ -1267,9 +1319,50 @@ switch ($action) {
 
 
             // 3. Atualiza o banco de dados
+            // Atualiza dados do cliente
             $sql = "UPDATE clientes SET nome_responsavel = ?, email_contato = ?, telefone = ? WHERE id = ?";
             $stmt = $pdo->prepare($sql);
             if ($stmt->execute([$nome_novo, $email_novo, $telefone_novo, $id])) {
+                // Upsert das preferências na tabela separada (simple mapping)
+                try {
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS tb_confg_emailCliente (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        id_client INT NOT NULL,
+                        permissao VARCHAR(100) NULL,
+                        descricao TEXT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        INDEX idx_id_client (id_client),
+                        INDEX idx_permissao (permissao)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+                    // receber_novas_cobrancas: insert/delete accordingly
+                    $chk = $pdo->prepare("SELECT 1 FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ? LIMIT 1");
+                    $chk->execute([$id, 'receber_novas_cobrancas']);
+                    $exists = (bool) $chk->fetchColumn();
+                    if ($receber_cobrancas_novo && !$exists) {
+                        $ins = $pdo->prepare("INSERT INTO tb_confg_emailCliente (id_client, permissao, descricao) VALUES (?, ?, ?)");
+                        $ins->execute([$id, 'receber_novas_cobrancas', 'Envia cobrança via email do cliente de forma automática']);
+                    } elseif (!$receber_cobrancas_novo && $exists) {
+                        $del = $pdo->prepare("DELETE FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ?");
+                        $del->execute([$id, 'receber_novas_cobrancas']);
+                    }
+
+                    // receber_recibos: insert/delete accordingly
+                    $chk2 = $pdo->prepare("SELECT 1 FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ? LIMIT 1");
+                    $chk2->execute([$id, 'receber_recibos']);
+                    $exists2 = (bool) $chk2->fetchColumn();
+                    if ($receber_recibos_novo && !$exists2) {
+                        $ins2 = $pdo->prepare("INSERT INTO tb_confg_emailCliente (id_client, permissao, descricao) VALUES (?, ?, ?)");
+                        $ins2->execute([$id, 'receber_recibos', 'Envia recibo de pagamento via email do cliente de forma automática']);
+                    } elseif (!$receber_recibos_novo && $exists2) {
+                        $del2 = $pdo->prepare("DELETE FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ?");
+                        $del2->execute([$id, 'receber_recibos']);
+                    }
+                } catch (Exception $e) {
+                    error_log('Falha ao criar/atualizar tb_confg_emailCliente (editar): ' . $e->getMessage());
+                }
+
                 $_SESSION['success_message'] = "Cliente atualizado com sucesso!";
                 logAction("Edição Cliente", "clientes", $id, $log_details_string);
             } else {
@@ -1507,10 +1600,78 @@ switch ($action) {
         $sql = "INSERT INTO cobrancas ({$company_col}, data_competencia, data_vencimento, valor, id_forma_pagamento, id_tipo_cobranca, descricao, contexto_pagamento, status_pagamento) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pendente')";
         $stmt = $pdo->prepare($sql);
-        if ($stmt->execute([$id_empresa, $data_competencia, $data_vencimento, $valor, $id_forma_pagamento, $id_tipo_cobranca, $descricao, $contexto_pagamento])) {
+                if ($stmt->execute([$id_empresa, $data_competencia, $data_vencimento, $valor, $id_forma_pagamento, $id_tipo_cobranca, $descricao, $contexto_pagamento])) {
                     $_SESSION['success_message'] = "Cobrança gerada com sucesso!";
                     $newId = $pdo->lastInsertId();
                     logAction("Gerou Cobrança", "cobrancas", $newId, "Valor: R$ $valor para empresa ID: $id_empresa");
+
+                    // Após criar a cobrança, tenta envio automático se o cliente da empresa autorizou
+                    try {
+                        // Busca empresa + cliente
+                        $stmtEmp = $pdo->prepare("SELECT emp.id_cliente, emp.razao_social, cli.nome_responsavel, cli.email_contato
+                            FROM empresas emp
+                            LEFT JOIN clientes cli ON emp.id_cliente = cli.id
+                            WHERE emp.id = ? LIMIT 1");
+                        $stmtEmp->execute([$id_empresa]);
+                        $empresa_info = $stmtEmp->fetch(PDO::FETCH_ASSOC);
+
+                        if ($empresa_info && !empty($empresa_info['id_cliente'])) {
+                            $id_cliente = $empresa_info['id_cliente'];
+
+                            // Verifica permissao na tabela de mapeamento
+                            $chk = $pdo->prepare("SELECT 1 FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ? LIMIT 1");
+                            $chk->execute([$id_cliente, 'receber_novas_cobrancas']);
+
+                            if ($chk->fetchColumn()) {
+                                // Só tenta enviar se houver email de contato
+                                $toEmail = $empresa_info['email_contato'] ?? null;
+                                $toName = $empresa_info['nome_responsavel'] ?? $empresa_info['razao_social'] ?? 'Cliente';
+
+                                if (!empty($toEmail)) {
+                                    // Resolve nomes de forma e tipo (como no envio manual)
+                                    $forma_nome = '';
+                                    if (!empty($id_forma_pagamento)) {
+                                        try {
+                                            $stmtFp = $pdo->prepare('SELECT nome FROM formas_pagamento WHERE id = ? LIMIT 1');
+                                            $stmtFp->execute([$id_forma_pagamento]);
+                                            $forma_nome = $stmtFp->fetchColumn() ?: '';
+                                        } catch (Exception $e) {
+                                            $forma_nome = '';
+                                        }
+                                    }
+                                    $tipo_nome = 'receita';
+                                    if (!empty($id_tipo_cobranca)) {
+                                        try {
+                                            $stmtTipo = $pdo->prepare('SELECT nome FROM tipos_cobranca WHERE id = ? LIMIT 1');
+                                            $stmtTipo->execute([$id_tipo_cobranca]);
+                                            $tipo_nome = $stmtTipo->fetchColumn() ?: $tipo_nome;
+                                        } catch (Exception $e) {
+                                            // mantém fallback
+                                        }
+                                    }
+
+                                    $lancamento_like = [
+                                        'id' => $newId,
+                                        'descricao' => $descricao ?? 'Cobrança',
+                                        'valor' => $valor,
+                                        'data_vencimento' => $data_vencimento,
+                                        'tipo' => $tipo_nome,
+                                        'forma_pagamento' => $forma_nome,
+                                        'contexto_pagamento' => $contexto_pagamento ?? ''
+                                    ];
+
+                                    $sentAuto = sendNotificationEmail($toEmail, $toName, $lancamento_like);
+                                    if ($sentAuto) {
+                                        logAction('Envio Automático Cobrança', 'cobrancas', $newId, 'Enviado automaticamente ao cliente id ' . $id_cliente);
+                                    } else {
+                                        logAction('Falha Envio Automático Cobrança', 'cobrancas', $newId, 'Tentativa automática ao cliente id ' . $id_cliente);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception $e) {
+                        error_log('Erro ao tentar envio automático de cobrança: ' . $e->getMessage());
+                    }
 
                     // Removida: geração automática de PNG de boleto ao criar cobrança (implementação anterior revertida)
                 } else {
@@ -1678,6 +1839,153 @@ switch ($action) {
                     if ($id_forma_pagamento !== null) $log_details .= ", Forma Pagamento ID: $id_forma_pagamento";
                     if (!empty($contexto_pagamento)) $log_details .= ", Contexto: " . substr($contexto_pagamento, 0, 200);
                     logAction("Baixa Cobrança", "cobrancas", $id, $log_details);
+                    // Tenta envio automático de recibo se o cliente estiver configurado para receber recibos
+                    try {
+                        $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+                        $stmtRec = $pdo->prepare("SELECT cob.*, emp.razao_social, emp.cnpj, emp.id_cliente AS empresa_cliente, cli.nome_responsavel, cli.email_contato, fp.nome as forma_nome, tc.nome as tipo_nome
+                            FROM cobrancas cob
+                            JOIN empresas emp ON cob.`" . $company_col . "` = emp.id
+                            LEFT JOIN clientes cli ON emp.id_cliente = cli.id
+                            LEFT JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
+                            LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id
+                            WHERE cob.id = ? LIMIT 1");
+                        $stmtRec->execute([$id]);
+                        $cobRec = $stmtRec->fetch(PDO::FETCH_ASSOC);
+                        if ($cobRec) {
+                            $id_cliente_rec = $cobRec['empresa_cliente'] ?? null;
+                            if (!empty($id_cliente_rec)) {
+                                $chkRec = $pdo->prepare("SELECT 1 FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ? LIMIT 1");
+                                $chkRec->execute([$id_cliente_rec, 'receber_recibos']);
+                                if ($chkRec->fetchColumn()) {
+                                    $toEmail = $cobRec['email_contato'] ?? null;
+                                    $toName = $cobRec['nome_responsavel'] ?? ($cobRec['razao_social'] ?? 'Cliente');
+                                    if (!empty($toEmail)) {
+                                        // Monta recibo em HTML reutilizando templates
+                                        $logo_path = __DIR__ . '/../assets/img/logo.png';
+                                        $logo_img = '';
+                                        if (file_exists($logo_path)) {
+                                            $data = base64_encode(file_get_contents($logo_path));
+                                            $logo_img = '<img src="data:image/png;base64,' . $data . '" style="max-height:80px;margin-bottom:10px;">';
+                                        }
+                                        $logo_url = file_exists($logo_path) ? 'cid:logo_cid' : base_url('assets/img/logo.png');
+
+                                        $templates = getDocumentTemplates();
+                                        $recibo_header = $templates['recibo_header'] ?? '';
+                                        $recibo_body = $templates['recibo_body'] ?? '';
+                                        $recibo_footer = $templates['recibo_footer'] ?? '';
+
+                                        $replacements = [
+                                            '{logo}' => $logo_img,
+                                            '{empresa}' => htmlspecialchars($cobRec['razao_social'] ?? ''),
+                                            '{cnpj}' => htmlspecialchars($cobRec['cnpj'] ?? ''),
+                                            '{cliente}' => htmlspecialchars($cobRec['nome_responsavel'] ?? ''),
+                                            '{cliente_email}' => htmlspecialchars($cobRec['email_contato'] ?? ''),
+                                            '{descricao}' => nl2br(htmlspecialchars($cobRec['descricao'] ?? '')),
+                                            '{logo_url}' => htmlspecialchars($logo_url ?? ''),
+                                            '{valor}' => number_format($cobRec['valor'], 2, ',', '.'),
+                                            '{data_pagamento}' => htmlspecialchars(date('d/m/Y', strtotime($cobRec['data_pagamento'] ?? date('Y-m-d')))),
+                                            '{data_vencimento}' => htmlspecialchars(date('d/m/Y', strtotime($cobRec['data_vencimento'] ?? ''))),
+                                            '{data_competencia}' => htmlspecialchars(date('d/m/Y', strtotime($cobRec['data_competencia'] ?? ''))),
+                                            '{date}' => date('d/m/Y H:i'),
+                                            '{tipo}' => htmlspecialchars($cobRec['tipo_nome'] ?? ''),
+                                            '{forma}' => htmlspecialchars($cobRec['forma_nome'] ?? ''),
+                                            '{contexto}' => nl2br(htmlspecialchars($cobRec['contexto_pagamento'] ?? ''))
+                                        ];
+
+                                        $html = '<html><head><meta charset="utf-8"><style>body{font-family: Arial, Helvetica, sans-serif; color:#222} .assinatura{margin-top:40px;display:flex;justify-content:space-between}.assinatura .box{width:45%;text-align:center;padding-top:60px;border-top:1px solid #000}</style></head><body>';
+                                        $html .= strtr($recibo_header, $replacements);
+                                        $html .= strtr($recibo_body, $replacements);
+                                        $html .= strtr($recibo_footer, $replacements);
+                                        $html .= '</body></html>';
+
+                                        // Renderiza PDF
+                                        $dompdf = new \Dompdf\Dompdf();
+                                        $dompdf->loadHtml($html);
+                                        $dompdf->setPaper('A4', 'portrait');
+                                        $dompdf->render();
+                                        $pdfString = $dompdf->output();
+
+                                        // Envio via PHPMailer
+                                        $settings = getSmtpSettings();
+                                        if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+                                            try {
+                                                $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+                                                $mail->CharSet = 'UTF-8';
+                                                $mail->Encoding = 'base64';
+                                                $mail->isSMTP();
+                                                $mail->Host = $settings['smtp_host'];
+                                                $mail->Port = intval($settings['smtp_port']);
+                                                $mail->SMTPAuth = true;
+                                                $mail->Username = $settings['smtp_username'];
+                                                $mail->Password = $settings['smtp_password'];
+
+                                                $secure = strtolower(trim($settings['smtp_secure'] ?? ''));
+                                                if ($secure === 'starttls' || $secure === 'tls') {
+                                                    $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                                                } elseif ($secure === 'ssl') {
+                                                    $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+                                                }
+
+                                                $mail->setFrom($settings['email_from'], $settings['email_from_name'] ?? 'Sistema Financeiro');
+                                                $mail->addAddress($toEmail, $toName);
+
+                                                if (file_exists($logo_path)) {
+                                                    try {
+                                                        $mail->addEmbeddedImage($logo_path, 'logo_cid', 'logo.png');
+                                                    } catch (Exception $e) {
+                                                        error_log('Falha ao embutir logo no envio automático de recibo: ' . $e->getMessage());
+                                                    }
+                                                }
+
+                                                $templatesMail = getDocumentTemplates();
+                                                $email_subject_tpl = $templatesMail['recibo_email_subject'] ?? '';
+                                                $email_body_tpl = $templatesMail['recibo_email_body'] ?? '';
+
+                                                $emailRepl = [
+                                                    '{id}' => $cobRec['id'],
+                                                    '{empresa}' => htmlspecialchars($cobRec['razao_social'] ?? ''),
+                                                    '{cnpj}' => htmlspecialchars($cobRec['cnpj'] ?? ''),
+                                                    '{cliente}' => htmlspecialchars($cobRec['nome_responsavel'] ?? ''),
+                                                    '{cliente_email}' => htmlspecialchars($cobRec['email_contato'] ?? ''),
+                                                    '{descricao}' => htmlspecialchars($cobRec['descricao'] ?? ''),
+                                                    '{logo}' => $logo_img,
+                                                    '{logo_url}' => htmlspecialchars($logo_url ?? ''),
+                                                    '{valor}' => number_format($cobRec['valor'], 2, ',', '.'),
+                                                    '{data_pagamento}' => htmlspecialchars(date('d/m/Y', strtotime($cobRec['data_pagamento'] ?? date('Y-m-d')))),
+                                                    '{data_vencimento}' => htmlspecialchars(date('d/m/Y', strtotime($cobRec['data_vencimento'] ?? ''))),
+                                                    '{date}' => date('d/m/Y H:i'),
+                                                    '{tipo}' => htmlspecialchars($cobRec['tipo_nome'] ?? ''),
+                                                    '{forma}' => htmlspecialchars($cobRec['forma_nome'] ?? ''),
+                                                    '{contexto}' => nl2br(htmlspecialchars($cobRec['contexto_pagamento'] ?? ''))
+                                                ];
+
+                                                $subject = !empty($email_subject_tpl) ? strtr($email_subject_tpl, $emailRepl) : 'Recibo de Pagamento - Cobrança #' . $cobRec['id'];
+                                                $bodyHtml = !empty($email_body_tpl) ? strtr($email_body_tpl, $emailRepl) : '<p>Prezados,</p><p>Em anexo segue o recibo de pagamento referente à cobrança #' . htmlspecialchars($cobRec['id']) . '.</p><p>Atenciosamente,</p>';
+
+                                                $mail->Subject = $subject;
+                                                $mail->isHTML(true);
+                                                $mail->Body = $bodyHtml;
+                                                $mail->addStringAttachment($pdfString, 'recibo_cobranca_' . $cobRec['id'] . '.pdf', 'base64', 'application/pdf');
+
+                                                $sent = $mail->send();
+                                                if ($sent) {
+                                                    logAction('Envio Automático Recibo', 'cobrancas', $id, 'Enviado automaticamente ao cliente id ' . $id_cliente_rec);
+                                                } else {
+                                                    logAction('Falha Envio Automático Recibo', 'cobrancas', $id, 'Tentativa automática ao cliente id ' . $id_cliente_rec);
+                                                }
+                                            } catch (Exception $e) {
+                                                error_log('Erro no PHPMailer (auto recibo): ' . $e->getMessage());
+                                            }
+                                        } else {
+                                            error_log('PHPMailer não disponível para envio automático de recibo.');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception $e) {
+                        error_log('Erro ao tentar envio automático de recibo: ' . $e->getMessage());
+                    }
                 } else {
                     $errorInfo = $stmt->errorInfo();
                     $_SESSION['error_message'] = "Erro ao dar baixa na cobrança: " . ($errorInfo[2] ?? "Erro desconhecido.");

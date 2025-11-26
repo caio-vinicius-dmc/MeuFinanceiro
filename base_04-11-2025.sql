@@ -184,6 +184,22 @@ CREATE TABLE `empresas` (
   `telefone_comercial` varchar(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+
+
+-- Estrutura para tabela `tb_confg_emailCliente`
+CREATE TABLE IF NOT EXISTS tb_confg_emailCliente (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_client INT NOT NULL,
+    permissao VARCHAR(100) NULL,
+    descricao TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_id_client (id_client),
+    INDEX idx_permissao (permissao)
+);
+
+
+
 --
 -- Despejando dados para a tabela `empresas`
 --

@@ -302,12 +302,19 @@ document.addEventListener("DOMContentLoaded", function() {
             const nome = button.getAttribute('data-nome');
             const email = button.getAttribute('data-email');
             const telefone = button.getAttribute('data-telefone');
+            const receberCobrancas = button.getAttribute('data-receber-cobrancas') === '1';
+            const receberRecibos = button.getAttribute('data-receber-recibos') === '1';
             
             const modalForm = modalEditarCliente.querySelector('form');
             modalForm.querySelector('#edit_id_cliente').value = id;
             modalForm.querySelector('#edit_nome_responsavel').value = nome;
             modalForm.querySelector('#edit_email_contato').value = email;
             modalForm.querySelector('#edit_telefone').value = telefone;
+            // Preenche checkboxes
+            const chkCobr = modalForm.querySelector('#edit_receber_novas_cobrancas_email');
+            const chkRec = modalForm.querySelector('#edit_receber_recibos_email');
+            if (chkCobr) chkCobr.checked = !!receberCobrancas;
+            if (chkRec) chkRec.checked = !!receberRecibos;
         });
     }
 

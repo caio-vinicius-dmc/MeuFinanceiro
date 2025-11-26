@@ -8,8 +8,13 @@ if (!isAdmin() && !isContador()) {
     exit;
 }
 
-// Buscar clientes existentes
-$stmt = $pdo->query("SELECT * FROM clientes ORDER BY nome_responsavel");
+// Buscar clientes existentes (inclui preferências de email se tabela de configuração existir)
+$stmt = $pdo->query(
+    "SELECT c.*, 
+        (SELECT 1 FROM tb_confg_emailCliente ec WHERE ec.id_client = c.id AND ec.permissao = 'receber_novas_cobrancas' LIMIT 1) AS receber_novas_cobrancas_email,
+        (SELECT 1 FROM tb_confg_emailCliente ec2 WHERE ec2.id_client = c.id AND ec2.permissao = 'receber_recibos' LIMIT 1) AS receber_recibos_email
+     FROM clientes c ORDER BY c.nome_responsavel"
+);
 $clientes = $stmt->fetchAll();
 
 ?>
@@ -34,6 +39,16 @@ $clientes = $stmt->fetchAll();
                     <div class="mb-3">
                         <label for="email_contato" class="form-label">Email de Contato</label>
                         <input type="email" class="form-control" id="email_contato" name="email_contato" required>
+                    </div>
+
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" value="1" id="receber_novas_cobrancas_email" name="receber_novas_cobrancas_email">
+                        <label class="form-check-label" for="receber_novas_cobrancas_email">Receber novas cobranças por email automaticamente</label>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" value="1" id="receber_recibos_email" name="receber_recibos_email">
+                        <label class="form-check-label" for="receber_recibos_email">Receber recibos de pagamento por email automaticamente</label>
                     </div>
 
                     <div class="mb-3">
@@ -79,6 +94,8 @@ $clientes = $stmt->fetchAll();
                                             data-nome="<?php echo htmlspecialchars($cliente['nome_responsavel']); ?>"
                                             data-email="<?php echo htmlspecialchars($cliente['email_contato']); ?>"
                                             data-telefone="<?php echo htmlspecialchars($cliente['telefone']); ?>"
+                                                    data-receber-cobrancas="<?php echo intval($cliente['receber_novas_cobrancas_email'] ?? 0); ?>"
+                                                    data-receber-recibos="<?php echo intval($cliente['receber_recibos_email'] ?? 0); ?>"
                                             title="Editar">
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -130,6 +147,14 @@ $clientes = $stmt->fetchAll();
                     <div class="mb-3">
                         <label for="edit_telefone" class="form-label">Telefone</label>
                         <input type="text" class="form-control" id="edit_telefone" name="telefone" placeholder="(XX) XXXXX-XXXX">
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" value="1" id="edit_receber_novas_cobrancas_email" name="receber_novas_cobrancas_email">
+                        <label class="form-check-label" for="edit_receber_novas_cobrancas_email">Receber novas cobranças por email automaticamente</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" value="1" id="edit_receber_recibos_email" name="receber_recibos_email">
+                        <label class="form-check-label" for="edit_receber_recibos_email">Receber recibos de pagamento por email automaticamente</label>
                     </div>
                 </div>
                 <div class="modal-footer">
