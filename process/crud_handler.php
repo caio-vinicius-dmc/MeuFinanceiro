@@ -336,16 +336,101 @@ switch ($action) {
                     break;
                 }
 
-                // Inserir associação
-                $ins = $pdo->prepare('INSERT INTO contador_clientes_assoc (id_usuario_contador, id_cliente) VALUES (?, ?)');
-                $ins->execute([$r['id_usuario_contador'], $r['id_cliente']]);
+                // Verifica se já existe associação (evita duplicatas)
+                $chkAssoc = $pdo->prepare('SELECT 1 FROM contador_clientes_assoc WHERE id_usuario_contador = ? AND id_cliente = ? LIMIT 1');
+                $chkAssoc->execute([$r['id_usuario_contador'], $r['id_cliente']]);
+                $assoc_exists = (bool) $chkAssoc->fetchColumn();
 
-                // Atualizar status da solicitação
-                $upd = $pdo->prepare('UPDATE contador_assoc_requests SET status = ? WHERE id = ?');
-                $upd->execute(['approved', $request_id]);
+                if ($assoc_exists) {
+                    // Marca como aprovado mesmo que já existisse, registra processed_* e notifica
+                    try {
+                        $updStmt = $pdo->prepare('UPDATE contador_assoc_requests SET status = ?, processed_by = ?, processed_at = NOW() WHERE id = ?');
+                        $updStmt->execute(['approved', $_SESSION['user_id'], $request_id]);
+                    } catch (Exception $e) {
+                        // fallback se as colunas processed_* não existirem
+                        $updStmt = $pdo->prepare('UPDATE contador_assoc_requests SET status = ? WHERE id = ?');
+                        $updStmt->execute(['approved', $request_id]);
+                    }
 
-                $_SESSION['success_message'] = 'Solicitação aprovada e associação realizada.';
-                logAction('Aprovação Associação', 'contador_assoc_requests', $request_id, 'Aprovado por: ' . $_SESSION['user_id']);
+                    $_SESSION['info_message'] = 'Associação já existe. Solicitação marcada como aprovada.';
+                    logAction('Aprovação Associação (duplicada)', 'contador_assoc_requests', $request_id, 'Aprovado por: ' . $_SESSION['user_id'] . ' (associação já existente)');
+                } else {
+                    // Inserir associação
+                    $ins = $pdo->prepare('INSERT INTO contador_clientes_assoc (id_usuario_contador, id_cliente) VALUES (?, ?)');
+                    $ins_ok = $ins->execute([$r['id_usuario_contador'], $r['id_cliente']]);
+
+                    // Atualizar status da solicitação com processed_by/at quando possível
+                    try {
+                        $upd = $pdo->prepare('UPDATE contador_assoc_requests SET status = ?, processed_by = ?, processed_at = NOW() WHERE id = ?');
+                        $upd->execute(['approved', $_SESSION['user_id'], $request_id]);
+                    } catch (Exception $e) {
+                        $upd = $pdo->prepare('UPDATE contador_assoc_requests SET status = ? WHERE id = ?');
+                        $upd->execute(['approved', $request_id]);
+                    }
+
+                    if ($ins_ok) {
+                        $_SESSION['success_message'] = 'Solicitação aprovada e associação realizada.';
+                        logAction('Aprovação Associação', 'contador_clientes_assoc', $r['id_cliente'], 'Aprovado por: ' . $_SESSION['user_id'] . ' - Contador: ' . $r['id_usuario_contador']);
+                    } else {
+                        $_SESSION['error_message'] = 'Erro ao criar associação.';
+                        logAction('Erro ao inserir associação', 'contador_clientes_assoc', $r['id_cliente'], 'Tentativa por: ' . $_SESSION['user_id']);
+                    }
+                }
+
+                // Notificar contador por email sobre o resultado (tentativa silenciosa se falhar)
+                try {
+                    $stmtU = $pdo->prepare('SELECT nome, email FROM usuarios WHERE id = ? LIMIT 1');
+                    $stmtU->execute([$r['id_usuario_contador']]);
+                    $urow = $stmtU->fetch(PDO::FETCH_ASSOC);
+                    if ($urow && !empty($urow['email'])) {
+                        $toEmail = $urow['email'];
+                        $toName = $urow['nome'] ?: 'Contador';
+
+                        $settings_email = getSmtpSettings();
+                        $subject_tpl = $settings_email['assoc_approved_subject'] ?? 'Solicitação de Associação Aprovada';
+                        $body_tpl = $settings_email['assoc_approved_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi aprovada pelo administrador.</p><p>Atenciosamente,</p>';
+
+                        // Enriquecer placeholders com informações do cliente/empresa quando possível
+                        $cliente_nome = '';
+                        $cliente_email = '';
+                        $empresa_nome = '';
+                        try {
+                            $stmtCli = $pdo->prepare('SELECT nome_responsavel, email_contato FROM clientes WHERE id = ? LIMIT 1');
+                            $stmtCli->execute([$r['id_cliente']]);
+                            $cli = $stmtCli->fetch(PDO::FETCH_ASSOC);
+                            if ($cli) {
+                                $cliente_nome = $cli['nome_responsavel'] ?? '';
+                                $cliente_email = $cli['email_contato'] ?? '';
+                            }
+                        } catch (Exception $e) {
+                            // ignore
+                        }
+                        try {
+                            $stmtEmp = $pdo->prepare('SELECT razao_social FROM empresas WHERE id_cliente = ? LIMIT 1');
+                            $stmtEmp->execute([$r['id_cliente']]);
+                            $empresa_nome = $stmtEmp->fetchColumn() ?: '';
+                        } catch (Exception $e) {
+                            // ignore
+                        }
+
+                        $placeholders = [
+                            '{toName}' => htmlspecialchars($toName),
+                            '{id_cliente}' => intval($r['id_cliente']),
+                            '{cliente_nome}' => htmlspecialchars($cliente_nome),
+                            '{cliente_email}' => htmlspecialchars($cliente_email),
+                            '{empresa}' => htmlspecialchars($empresa_nome),
+                            '{date}' => date('d/m/Y H:i')
+                        ];
+
+                        $subject_filled = str_replace(array_keys($placeholders), array_values($placeholders), $subject_tpl);
+                        $body_filled = str_replace(array_keys($placeholders), array_values($placeholders), $body_tpl);
+
+                        $sentNotify = sendDocumentNotification($toEmail, $toName, $subject_filled, $body_filled);
+                        logAction('Notificação Associação Enviada', 'usuarios', $r['id_usuario_contador'], 'Enviado para: ' . $toEmail . ' - Sucesso: ' . ($sentNotify ? '1' : '0'));
+                    }
+                } catch (Exception $e) {
+                    error_log('Falha ao enviar notificação de aprovação: ' . $e->getMessage());
+                }
             } catch (Exception $e) {
                 error_log('Erro ao aprovar solicitação: ' . $e->getMessage());
                 $_SESSION['error_message'] = 'Erro ao aprovar solicitação.';
@@ -375,10 +460,72 @@ switch ($action) {
                     break;
                 }
 
-                $upd = $pdo->prepare('UPDATE contador_assoc_requests SET status = ? WHERE id = ?');
-                $upd->execute(['rejected', $request_id]);
+                // Atualizar status e registrar processed_by/processed_at quando possível
+                try {
+                    $upd = $pdo->prepare('UPDATE contador_assoc_requests SET status = ?, processed_by = ?, processed_at = NOW() WHERE id = ?');
+                    $upd->execute(['rejected', $_SESSION['user_id'], $request_id]);
+                } catch (Exception $e) {
+                    $upd = $pdo->prepare('UPDATE contador_assoc_requests SET status = ? WHERE id = ?');
+                    $upd->execute(['rejected', $request_id]);
+                }
+
                 $_SESSION['success_message'] = 'Solicitação recusada.';
                 logAction('Recusa Associação', 'contador_assoc_requests', $request_id, 'Recusado por: ' . $_SESSION['user_id']);
+
+                // Notificar contador por email sobre a recusa
+                try {
+                    $stmtU = $pdo->prepare('SELECT nome, email FROM usuarios WHERE id = ? LIMIT 1');
+                    $stmtU->execute([$r['id_usuario_contador']]);
+                    $urow = $stmtU->fetch(PDO::FETCH_ASSOC);
+                    if ($urow && !empty($urow['email'])) {
+                        $toEmail = $urow['email'];
+                        $toName = $urow['nome'] ?: 'Contador';
+
+                        $settings_email = getSmtpSettings();
+                        $subject_tpl = $settings_email['assoc_rejected_subject'] ?? 'Solicitação de Associação Recusada';
+                        $body_tpl = $settings_email['assoc_rejected_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi recusada pelo administrador.</p><p>Atenciosamente,</p>';
+
+                        // Enriquecer placeholders com informações do cliente/empresa quando possível
+                        $cliente_nome = '';
+                        $cliente_email = '';
+                        $empresa_nome = '';
+                        try {
+                            $stmtCli = $pdo->prepare('SELECT nome_responsavel, email_contato FROM clientes WHERE id = ? LIMIT 1');
+                            $stmtCli->execute([$r['id_cliente']]);
+                            $cli = $stmtCli->fetch(PDO::FETCH_ASSOC);
+                            if ($cli) {
+                                $cliente_nome = $cli['nome_responsavel'] ?? '';
+                                $cliente_email = $cli['email_contato'] ?? '';
+                            }
+                        } catch (Exception $e) {
+                            // ignore
+                        }
+                        try {
+                            $stmtEmp = $pdo->prepare('SELECT razao_social FROM empresas WHERE id_cliente = ? LIMIT 1');
+                            $stmtEmp->execute([$r['id_cliente']]);
+                            $empresa_nome = $stmtEmp->fetchColumn() ?: '';
+                        } catch (Exception $e) {
+                            // ignore
+                        }
+
+                        $placeholders = [
+                            '{toName}' => htmlspecialchars($toName),
+                            '{id_cliente}' => intval($r['id_cliente']),
+                            '{cliente_nome}' => htmlspecialchars($cliente_nome),
+                            '{cliente_email}' => htmlspecialchars($cliente_email),
+                            '{empresa}' => htmlspecialchars($empresa_nome),
+                            '{date}' => date('d/m/Y H:i')
+                        ];
+
+                        $subject_filled = str_replace(array_keys($placeholders), array_values($placeholders), $subject_tpl);
+                        $body_filled = str_replace(array_keys($placeholders), array_values($placeholders), $body_tpl);
+
+                        $sentNotify = sendDocumentNotification($toEmail, $toName, $subject_filled, $body_filled);
+                        logAction('Notificação Recusa Associação Enviada', 'usuarios', $r['id_usuario_contador'], 'Enviado para: ' . $toEmail . ' - Sucesso: ' . ($sentNotify ? '1' : '0'));
+                    }
+                } catch (Exception $e) {
+                    error_log('Falha ao enviar notificação de recusa: ' . $e->getMessage());
+                }
             } catch (Exception $e) {
                 error_log('Erro ao recusar solicitação: ' . $e->getMessage());
                 $_SESSION['error_message'] = 'Erro ao recusar solicitação.';
@@ -480,7 +627,9 @@ switch ($action) {
                 // Recibo
                 'recibo_email_subject', 'recibo_email_title', 'recibo_email_body',
                 // Corpo customizável do lançamento
-                'lancamento_email_body', 'lancamento_email_title'
+                'lancamento_email_body', 'lancamento_email_title',
+                // Associações: templates de notificação para aprovacao/recusa
+                'assoc_approved_subject', 'assoc_approved_body', 'assoc_rejected_subject', 'assoc_rejected_body'
             ];
 
             foreach ($template_keys as $k) {

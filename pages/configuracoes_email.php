@@ -91,6 +91,22 @@ $smtp_password = '';
     </div>
     </div>
 </div>
+    <!-- Inicializar WYSIWYG (TinyMCE via CDN) -->
+    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof tinymce !== 'undefined') {
+            tinymce.init({
+                selector: 'textarea.tinymce',
+                height: 250,
+                menubar: false,
+                plugins: ['link', 'lists', 'paste', 'autoresize'],
+                toolbar: 'undo redo | bold italic underline | bullist numlist | link',
+                content_style: 'body { font-family: Arial,Helvetica,sans-serif; font-size:14px }'
+            });
+        }
+    });
+    </script>
 
 <!-- Card separado: Modelos de Template (assunto/intro/closing) -->
 <div class="card shadow-sm mt-3">
@@ -124,9 +140,9 @@ $smtp_password = '';
 
             <!-- Assunto removido: o assunto será definido pelo sistema ou por outro fluxo -->
 
-            <div class="mb-3">
+                <div class="mb-3">
                 <label for="lancamento_email_body" class="form-label">Mensagem do Email (HTML)</label>
-                <textarea class="form-control" id="lancamento_email_body" name="lancamento_email_body" rows="8"><?php echo htmlspecialchars($settings['lancamento_email_body'] ?? "<p>{logo}</p><p>{salutation}</p><p>{email_intro}</p>{lancamento_table}<p>{email_closing}</p>"); ?></textarea>
+                <textarea class="form-control tinymce" id="lancamento_email_body" name="lancamento_email_body" rows="8"><?php echo htmlspecialchars($settings['lancamento_email_body'] ?? "<p>{logo}</p><p>{salutation}</p><p>{email_intro}</p>{lancamento_table}<p>{email_closing}</p>"); ?></textarea>
                 <div class="form-text small">Aceita HTML. Use placeholders: <code>{toName}</code>, <code>{descricao}</code>, <code>{valor}</code>, <code>{data_vencimento}</code>, <code>{tipo}</code>, <code>{forma}</code>, <code>{contexto}</code>, <code>{logo}</code>, <code>{logo_url}</code>, <code>{lancamento_table}</code>.
                 <br>Observação: o campo "Nome do Remetente" foi removido da interface; se precisar inserir o nome do destinatário utilize <code>{toName}</code> no template.</div>
             </div>
@@ -169,9 +185,9 @@ $smtp_password = '';
                 <input type="text" name="recibo_email_title" class="form-control" value="<?php echo htmlspecialchars($settings['recibo_email_title'] ?? 'Recibo de Pagamento'); ?>" placeholder="Título exibido no corpo do email (opcional)">
             </div>
 
-            <div class="mb-3">
+                <div class="mb-3">
                 <label class="form-label">Mensagem do Email (HTML)</label>
-                <textarea name="recibo_email_body" rows="6" class="form-control"><?php echo htmlspecialchars($settings['recibo_email_body'] ?? '<p>Prezados,</p><p>Em anexo segue o recibo de pagamento referente à cobrança #{id}.</p><p>Atenciosamente,</p>'); ?></textarea>
+                <textarea name="recibo_email_body" rows="6" class="form-control tinymce"><?php echo htmlspecialchars($settings['recibo_email_body'] ?? '<p>Prezados,</p><p>Em anexo segue o recibo de pagamento referente à cobrança #{id}.</p><p>Atenciosamente,</p>'); ?></textarea>
                 <div class="form-text small">Aceita HTML. Exemplos de uso: <code>&lt;p&gt;Prezados, &lt;/p&gt;&lt;p&gt;Em anexo... Cobrança #{id} - R$ {valor}&lt;/p&gt;</code></div>
             </div>
 
@@ -192,5 +208,48 @@ $smtp_password = '';
                 <button type="submit" name="action" value="salvar_templates_email" class="btn btn-primary btn-full-mobile"><i class="bi bi-save me-2"></i> Salvar Template do Recibo</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Associação de Contador: templates de notificação -->
+<div class="card shadow-sm mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4 class="mb-0"><code>Notificações - Solicitações de Associação</code></h4>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_assoc" aria-expanded="true" aria-controls="collapse_assoc">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+    </div>
+    <div id="collapse_assoc" class="collapse show">
+    <div class="card-body">
+        <p class="small text-muted">Mensagens enviadas ao contador quando sua solicitação de associação for aprovada ou recusada. Use placeholders: <code>{toName}</code>, <code>{id_cliente}</code>, <code>{date}</code>.</p>
+
+        <form action="process/crud_handler.php" method="POST">
+            <input type="hidden" name="action" value="salvar_templates_email">
+            <div class="mb-3">
+                <label class="form-label">Assunto — Aprovação</label>
+                <input type="text" name="assoc_approved_subject" class="form-control" value="<?php echo htmlspecialchars($settings['assoc_approved_subject'] ?? 'Solicitação de Associação Aprovada'); ?>">
+            </div>
+                <div class="mb-3">
+                <label class="form-label">Mensagem (HTML) — Aprovação</label>
+                <textarea name="assoc_approved_body" rows="4" class="form-control tinymce"><?php echo htmlspecialchars($settings['assoc_approved_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi aprovada.</p><p>Atenciosamente,</p>'); ?></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Assunto — Recusa</label>
+                <input type="text" name="assoc_rejected_subject" class="form-control" value="<?php echo htmlspecialchars($settings['assoc_rejected_subject'] ?? 'Solicitação de Associação Recusada'); ?>">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Mensagem (HTML) — Recusa</label>
+                <textarea name="assoc_rejected_body" rows="4" class="form-control tinymce"><?php echo htmlspecialchars($settings['assoc_rejected_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi recusada pelo administrador.</p><p>Atenciosamente,</p>'); ?></textarea>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex">
+                <button type="submit" name="action" value="salvar_templates_email" class="btn btn-primary btn-full-mobile"><i class="bi bi-save me-2"></i> Salvar Notificações</button>
+            </div>
+        </form>
+    </div>
+</div>
     </div>
 </div>
