@@ -152,6 +152,84 @@ switch ($action) {
             exit;
             break;
 
+    case 'salvar_preferencias_cliente':
+        // Permite que o cliente ajuste suas preferências de envio automático de emails
+        if (!isClient()) {
+            $_SESSION['error_message'] = 'Ação não permitida.';
+            header('Location: ' . base_url('index.php?page=meu_perfil'));
+            exit;
+        }
+        $id_cliente = $_SESSION['id_cliente_associado'] ?? null;
+        if (empty($id_cliente)) {
+            $_SESSION['error_message'] = 'Cliente associado não encontrado.';
+            header('Location: ' . base_url('index.php?page=meu_perfil'));
+            exit;
+        }
+
+        $receber_cobrancas = isset($_POST['receber_novas_cobrancas']) ? 1 : 0;
+        $receber_recibos = isset($_POST['receber_recibos']) ? 1 : 0;
+
+        // Validação adicional: garantir que o cliente tenha email de contato antes de permitir ativar preferências
+        try {
+            $stmtCliEmail = $pdo->prepare('SELECT email_contato FROM clientes WHERE id = ? LIMIT 1');
+            $stmtCliEmail->execute([$id_cliente]);
+            $cliRow = $stmtCliEmail->fetch(PDO::FETCH_ASSOC);
+            $cliente_email = trim($cliRow['email_contato'] ?? '');
+            if (empty($cliente_email) && ($receber_cobrancas || $receber_recibos)) {
+                $_SESSION['error_message'] = 'Não é possível ativar notificações: o cliente não possui email de contato cadastrado.';
+                header('Location: ' . base_url('index.php?page=meu_perfil'));
+                exit;
+            }
+        } catch (Exception $e) {
+            // se falhar a leitura do email, bloqueia alterações por segurança
+            if ($receber_cobrancas || $receber_recibos) {
+                $_SESSION['error_message'] = 'Erro ao verificar email do cliente. Tente novamente mais tarde.';
+                header('Location: ' . base_url('index.php?page=meu_perfil'));
+                exit;
+            }
+        }
+
+        try {
+            $pdo->beginTransaction();
+
+            // cobranças
+            if ($receber_cobrancas) {
+                $chk = $pdo->prepare("SELECT 1 FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ? LIMIT 1");
+                $chk->execute([$id_cliente, 'receber_novas_cobrancas']);
+                if (!$chk->fetchColumn()) {
+                    $ins = $pdo->prepare("INSERT INTO tb_confg_emailCliente (id_client, permissao, descricao) VALUES (?, ?, ?)");
+                    $ins->execute([$id_cliente, 'receber_novas_cobrancas', 'Envia cobrança via email do cliente de forma automática']);
+                }
+            } else {
+                $del = $pdo->prepare("DELETE FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ?");
+                $del->execute([$id_cliente, 'receber_novas_cobrancas']);
+            }
+
+            // recibos
+            if ($receber_recibos) {
+                $chk2 = $pdo->prepare("SELECT 1 FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ? LIMIT 1");
+                $chk2->execute([$id_cliente, 'receber_recibos']);
+                if (!$chk2->fetchColumn()) {
+                    $ins2 = $pdo->prepare("INSERT INTO tb_confg_emailCliente (id_client, permissao, descricao) VALUES (?, ?, ?)");
+                    $ins2->execute([$id_cliente, 'receber_recibos', 'Envia recibo de pagamento via email do cliente de forma automática']);
+                }
+            } else {
+                $del2 = $pdo->prepare("DELETE FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ?");
+                $del2->execute([$id_cliente, 'receber_recibos']);
+            }
+
+            $pdo->commit();
+            $_SESSION['success_message'] = 'Preferências salvas com sucesso.';
+            logAction('Atualizou Preferências Email', 'clientes', $id_cliente, 'Preferências de envio de emails atualizadas pelo cliente.');
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $_SESSION['error_message'] = 'Erro ao salvar preferências: ' . $e->getMessage();
+            error_log('Erro ao salvar preferencias cliente: ' . $e->getMessage());
+        }
+        header('Location: ' . base_url('index.php?page=meu_perfil'));
+        exit;
+        break;
+
     case 'salvar_config_smtp':
         // Salva as configurações SMTP no banco (tabela system_settings)
         if (!isAdmin()) {

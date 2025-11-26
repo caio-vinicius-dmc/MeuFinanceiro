@@ -114,3 +114,54 @@ if (isClient()) {
     </div>
 </div>
 <?php endif; ?>
+<?php // Preferências de Notificação por Email para clientes ?>
+<?php if (isClient()): ?>
+    <?php
+        $id_cliente_logado = $_SESSION['id_cliente_associado'] ?? null;
+        $pref_cobrancas = 0;
+        $pref_recibos = 0;
+        $cliente_email = '';
+        if ($id_cliente_logado) {
+            try {
+                // lê email do cliente para decidir se as opções devem ser habilitadas
+                $stmtCli = $pdo->prepare("SELECT email_contato FROM clientes WHERE id = ? LIMIT 1");
+                $stmtCli->execute([$id_cliente_logado]);
+                $cliente_row = $stmtCli->fetch(PDO::FETCH_ASSOC);
+                $cliente_email = trim($cliente_row['email_contato'] ?? '');
+
+                $chk = $pdo->prepare("SELECT 1 FROM tb_confg_emailCliente WHERE id_client = ? AND permissao = ? LIMIT 1");
+                $chk->execute([$id_cliente_logado, 'receber_novas_cobrancas']);
+                $pref_cobrancas = $chk->fetchColumn() ? 1 : 0;
+                $chk->execute([$id_cliente_logado, 'receber_recibos']);
+                $pref_recibos = $chk->fetchColumn() ? 1 : 0;
+            } catch (Exception $e) {
+                // se a tabela não existir ou erro, mantém defaults em 0
+                error_log('Erro ao ler preferências de email do cliente: ' . $e->getMessage());
+            }
+        }
+        $disabled_attr = empty($cliente_email) ? 'disabled' : '';
+    ?>
+    <div class="card mt-4">
+        <div class="card-header">
+            <i class="bi bi-envelope-fill me-2"></i> Preferências de Notificação por Email
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Marque as opções de e-mail que deseja receber automaticamente.</p>
+            <form method="POST" action="process/crud_handler.php">
+                <input type="hidden" name="action" value="salvar_preferencias_cliente">
+                <?php if (empty($cliente_email)): ?>
+                    <div class="alert alert-warning">Seu cliente não tem um <strong>email de contato</strong> cadastrado. Para receber notificações por email, peça para seu administrador/contador cadastrar um email de contato na ficha do cliente.</div>
+                <?php endif; ?>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" value="1" id="pref_receber_cobrancas" name="receber_novas_cobrancas" <?php echo $pref_cobrancas ? 'checked' : ''; ?> <?php echo $disabled_attr; ?> />
+                    <label class="form-check-label" for="pref_receber_cobrancas">Receber novas cobranças por email automaticamente</label>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" value="1" id="pref_receber_recibos" name="receber_recibos" <?php echo $pref_recibos ? 'checked' : ''; ?> <?php echo $disabled_attr; ?> />
+                    <label class="form-check-label" for="pref_receber_recibos">Receber recibos de pagamento por email automaticamente</label>
+                </div>
+                <button type="submit" class="btn btn-primary">Salvar Preferências</button>
+            </form>
+        </div>
+    </div>
+<?php endif; ?>
