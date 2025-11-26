@@ -477,16 +477,7 @@ endif;
     </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-    try {
-        var el = document.getElementById('filtersCollapseLancamentos');
-        if (el && window.innerWidth < 768) {
-            el.classList.add('show');
-        }
-    } catch(e) { console.warn(e); }
-});
-</script>
+
 <!-- Filtros ativos (pills) -->
 <?php
 $activeFilters = [];

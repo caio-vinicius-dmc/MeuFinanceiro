@@ -436,22 +436,24 @@ if (isClient()) {
 
         <!-- Filtros ativos (cliente) -->
         <?php
-        $activeFilters = [];
-        if (!empty($filtro_tipo_data)) $activeFilters[] = 'Tipo Data: ' . htmlspecialchars($filtro_tipo_data);
-        if (!empty($filtro_data_inicio) || !empty($filtro_data_fim)) $activeFilters[] = 'Vencimento: ' . htmlspecialchars($filtro_data_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_data_fim ?? '-');
-        if (!empty($filtro_empresa_id)) $activeFilters[] = 'Empresa: ' . htmlspecialchars(array_column($empresas_cliente, 'razao_social', 'id')[$filtro_empresa_id] ?? $filtro_empresa_id);
-        if (!empty($filtro_pag_inicio) || !empty($filtro_pag_fim)) $activeFilters[] = 'Pagamento: ' . htmlspecialchars($filtro_pag_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_pag_fim ?? '-');
-        if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFilters[] = 'Mês de competência: ' . htmlspecialchars(_fmt_comp_cob($filtro_comp_inicio) ?? '-') . ' → ' . htmlspecialchars(_fmt_comp_cob($filtro_comp_fim) ?? '-');
-        if (!empty($filtro_forma_pag)) $activeFilters[] = 'Forma: ' . htmlspecialchars(array_column($formas_pagamento, 'nome', 'id')[$filtro_forma_pag] ?? $filtro_forma_pag);
-        if (!empty($activeFilters)): ?>
-            <div class="mb-3">
-                <?php foreach ($activeFilters as $f): ?>
-                    <span class="badge bg-secondary me-1"><?php echo $f; ?></span>
-                <?php endforeach; ?>
-            </div>
+            $activeFilters = [];
+            if (!empty($filtro_tipo_data)) $activeFilters[] = 'Tipo Data: ' . htmlspecialchars($filtro_tipo_data);
+            if (!empty($filtro_data_inicio) || !empty($filtro_data_fim)) $activeFilters[] = 'Vencimento: ' . htmlspecialchars($filtro_data_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_data_fim ?? '-');
+            if (!empty($filtro_empresa_id)) $activeFilters[] = 'Empresa: ' . htmlspecialchars(array_column($empresas_cliente, 'razao_social', 'id')[$filtro_empresa_id] ?? $filtro_empresa_id);
+            if (!empty($filtro_pag_inicio) || !empty($filtro_pag_fim)) $activeFilters[] = 'Pagamento: ' . htmlspecialchars($filtro_pag_inicio ?? '-') . ' → ' . htmlspecialchars($filtro_pag_fim ?? '-');
+            if (!empty($filtro_comp_inicio) || !empty($filtro_comp_fim)) $activeFilters[] = 'Mês de competência: ' . htmlspecialchars(_fmt_comp_cob($filtro_comp_inicio) ?? '-') . ' → ' . htmlspecialchars(_fmt_comp_cob($filtro_comp_fim) ?? '-');
+            if (!empty($filtro_forma_pag)) $activeFilters[] = 'Forma: ' . htmlspecialchars(array_column($formas_pagamento, 'nome', 'id')[$filtro_forma_pag] ?? $filtro_forma_pag);
+            if (!empty($activeFilters)): ?>
+                <div class="mb-3">
+                    <?php foreach ($activeFilters as $f): ?>
+                        <span class="badge bg-secondary me-1"><?php echo $f; ?></span>
+                    <?php endforeach; ?>
+                </div>
         <?php endif; ?>
+        
 
-        <div class="card shadow-sm">
+
+    <div class="card shadow-sm mt-4">
             <div class="card-body">
                 <div class="row gy-4">
             <?php if (empty($cobrancas)): ?>
@@ -731,10 +733,9 @@ if (isClient()) {
                 </form>
             </div>
         </div>
-
-        
-        
-        <div class="card shadow-sm">
+        </div>
+                                
+        <div class="card shadow-sm mt-4">
             <div class="card-header">
                 <h5 class="card-title mb-0">Histórico de Cobranças</h5>
             </div>

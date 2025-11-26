@@ -616,15 +616,9 @@ $status_chart_json = json_encode([
         </form>
     </div>
 </div>
+</div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-    try {
-        var el = document.getElementById('filtersCollapseDashboard');
-        if (el && window.innerWidth < 768) el.classList.add('show');
-    } catch(e){ console.warn(e); }
-});
-</script>
+ 
 
 <?php if (hasLancamentosAccess()): ?>
 <section id="dashboard-lancamentos-section" class="dashboard-section dashboard-section-lancamentos collapsed">
@@ -658,7 +652,7 @@ document.addEventListener('DOMContentLoaded', function(){
         }
     ?>
     <div class="section-body" style="height:0px;">
-    <div class="card mb-4">
+    <div class="card shadow-sm mt-4">
         <div class="card-body">
             <div class="row g-4 mb-4">
     <div class="col-md-6 col-lg-3" data-bs-toggle="tooltip" data-bs-placement="top" title="Soma total das receitas com data de vencimento no período, que ainda não foram pagas.">
