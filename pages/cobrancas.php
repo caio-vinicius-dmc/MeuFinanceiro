@@ -816,6 +816,21 @@ if (isClient()) {
                                                 <a href="process/crud_handler.php?action=enviar_cobranca_email&id=<?php echo $cobranca['id']; ?>" class="btn btn-sm btn-outline-primary" title="Enviar por Email" onclick="return confirm('Enviar cobrança por email para o contato cadastrado?');">
                                                     <i class="bi bi-envelope-fill"></i>
                                                 </a>
+
+                                                <?php
+                                                // Para Admin/Contador: quando a cobrança estiver Paga ou Confirmada, exibe opções de Recibo
+                                                $status_norm = strtolower(trim((string)$status_pagamento));
+                                                if (isAdmin() || isContador()) {
+                                                    if (in_array($status_norm, ['pago', 'confirmado_cliente', 'confirmado'])): ?>
+                                                        <a href="process/crud_handler.php?action=recibo_pagamento&id=<?php echo $cobranca['id']; ?>" target="_blank" class="btn btn-sm btn-outline-secondary" title="Ver Recibo de Pagamento">
+                                                            <i class="bi bi-receipt"></i>
+                                                        </a>
+                                                        <a href="process/crud_handler.php?action=enviar_recibo_pagamento&id=<?php echo $cobranca['id']; ?>" class="btn btn-sm btn-primary" title="Enviar Recibo por Email" onclick="return confirm('Enviar recibo de pagamento por email para o contato cadastrado?');">
+                                                            <i class="bi bi-envelope-paper"></i>
+                                                        </a>
+                                                    <?php endif;
+                                                }
+                                                ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

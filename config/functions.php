@@ -121,7 +121,17 @@ function getSmtpSettings() {
         'email_from_name' => 'DMC - Sistema Financeiro',
         'email_salutation' => 'Prezado(a) {toName},',
         'email_intro' => 'Informamos que um novo lançamento financeiro foi disponibilizado para sua empresa. Por favor, acesse o portal para visualizar os detalhes e a situação de pagamento.',
-        'email_closing' => "Atenciosamente,\nEquipe Financeira"
+        'email_closing' => "Atenciosamente,\nEquipe Financeira",
+        // Recibo de Pagamento - templates de email (personalização)
+        'recibo_email_subject' => 'Recibo de Pagamento - Cobrança #{id}',
+        'recibo_email_title' => 'Recibo de Pagamento',
+        'recibo_email_body' => '<p>Prezados,</p><p>Em anexo segue o recibo de pagamento referente à cobrança #{id}.</p><p>Atenciosamente,</p>'
+        ,
+        // Template customizável do corpo do email de lançamento (HTML)
+        'lancamento_email_body' => "<p>{logo}</p><p>{salutation}</p><p>{email_intro}</p>{lancamento_table}<p>{email_closing}</p>"
+        ,
+        // Título opcional para email de lançamento
+        'lancamento_email_title' => ''
     ];
 
     try {
@@ -311,49 +321,88 @@ function sendNotificationEmail($toEmail, $toName, $lancamento) {
 
     // Monta assunto a partir do template configurado (substitui placeholders)
     $subject_template = $settings['email_subject_template'] ?? "Novo Lançamento Financeiro Disponível: R$ {valor}";
+    // valores de placeholder com escaping onde apropriado
     $placeholders = [
-        '{toName}' => $toName,
-        '{descricao}' => $lancamento['descricao'] ?? '',
+        '{id}' => htmlspecialchars($lancamento['id'] ?? ''),
+        '{toName}' => htmlspecialchars($toName),
+        '{descricao}' => htmlspecialchars($lancamento['descricao'] ?? ''),
         '{valor}' => $valor,
         '{data_vencimento}' => $data_vencimento,
-        '{tipo}' => $tipo
+        '{tipo}' => htmlspecialchars($tipo)
     ];
     $subject = str_replace(array_keys($placeholders), array_values($placeholders), $subject_template);
 
     // Determina origem do logo: prefere embutir arquivo local (CID), senão usa URL pública
     $logo_path_fs = __DIR__ . '/../assets/img/logo.png';
     $logo_src = file_exists($logo_path_fs) ? 'cid:logo_cid' : base_url('assets/img/logo.png');
+    // HTML do logo que pode ser usado como placeholder {logo}
+    $logo_html = '<img src="' . $logo_src . '" alt="Logo" style="max-height:80px;margin-bottom:10px;">';
     // Saudação / intro / closing configuráveis
     $salutation_template = $settings['email_salutation'] ?? 'Prezado(a) {toName},';
     $email_intro = $settings['email_intro'] ?? 'Informamos que um novo lançamento financeiro foi disponibilizado para sua empresa. Por favor, acesse o portal para visualizar os detalhes e a situação de pagamento.';
     $email_closing = $settings['email_closing'] ?? "Atenciosamente,\nEquipe Financeira";
 
+    // Adiciona {logo} aos placeholders para permitir seu uso nos templates
+    $placeholders['{logo}'] = $logo_html;
+    // Adiciona {logo_url} que pode ser usada em atributos src (retorna cid:logo_cid ou URL pública)
+    $placeholders['{logo_url}'] = $logo_src;
+
+    // Preparar a tabela resumida do lançamento (para uso em templates customizados)
+    $lancamento_table = "<table style='border: 1px solid #ccc; border-collapse: collapse; width: 100%; font-family: Arial, sans-serif;'>"
+        . "<tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0; width: 30%;'>Descrição</td><td style='padding: 8px; border: 1px solid #ccc;'>{$lancamento['descricao']}</td></tr>"
+        . "<tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Valor</td><td style='padding: 8px; border: 1px solid #ccc;'><b>R$ {$valor}</b></td></tr>"
+        . "<tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Data de vencimento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$data_vencimento}</td></tr>"
+        . "<tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Tipo da cobrança</td><td style='padding: 8px; border: 1px solid #ccc;'>{$tipo}</td></tr>"
+        . "<tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Forma de Pagamento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$forma_pagamento}</td></tr>"
+        . "<tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Contexto do Pagamento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$contexto_pagamento}</td></tr>"
+        . "</table>";
+
+    $placeholders['{lancamento_table}'] = $lancamento_table;
+
+    // Também expõe versões sem HTML (caso o template queira apenas texto simples)
+    $placeholders['{descricao}'] = htmlspecialchars($lancamento['descricao']);
+    $placeholders['{valor}'] = $valor;
+    $placeholders['{data_vencimento}'] = $data_vencimento;
+    $placeholders['{tipo}'] = htmlspecialchars($tipo);
+    $placeholders['{forma}'] = htmlspecialchars($forma_pagamento);
+    $placeholders['{contexto}'] = htmlspecialchars($contexto_pagamento);
+
     $salutation = str_replace(array_keys($placeholders), array_values($placeholders), $salutation_template);
 
-    $body = "
-        <p>" . nl2br(htmlspecialchars($salutation)) . "</p>
-        <p>" . nl2br(htmlspecialchars($email_intro)) . "</p>
-        <table style='border: 1px solid #ccc; border-collapse: collapse; width: 100%; font-family: Arial, sans-serif;'>
-            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0; width: 30%;'>Descrição</td><td style='padding: 8px; border: 1px solid #ccc;'>{$lancamento['descricao']}</td></tr>
-            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Valor</td><td style='padding: 8px; border: 1px solid #ccc;'><b>R$ {$valor}</b></td></tr>
-            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Data de vencimento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$data_vencimento}</td></tr>
-            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Tipo da cobrança</td><td style='padding: 8px; border: 1px solid #ccc;'>{$tipo}</td></tr>
-            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Forma de Pagamento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$forma_pagamento}</td></tr>
-            <tr><td style='padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0;'>Contexto do Pagamento</td><td style='padding: 8px; border: 1px solid #ccc;'>{$contexto_pagamento}</td></tr>
-        </table>
+    // Preenche intro/closing com placeholders já escapados; permitimos HTML do {logo} embutido
+    $email_intro_filled = str_replace(array_keys($placeholders), array_values($placeholders), $email_intro);
+    $email_closing_filled = str_replace(array_keys($placeholders), array_values($placeholders), $email_closing);
+
+    // Se o usuário customizou um template HTML para o corpo do email de lançamento, usa-o
+    $body = "";
+    $custom_body_tpl = $settings['lancamento_email_body'] ?? null;
+    if (!empty($custom_body_tpl)) {
+        // Garante que placeholders básicos estejam presentes no array
+        $placeholders['{salutation}'] = nl2br($salutation);
+        $placeholders['{email_intro}'] = nl2br($email_intro_filled);
+        $placeholders['{email_closing}'] = nl2br($email_closing_filled);
+        // Substitui
+        $body = str_replace(array_keys($placeholders), array_values($placeholders), $custom_body_tpl);
+    } else {
+        // comportamento antigo (padrão)
+        $body = "
+        <p>" . nl2br($salutation) . "</p>
+        <p>" . nl2br($email_intro_filled) . "</p>
+        " . $lancamento_table . "
 
         <br>
 
         <table style='width: 100%; font-family: Arial, sans-serif;'>
-            <tr>
-                <td style='width: 10%;'><img src='{$logo_src}' alt='Logo' style='width:100px; height: 100px;'></td>
+                <tr>
+                <td style='width: 10%;'>{$logo_html}</td>
                 <td>
-                    <p>" . nl2br(htmlspecialchars($email_closing)) . "</p>
+                    <p>" . nl2br($email_closing_filled) . "</p>
                 </td>
             </tr>
         </table>
 
     ";
+    }
     
     // --- Lógica de Envio usando PHPMailer (recomendada) ---
     $mail_success = false;

@@ -86,6 +86,7 @@ switch ($action) {
                 }
 
                 $lancamento_like = [
+                    'id' => $cob['id'],
                     'descricao' => $cob['descricao'] ?? 'Cobrança',
                     'valor' => $cob['valor'],
                     'data_vencimento' => $cob['data_vencimento'],
@@ -190,12 +191,19 @@ switch ($action) {
             $upsert('smtp_secure', $smtp_secure);
             $upsert('email_from', $email_from);
             $upsert('smtp_username', $smtp_username);
-            // Campos de template e remetente
-            $upsert('email_subject_template', trim($_POST['email_subject_template'] ?? ''));
-            $upsert('email_from_name', trim($_POST['email_from_name'] ?? ''));
-            $upsert('email_salutation', trim($_POST['email_salutation'] ?? ''));
-            $upsert('email_intro', trim($_POST['email_intro'] ?? ''));
-            $upsert('email_closing', trim($_POST['email_closing'] ?? ''));
+            // Campos de template e remetente: só atualiza se o campo foi enviado no formulário
+            if (array_key_exists('email_subject_template', $_POST)) $upsert('email_subject_template', trim($_POST['email_subject_template'] ?? ''));
+            if (array_key_exists('email_from_name', $_POST)) $upsert('email_from_name', trim($_POST['email_from_name'] ?? ''));
+            if (array_key_exists('email_salutation', $_POST)) $upsert('email_salutation', trim($_POST['email_salutation'] ?? ''));
+            if (array_key_exists('email_intro', $_POST)) $upsert('email_intro', trim($_POST['email_intro'] ?? ''));
+            if (array_key_exists('email_closing', $_POST)) $upsert('email_closing', trim($_POST['email_closing'] ?? ''));
+
+            // Corpo customizado para emails de lançamento
+            if (array_key_exists('lancamento_email_body', $_POST)) $upsert('lancamento_email_body', $_POST['lancamento_email_body'] ?? '');
+            // Recibo de Pagamento - personalização de email (opcional neste formulário)
+            if (array_key_exists('recibo_email_subject', $_POST)) $upsert('recibo_email_subject', trim($_POST['recibo_email_subject'] ?? ''));
+            if (array_key_exists('recibo_email_title', $_POST)) $upsert('recibo_email_title', trim($_POST['recibo_email_title'] ?? ''));
+            if (array_key_exists('recibo_email_body', $_POST)) $upsert('recibo_email_body', trim($_POST['recibo_email_body'] ?? ''));
 
             // Senha: só atualiza se foi enviada
             if (trim($smtp_password) !== '') {
@@ -208,6 +216,52 @@ switch ($action) {
         } catch (Exception $e) {
             $pdo->rollBack();
             $_SESSION['error_message'] = 'Erro ao salvar configurações: ' . $e->getMessage();
+        }
+
+        header('Location: ' . base_url('index.php?page=configuracoes_email'));
+        exit;
+        break;
+
+    case 'salvar_templates_email':
+        // Salva apenas os modelos/templates de e-mail (sem exigir campos SMTP)
+        if (!isAdmin()) {
+            $_SESSION['error_message'] = 'Apenas administradores podem alterar os modelos de e-mail.';
+            header('Location: ' . base_url('index.php?page=configuracoes_email'));
+            exit;
+        }
+
+        try {
+            $pdo->beginTransaction();
+
+            $upsert = function($key, $value) use ($pdo) {
+                $sql = 'INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)';
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$key, $value]);
+            };
+
+            // Lista de keys de templates a serem sempre upsertadas quando o formulário de modelos for enviado.
+            $template_keys = [
+                'email_subject_template', 'email_salutation', 'email_intro', 'email_closing',
+                // Recibo
+                'recibo_email_subject', 'recibo_email_title', 'recibo_email_body',
+                // Corpo customizável do lançamento
+                'lancamento_email_body', 'lancamento_email_title'
+            ];
+
+            foreach ($template_keys as $k) {
+                // Somente atualiza as chaves que foram realmente enviadas pelo formulário
+                if (array_key_exists($k, $_POST)) {
+                    $val = $_POST[$k];
+                    $upsert($k, is_string($val) ? trim($val) : $val);
+                }
+            }
+
+            $pdo->commit();
+            $_SESSION['success_message'] = 'Modelos de e-mail salvos com sucesso.';
+            logAction('Atualizou Modelos de Email', 'system_settings', null, 'Atualizou templates de email');
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $_SESSION['error_message'] = 'Erro ao salvar modelos: ' . $e->getMessage();
         }
 
         header('Location: ' . base_url('index.php?page=configuracoes_email'));
@@ -230,12 +284,17 @@ switch ($action) {
                 $stmt->execute([$key, $value]);
             };
 
-            $upsert('termo_header', trim($_POST['termo_header'] ?? ''));
-            $upsert('termo_body', trim($_POST['termo_body'] ?? ''));
-            $upsert('termo_footer', trim($_POST['termo_footer'] ?? ''));
-            $upsert('recibo_header', trim($_POST['recibo_header'] ?? ''));
-            $upsert('recibo_body', trim($_POST['recibo_body'] ?? ''));
-            $upsert('recibo_footer', trim($_POST['recibo_footer'] ?? ''));
+            // Only update keys that were present in the POST (so forms can update subsets safely)
+            $allowed_keys = [
+                'termo_header','termo_body','termo_footer',
+                'recibo_header','recibo_body','recibo_footer',
+                'recibo_email_subject','recibo_email_title','recibo_email_body'
+            ];
+            foreach ($allowed_keys as $k) {
+                if (array_key_exists($k, $_POST)) {
+                    $upsert($k, trim($_POST[$k] ?? ''));
+                }
+            }
 
             $pdo->commit();
             $_SESSION['success_message'] = 'Templates de documentos salvos com sucesso.';
@@ -1865,6 +1924,8 @@ switch ($action) {
                 $data = base64_encode(file_get_contents($logo_path));
                 $logo_img = '<img src="data:image/png;base64,' . $data . '" style="max-height:80px;margin-bottom:10px;">';
             }
+            // For use inside <img src="..."> attributes in email templates
+            $logo_url = file_exists($logo_path) ? 'cid:logo_cid' : base_url('assets/img/logo.png');
 
             // Usa templates configuráveis para recibo (header, body, footer)
             $templates = getDocumentTemplates();
@@ -1879,8 +1940,9 @@ switch ($action) {
                 '{cnpj}' => htmlspecialchars($cob['cnpj'] ?? ''),
                 '{cliente}' => htmlspecialchars($cob['nome_responsavel'] ?? ''),
                 '{cliente_email}' => htmlspecialchars($cob['email_contato'] ?? ''),
-                '{descricao}' => nl2br(htmlspecialchars($cob['descricao'] ?? '')),
-                '{valor}' => number_format($cob['valor'], 2, ',', '.'),
+                    '{descricao}' => nl2br(htmlspecialchars($cob['descricao'] ?? '')),
+                    '{logo_url}' => htmlspecialchars($logo_url ?? ''),
+                    '{valor}' => number_format($cob['valor'], 2, ',', '.'),
                 '{data_pagamento}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_pagamento'] ?? ''))),
                 '{data_vencimento}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_vencimento'] ?? ''))),
                 '{data_competencia}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_competencia'] ?? ''))),
@@ -1908,6 +1970,211 @@ switch ($action) {
             header('Location: ' . base_url('index.php?page=cobrancas'));
             exit;
         }
+        break;
+
+    case 'enviar_recibo_pagamento':
+        // Gera o recibo em PDF e envia por e-mail como anexo (Admin/Contador podem enviar)
+        $id_cobranca = $_GET['id'] ?? $_POST['id'] ?? null;
+        if (!$id_cobranca) {
+            $_SESSION['error_message'] = 'ID da cobrança ausente.';
+            header('Location: ' . base_url('index.php?page=cobrancas'));
+            exit;
+        }
+        try {
+            $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
+            $sql = "SELECT cob.*, emp.razao_social, emp.cnpj, emp.id_cliente AS empresa_cliente, cli.nome_responsavel, cli.email_contato, fp.nome as forma_nome, tc.nome as tipo_nome
+                    FROM cobrancas cob
+                    JOIN empresas emp ON cob.`" . $company_col . "` = emp.id
+                    LEFT JOIN clientes cli ON emp.id_cliente = cli.id
+                    LEFT JOIN formas_pagamento fp ON cob.id_forma_pagamento = fp.id
+                    LEFT JOIN tipos_cobranca tc ON cob.id_tipo_cobranca = tc.id
+                    WHERE cob.id = ? LIMIT 1";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$id_cobranca]);
+            $cob = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$cob) {
+                $_SESSION['error_message'] = 'Cobrança não encontrada.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+
+            // Permissões: admin/contador podem; clientes apenas do seu cliente associado
+            if (isClient()) {
+                $id_cliente_logado = $_SESSION['id_cliente_associado'] ?? null;
+                $empresa_cliente = $cob['empresa_cliente'] ?? null;
+                if ($id_cliente_logado == null || $empresa_cliente == null || intval($id_cliente_logado) !== intval($empresa_cliente)) {
+                    $_SESSION['error_message'] = 'Você não tem permissão para enviar este recibo.';
+                    header('Location: ' . base_url('index.php?page=cobrancas'));
+                    exit;
+                }
+            }
+
+            // Aceita cobranças marcadas como Pago ou Confirmado (flexível)
+            $st = strtolower(trim((string)$cob['status_pagamento'] ?? ''));
+            if (!in_array($st, ['pago', 'confirmado_cliente', 'confirmado'])) {
+                $_SESSION['error_message'] = 'Recibo disponível apenas para cobranças marcadas como Pagas ou Confirmadas.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+
+            // Monta HTML do recibo (reaproveita templates configuráveis)
+            $logo_path = __DIR__ . '/../assets/img/logo.png';
+            $logo_img = '';
+            if (file_exists($logo_path)) {
+                $data = base64_encode(file_get_contents($logo_path));
+                $logo_img = '<img src="data:image/png;base64,' . $data . '" style="max-height:80px;margin-bottom:10px;">';
+            }
+            // For use inside <img src="..."> attributes in email templates
+            $logo_url = file_exists($logo_path) ? 'cid:logo_cid' : base_url('assets/img/logo.png');
+
+            $templates = getDocumentTemplates();
+            $recibo_header = $templates['recibo_header'] ?? '';
+            $recibo_body = $templates['recibo_body'] ?? '';
+            $recibo_footer = $templates['recibo_footer'] ?? '';
+
+            $replacements = [
+                '{id}' => $cob['id'],
+                '{logo}' => $logo_img,
+                '{logo_url}' => htmlspecialchars($logo_url ?? ''),
+                '{empresa}' => htmlspecialchars($cob['razao_social'] ?? ''),
+                '{cnpj}' => htmlspecialchars($cob['cnpj'] ?? ''),
+                '{cliente}' => htmlspecialchars($cob['nome_responsavel'] ?? ''),
+                '{cliente_email}' => htmlspecialchars($cob['email_contato'] ?? ''),
+                '{descricao}' => nl2br(htmlspecialchars($cob['descricao'] ?? '')),
+                '{valor}' => number_format($cob['valor'], 2, ',', '.'),
+                '{data_pagamento}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_pagamento'] ?? date('Y-m-d')))),
+                '{data_vencimento}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_vencimento'] ?? ''))),
+                '{data_competencia}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_competencia'] ?? ''))),
+                '{date}' => date('d/m/Y H:i'),
+                '{tipo}' => htmlspecialchars($cob['tipo_nome'] ?? ''),
+                '{forma}' => htmlspecialchars($cob['forma_nome'] ?? ''),
+                '{contexto}' => nl2br(htmlspecialchars($cob['contexto_pagamento'] ?? ''))
+            ];
+
+            $html = '<html><head><meta charset="utf-8"><style>body{font-family: Arial, Helvetica, sans-serif; color:#222} .assinatura{margin-top:40px;display:flex;justify-content:space-between}.assinatura .box{width:45%;text-align:center;padding-top:60px;border-top:1px solid #000}</style></head><body>';
+            $html .= strtr($recibo_header, $replacements);
+            $html .= strtr($recibo_body, $replacements);
+            $html .= strtr($recibo_footer, $replacements);
+            $html .= '</body></html>';
+
+            // Renderiza PDF em memória
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            $pdfString = $dompdf->output();
+
+            // Envia por e-mail usando PHPMailer (adiciona anexo)
+            $settings = getSmtpSettings();
+            if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+                $_SESSION['error_message'] = 'PHPMailer não disponível. Execute composer install para habilitar envio de emails.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+
+            $toEmail = $cob['email_contato'] ?? null;
+            $toName = $cob['nome_responsavel'] ?? ($cob['razao_social'] ?? 'Cliente');
+            if (empty($toEmail)) {
+                $_SESSION['error_message'] = 'Email do cliente não encontrado. Verifique cadastro do cliente.';
+                header('Location: ' . base_url('index.php?page=cobrancas'));
+                exit;
+            }
+
+            try {
+                $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+                $mail->CharSet = 'UTF-8';
+                $mail->Encoding = 'base64';
+                $mail->isSMTP();
+                $mail->Host = $settings['smtp_host'];
+                $mail->Port = intval($settings['smtp_port']);
+                $mail->SMTPAuth = true;
+                $mail->Username = $settings['smtp_username'];
+                $mail->Password = $settings['smtp_password'];
+
+                $secure = strtolower(trim($settings['smtp_secure'] ?? ''));
+                if ($secure === 'starttls' || $secure === 'tls') {
+                    $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                } elseif ($secure === 'ssl') {
+                    $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+                }
+
+                $mail->setFrom($settings['email_from'], $settings['email_from_name'] ?? 'Sistema Financeiro');
+                $mail->addAddress($toEmail, $toName);
+
+                // Embutir logo como CID quando disponível para permitir uso de src="cid:logo_cid" ou {logo_url}
+                if (file_exists($logo_path)) {
+                    try {
+                        $mail->addEmbeddedImage($logo_path, 'logo_cid', 'logo.png');
+                    } catch (Exception $e) {
+                        error_log('Falha ao embutir logo no envio de recibo: ' . $e->getMessage());
+                    }
+                }
+
+                // Usa templates configuráveis para assunto/título/corpo do email de recibo
+                $templates = getDocumentTemplates();
+                $email_subject_tpl = $templates['recibo_email_subject'] ?? '';
+                $email_title_tpl = $templates['recibo_email_title'] ?? '';
+                $email_body_tpl = $templates['recibo_email_body'] ?? '';
+
+                // Substituições disponíveis no template de email
+                $emailRepl = [
+                    '{id}' => $cob['id'],
+                    '{empresa}' => htmlspecialchars($cob['razao_social'] ?? ''),
+                    '{cnpj}' => htmlspecialchars($cob['cnpj'] ?? ''),
+                    '{cliente}' => htmlspecialchars($cob['nome_responsavel'] ?? ''),
+                    '{cliente_email}' => htmlspecialchars($cob['email_contato'] ?? ''),
+                    '{descricao}' => htmlspecialchars($cob['descricao'] ?? ''),
+                    '{logo}' => $logo_img,
+                    '{logo_url}' => htmlspecialchars($logo_url ?? ''),
+                    '{valor}' => number_format($cob['valor'], 2, ',', '.'),
+                    '{data_pagamento}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_pagamento'] ?? date('Y-m-d')))),
+                    '{data_vencimento}' => htmlspecialchars(date('d/m/Y', strtotime($cob['data_vencimento'] ?? ''))),
+                    '{date}' => date('d/m/Y H:i'),
+                    '{tipo}' => htmlspecialchars($cob['tipo_nome'] ?? ''),
+                    '{forma}' => htmlspecialchars($cob['forma_nome'] ?? ''),
+                    '{contexto}' => nl2br(htmlspecialchars($cob['contexto_pagamento'] ?? ''))
+                ];
+
+                // Assunto
+                if (!empty($email_subject_tpl)) {
+                    $subject = strtr($email_subject_tpl, $emailRepl);
+                } else {
+                    $subject = 'Recibo de Pagamento - Cobrança #' . $cob['id'];
+                }
+
+                // Corpo do email (HTML)
+                if (!empty($email_body_tpl)) {
+                    $bodyHtml = strtr($email_body_tpl, $emailRepl);
+                } else {
+                    $bodyHtml = '<p>Prezados,</p><p>Em anexo segue o recibo de pagamento referente à cobrança #' . htmlspecialchars($cob['id']) . '.</p><p>Atenciosamente,</p>';
+                }
+
+                // Anexa PDF gerado em memória
+                $filename = 'recibo_cobranca_' . $cob['id'] . '.pdf';
+                $mail->Subject = $subject;
+                $mail->isHTML(true);
+                $mail->Body = $bodyHtml;
+                $mail->addStringAttachment($pdfString, $filename, 'base64', 'application/pdf');
+
+                $sent = $mail->send();
+                if ($sent) {
+                    $_SESSION['success_message'] = 'Recibo enviado com sucesso para ' . htmlspecialchars($toEmail);
+                    logAction('Enviou Recibo por Email', 'cobrancas', $id_cobranca, 'Email para: ' . $toEmail);
+                } else {
+                    $_SESSION['error_message'] = 'Falha no envio do recibo por e-mail.';
+                    logAction('Falha ao enviar Recibo por Email', 'cobrancas', $id_cobranca, 'Tentativa para: ' . $toEmail);
+                }
+
+            } catch (Exception $e) {
+                $_SESSION['error_message'] = 'Erro ao enviar email: ' . $e->getMessage();
+            }
+
+        } catch (Exception $e) {
+            $_SESSION['error_message'] = 'Erro ao processar envio do recibo: ' . $e->getMessage();
+        }
+
+        header('Location: ' . base_url('index.php?page=cobrancas'));
+        exit;
         break;
 
     case 'termo_quitacao':
@@ -1991,6 +2258,7 @@ switch ($action) {
 
             $replacements_term = [
                 '{logo}' => $logo_img,
+                '{logo_url}' => htmlspecialchars($logo_url ?? ''),
                 '{date}' => date('d/m/Y'),
                 '{payments_table}' => $payments_table_html,
                 '{total}' => 'R$ ' . number_format($total, 2, ',', '.')
