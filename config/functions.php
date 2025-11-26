@@ -233,6 +233,32 @@ function getDocumentTemplates() {
 }
 
 /**
+ * Sanitiza HTML recebidos de editores WYSIWYG antes de persistir.
+ * Usa HTMLPurifier se disponível via Composer (ezyang/htmlpurifier).
+ * Retorna HTML purificado ou o HTML original se a lib não estiver instalada.
+ */
+function sanitize_html($html) {
+    if ($html === null) return null;
+    // Se a classe não existir, retornamos o HTML como fallback (não ideal)
+    if (!class_exists('HTMLPurifier')) {
+        return $html;
+    }
+
+    static $purifier = null;
+    if ($purifier === null) {
+        $config = HTMLPurifier_Config::createDefault();
+        // Configurações seguras mínimas
+        $config->set('HTML.SafeIframe', true);
+        $config->set('URI.SafeIframeRegexp', '%^(https?:)?//(www.youtube.com/embed/|player.vimeo.com/video/)%');
+        // Limitar propriedades CSS permitidas para reduzir risco
+        $config->set('CSS.AllowedProperties', array('font','font-size','font-weight','font-style','text-decoration','padding','margin','color','background-color','text-align'));
+        $purifier = new HTMLPurifier($config);
+    }
+
+    return $purifier->purify($html);
+}
+
+/**
  * Verifica se um usuário está associado a uma pasta (tabela pivot) ou é o owner antigo.
  * Retorna true se associado (ou se o usuário for admin).
  */

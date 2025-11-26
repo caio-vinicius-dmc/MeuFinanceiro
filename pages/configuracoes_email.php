@@ -91,18 +91,90 @@ $smtp_password = '';
     </div>
     </div>
 </div>
-    <!-- Inicializar WYSIWYG (TinyMCE via CDN) -->
-    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+    <!-- Inicializar editor WYSIWYG: uso CKEditor (CDN) em vez de TinyMCE para evitar API key -->
+    <!-- Use CKEditor 5 (Classic) via CDN -->
+    <script src="https://cdn.ckeditor.com/ckeditor5/39.0.1/classic/ckeditor.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        if (typeof tinymce !== 'undefined') {
-            tinymce.init({
-                selector: 'textarea.tinymce',
-                height: 250,
-                menubar: false,
-                plugins: ['link', 'lists', 'paste', 'autoresize'],
-                toolbar: 'undo redo | bold italic underline | bullist numlist | link',
-                content_style: 'body { font-family: Arial,Helvetica,sans-serif; font-size:14px }'
+        if (typeof ClassicEditor !== 'undefined') {
+            var editors = {};
+            document.querySelectorAll('textarea.tinymce').forEach(function(el) {
+                try {
+                    if (!el.id) el.id = 'editor_' + Math.random().toString(36).substr(2,6);
+                    ClassicEditor.create(el, {
+                        toolbar: ['undo','redo','bold','italic','link','bulletedList','numberedList'],
+                        removePlugins: ['Title'],
+                    }).then(function(editor) {
+                        editors[el.id] = editor;
+
+                        // Criar toolbar de toggle Visual / HTML
+                        var wrap = document.createElement('div');
+                        wrap.className = 'mb-2';
+                        var btnGroup = document.createElement('div');
+                        btnGroup.className = 'btn-group btn-group-sm';
+                        var btnVisual = document.createElement('button');
+                        btnVisual.type = 'button'; btnVisual.className = 'btn btn-outline-secondary active'; btnVisual.textContent = 'Visual';
+                        var btnHtml = document.createElement('button');
+                        btnHtml.type = 'button'; btnHtml.className = 'btn btn-outline-secondary'; btnHtml.textContent = 'HTML';
+                        btnGroup.appendChild(btnVisual); btnGroup.appendChild(btnHtml);
+                        wrap.appendChild(btnGroup);
+
+                        // Inserir toolbar antes do container do editor
+                        var parent = el.parentNode;
+                        parent.insertBefore(wrap, el);
+
+                        // Criar textarea source escondida
+                        var source = document.createElement('textarea');
+                        source.className = 'form-control d-none source-html';
+                        source.style.minHeight = '200px';
+                        source.id = el.id + '_source';
+                        parent.insertBefore(source, el.nextSibling);
+
+                        // Localizar wrapper do CKEditor para ocultar/mostrar
+                        var editorWrapper = null;
+                        try { editorWrapper = editor.ui.view.editable.element.closest('.ck-editor'); } catch(e) { editorWrapper = null; }
+
+                        // Handler HTML button
+                        btnHtml.addEventListener('click', function(){
+                            // preencher source com HTML atual
+                            try { source.value = editor.getData(); } catch(e) { source.value = el.value; }
+                            // ocultar editor UI
+                            if (editorWrapper) editorWrapper.style.display = 'none';
+                            // mostrar source
+                            source.classList.remove('d-none');
+                            btnHtml.classList.add('active'); btnVisual.classList.remove('active');
+                        });
+
+                        // Handler Visual button
+                        btnVisual.addEventListener('click', function(){
+                            // aplicar source no editor
+                            try { editor.setData(source.value); } catch(e) {}
+                            if (editorWrapper) editorWrapper.style.display = '';
+                            source.classList.add('d-none');
+                            btnVisual.classList.add('active'); btnHtml.classList.remove('active');
+                        });
+
+                    }).catch(function(err){ console.error(err); });
+                } catch (e) {
+                    console.error('Erro ao iniciar CKEditor5:', e);
+                }
+            });
+
+            // On form submit, synchronize editor data into original textareas
+            document.querySelectorAll('form').forEach(function(form){
+                form.addEventListener('submit', function(){
+                    Object.keys(editors).forEach(function(id){
+                        var editor = editors[id];
+                        var textarea = document.getElementById(id);
+                        var source = document.getElementById(id + '_source');
+                        if (!textarea) return;
+                        if (source && !source.classList.contains('d-none')) {
+                            textarea.value = source.value;
+                        } else {
+                            try { textarea.value = editor.getData(); } catch(e) {}
+                        }
+                    });
+                });
             });
         }
     });
@@ -187,7 +259,7 @@ $smtp_password = '';
 
                 <div class="mb-3">
                 <label class="form-label">Mensagem do Email (HTML)</label>
-                <textarea name="recibo_email_body" rows="6" class="form-control tinymce"><?php echo htmlspecialchars($settings['recibo_email_body'] ?? '<p>Prezados,</p><p>Em anexo segue o recibo de pagamento referente à cobrança #{id}.</p><p>Atenciosamente,</p>'); ?></textarea>
+                <textarea id="recibo_email_body" name="recibo_email_body" rows="6" class="form-control tinymce"><?php echo htmlspecialchars($settings['recibo_email_body'] ?? '<p>Prezados,</p><p>Em anexo segue o recibo de pagamento referente à cobrança #{id}.</p><p>Atenciosamente,</p>'); ?></textarea>
                 <div class="form-text small">Aceita HTML. Exemplos de uso: <code>&lt;p&gt;Prezados, &lt;/p&gt;&lt;p&gt;Em anexo... Cobrança #{id} - R$ {valor}&lt;/p&gt;</code></div>
             </div>
 
@@ -233,7 +305,7 @@ $smtp_password = '';
             </div>
                 <div class="mb-3">
                 <label class="form-label">Mensagem (HTML) — Aprovação</label>
-                <textarea name="assoc_approved_body" rows="4" class="form-control tinymce"><?php echo htmlspecialchars($settings['assoc_approved_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi aprovada.</p><p>Atenciosamente,</p>'); ?></textarea>
+                <textarea id="assoc_approved_body" name="assoc_approved_body" rows="4" class="form-control tinymce"><?php echo htmlspecialchars($settings['assoc_approved_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi aprovada.</p><p>Atenciosamente,</p>'); ?></textarea>
             </div>
 
             <div class="mb-3">
@@ -242,7 +314,7 @@ $smtp_password = '';
             </div>
             <div class="mb-3">
                 <label class="form-label">Mensagem (HTML) — Recusa</label>
-                <textarea name="assoc_rejected_body" rows="4" class="form-control tinymce"><?php echo htmlspecialchars($settings['assoc_rejected_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi recusada pelo administrador.</p><p>Atenciosamente,</p>'); ?></textarea>
+                <textarea id="assoc_rejected_body" name="assoc_rejected_body" rows="4" class="form-control tinymce"><?php echo htmlspecialchars($settings['assoc_rejected_body'] ?? '<p>Olá {toName},</p><p>Sua solicitação de associação ao cliente (ID: {id_cliente}) foi recusada pelo administrador.</p><p>Atenciosamente,</p>'); ?></textarea>
             </div>
 
             <div class="d-grid gap-2 d-md-flex">

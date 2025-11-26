@@ -580,12 +580,12 @@ switch ($action) {
             if (array_key_exists('email_intro', $_POST)) $upsert('email_intro', trim($_POST['email_intro'] ?? ''));
             if (array_key_exists('email_closing', $_POST)) $upsert('email_closing', trim($_POST['email_closing'] ?? ''));
 
-            // Corpo customizado para emails de lançamento
-            if (array_key_exists('lancamento_email_body', $_POST)) $upsert('lancamento_email_body', $_POST['lancamento_email_body'] ?? '');
+            // Corpo customizado para emails de lançamento (sanitizar HTML)
+            if (array_key_exists('lancamento_email_body', $_POST)) $upsert('lancamento_email_body', sanitize_html($_POST['lancamento_email_body'] ?? ''));
             // Recibo de Pagamento - personalização de email (opcional neste formulário)
             if (array_key_exists('recibo_email_subject', $_POST)) $upsert('recibo_email_subject', trim($_POST['recibo_email_subject'] ?? ''));
             if (array_key_exists('recibo_email_title', $_POST)) $upsert('recibo_email_title', trim($_POST['recibo_email_title'] ?? ''));
-            if (array_key_exists('recibo_email_body', $_POST)) $upsert('recibo_email_body', trim($_POST['recibo_email_body'] ?? ''));
+            if (array_key_exists('recibo_email_body', $_POST)) $upsert('recibo_email_body', sanitize_html($_POST['recibo_email_body'] ?? ''));
 
             // Senha: só atualiza se foi enviada
             if (trim($smtp_password) !== '') {
@@ -636,7 +636,13 @@ switch ($action) {
                 // Somente atualiza as chaves que foram realmente enviadas pelo formulário
                 if (array_key_exists($k, $_POST)) {
                     $val = $_POST[$k];
-                    $upsert($k, is_string($val) ? trim($val) : $val);
+                    // Se for um campo HTML (body), sanitiza antes de salvar
+                    if (is_string($val) && preg_match('/_body$/', $k)) {
+                        $clean = sanitize_html($val);
+                        $upsert($k, $clean);
+                    } else {
+                        $upsert($k, is_string($val) ? trim($val) : $val);
+                    }
                 }
             }
 
@@ -676,7 +682,12 @@ switch ($action) {
             ];
             foreach ($allowed_keys as $k) {
                 if (array_key_exists($k, $_POST)) {
-                    $upsert($k, trim($_POST[$k] ?? ''));
+                    $val = $_POST[$k] ?? '';
+                    if (is_string($val) && preg_match('/_body$/', $k)) {
+                        $upsert($k, sanitize_html($val));
+                    } else {
+                        $upsert($k, trim($val));
+                    }
                 }
             }
 

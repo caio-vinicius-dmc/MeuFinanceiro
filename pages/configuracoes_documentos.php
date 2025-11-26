@@ -67,6 +67,82 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
     </div>
     </div>
 </div>
+    <!-- Inicializar editor WYSIWYG (CKEditor5) e adicionar toggle Visual/HTML para cada textarea.tinymce -->
+    <script src="https://cdn.ckeditor.com/ckeditor5/39.0.1/classic/ckeditor.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof ClassicEditor !== 'undefined') {
+            var editors = {};
+            document.querySelectorAll('textarea.tinymce').forEach(function(el) {
+                try {
+                    if (!el.id) el.id = 'editor_' + Math.random().toString(36).substr(2,6);
+                    ClassicEditor.create(el, {
+                        toolbar: ['undo','redo','bold','italic','link','bulletedList','numberedList'],
+                        removePlugins: ['Title'],
+                    }).then(function(editor) {
+                        editors[el.id] = editor;
+
+                        var wrap = document.createElement('div');
+                        wrap.className = 'mb-2';
+                        var btnGroup = document.createElement('div');
+                        btnGroup.className = 'btn-group btn-group-sm';
+                        var btnVisual = document.createElement('button');
+                        btnVisual.type = 'button'; btnVisual.className = 'btn btn-outline-secondary active'; btnVisual.textContent = 'Visual';
+                        var btnHtml = document.createElement('button');
+                        btnHtml.type = 'button'; btnHtml.className = 'btn btn-outline-secondary'; btnHtml.textContent = 'HTML';
+                        btnGroup.appendChild(btnVisual); btnGroup.appendChild(btnHtml);
+                        wrap.appendChild(btnGroup);
+
+                        var parent = el.parentNode;
+                        parent.insertBefore(wrap, el);
+
+                        var source = document.createElement('textarea');
+                        source.className = 'form-control d-none source-html';
+                        source.style.minHeight = '200px';
+                        source.id = el.id + '_source';
+                        parent.insertBefore(source, el.nextSibling);
+
+                        var editorWrapper = null;
+                        try { editorWrapper = editor.ui.view.editable.element.closest('.ck-editor'); } catch(e) { editorWrapper = null; }
+
+                        btnHtml.addEventListener('click', function(){
+                            try { source.value = editor.getData(); } catch(e) { source.value = el.value; }
+                            if (editorWrapper) editorWrapper.style.display = 'none';
+                            source.classList.remove('d-none');
+                            btnHtml.classList.add('active'); btnVisual.classList.remove('active');
+                        });
+
+                        btnVisual.addEventListener('click', function(){
+                            try { editor.setData(source.value); } catch(e) {}
+                            if (editorWrapper) editorWrapper.style.display = '';
+                            source.classList.add('d-none');
+                            btnVisual.classList.add('active'); btnHtml.classList.remove('active');
+                        });
+
+                    }).catch(function(err){ console.error(err); });
+                } catch (e) {
+                    console.error('Erro ao iniciar CKEditor5:', e);
+                }
+            });
+
+            document.querySelectorAll('form').forEach(function(form){
+                form.addEventListener('submit', function(){
+                    document.querySelectorAll('textarea.tinymce').forEach(function(el){
+                        var id = el.id;
+                        var editor = editors[id];
+                        var source = document.getElementById(id + '_source');
+                        if (!el) return;
+                        if (source && !source.classList.contains('d-none')) {
+                            el.value = source.value;
+                        } else {
+                            try { el.value = editor.getData(); } catch(e) {}
+                        }
+                    });
+                });
+            });
+        }
+    });
+    </script>
 
 <!-- Termo de Quitação (separado, com collapse) -->
 <div class="card shadow-sm mb-3">
@@ -85,17 +161,17 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
 
             <div class="mb-3">
                 <label for="termo_header" class="form-label"><strong>Termo - Cabeçalho</strong></label>
-                <textarea class="form-control" id="termo_header" name="termo_header" rows="3"><?php echo htmlspecialchars($doc_templates['termo_header'] ?? '<div>{logo}<h2>Termo de Quitação</h2></div>'); ?></textarea>
+                <textarea class="form-control tinymce" id="termo_header" name="termo_header" rows="3"><?php echo htmlspecialchars($doc_templates['termo_header'] ?? '<div>{logo}<h2>Termo de Quitação</h2></div>'); ?></textarea>
             </div>
 
             <div class="mb-3">
                 <label for="termo_body" class="form-label"><strong>Termo - Corpo</strong></label>
-                <textarea class="form-control" id="termo_body" name="termo_body" rows="6"><?php echo htmlspecialchars($doc_templates['termo_body'] ?? '<p>Lista de pagamentos confirmados até {date}:</p>{payments_table}'); ?></textarea>
+                <textarea class="form-control tinymce" id="termo_body" name="termo_body" rows="6"><?php echo htmlspecialchars($doc_templates['termo_body'] ?? '<p>Lista de pagamentos confirmados até {date}:</p>{payments_table}'); ?></textarea>
             </div>
 
             <div class="mb-3">
                 <label for="termo_footer" class="form-label"><strong>Termo - Rodapé</strong></label>
-                <textarea class="form-control" id="termo_footer" name="termo_footer" rows="2"><?php echo htmlspecialchars($doc_templates['termo_footer'] ?? '<p>Documento gerado em {date}</p>'); ?></textarea>
+                <textarea class="form-control tinymce" id="termo_footer" name="termo_footer" rows="2"><?php echo htmlspecialchars($doc_templates['termo_footer'] ?? '<p>Documento gerado em {date}</p>'); ?></textarea>
             </div>
 
             <div class="d-grid gap-2 d-md-flex">
@@ -123,17 +199,17 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
 
             <div class="mb-3">
                 <label for="recibo_header" class="form-label"><strong>Recibo - Cabeçalho</strong></label>
-                <textarea class="form-control" id="recibo_header" name="recibo_header" rows="3"><?php echo htmlspecialchars($doc_templates['recibo_header'] ?? '<div>{logo}<h2>Recibo de Pagamento</h2></div>'); ?></textarea>
+                <textarea class="form-control tinymce" id="recibo_header" name="recibo_header" rows="3"><?php echo htmlspecialchars($doc_templates['recibo_header'] ?? '<div>{logo}<h2>Recibo de Pagamento</h2></div>'); ?></textarea>
             </div>
 
             <div class="mb-3">
                 <label for="recibo_body" class="form-label"><strong>Recibo - Corpo</strong></label>
-                <textarea class="form-control" id="recibo_body" name="recibo_body" rows="6"><?php echo htmlspecialchars($doc_templates['recibo_body'] ?? '<p><strong>Empresa:</strong> {empresa} ({cnpj})</p>'); ?></textarea>
+                <textarea class="form-control tinymce" id="recibo_body" name="recibo_body" rows="6"><?php echo htmlspecialchars($doc_templates['recibo_body'] ?? '<p><strong>Empresa:</strong> {empresa} ({cnpj})</p>'); ?></textarea>
             </div>
 
             <div class="mb-3">
                 <label for="recibo_footer" class="form-label"><strong>Recibo - Rodapé</strong></label>
-                <textarea class="form-control" id="recibo_footer" name="recibo_footer" rows="2"><?php echo htmlspecialchars($doc_templates['recibo_footer'] ?? '<p>Documento gerado em {date}</p>'); ?></textarea>
+                <textarea class="form-control tinymce" id="recibo_footer" name="recibo_footer" rows="2"><?php echo htmlspecialchars($doc_templates['recibo_footer'] ?? '<p>Documento gerado em {date}</p>'); ?></textarea>
             </div>
 
             <div class="d-grid gap-2 d-md-flex">
