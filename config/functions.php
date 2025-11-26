@@ -48,6 +48,22 @@ function isClient() {
     return (isLoggedIn() && isset($_SESSION['user_tipo']) && $_SESSION['user_tipo'] == 'cliente');
 }
 
+// Verifica se o usuário é Super Admin (flag armazenada na tabela `usuarios`).
+function isSuperAdmin() {
+    if (!isLoggedIn()) return false;
+    if (isset($_SESSION['is_super_admin'])) return (bool) $_SESSION['is_super_admin'];
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare('SELECT is_super_admin FROM usuarios WHERE id = ? LIMIT 1');
+        $stmt->execute([$_SESSION['user_id']]);
+        $val = $stmt->fetchColumn();
+        $_SESSION['is_super_admin'] = (bool) $val;
+        return (bool) $val;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
 // Função para verificar se o usuário tem acesso à tela de lançamentos
 function hasLancamentosAccess() {
     global $pdo;

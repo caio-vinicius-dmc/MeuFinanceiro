@@ -198,8 +198,6 @@ CREATE TABLE IF NOT EXISTS tb_confg_emailCliente (
     INDEX idx_permissao (permissao)
 );
 
-ALTER TABLE usuarios ADD COLUMN is_super_admin TINYINT(1) NOT NULL DEFAULT 0;
-
 --
 -- Despejando dados para a tabela `empresas`
 --

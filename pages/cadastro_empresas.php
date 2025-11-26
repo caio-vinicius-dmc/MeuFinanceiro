@@ -35,6 +35,9 @@ if (isContador() && empty($clientes_para_select)) {
     $clientes_para_select = $stmt_fallback->fetchAll();
 }
 
+// Flag para desabilitar select quando contador não tem clientes associados (usar apenas aviso)
+$select_disabled = (isContador() && $contador_sem_clientes) ? 'disabled' : '';
+
 
 // Buscar empresas existentes para a listagem
 $sql_empresas = "SELECT e.*, c.nome_responsavel 
@@ -81,13 +84,17 @@ $empresas = $stmt_empresas->fetchAll();
                             <?php if (isContador() && $contador_sem_clientes): ?>
                                 <div class="alert alert-warning">Você não possui clientes associados. A lista abaixo mostra todos os clientes como fallback; associe clientes ao seu usuário para restringir a seleção.</div>
                             <?php endif; ?>
-                            <select id="id_cliente" name="id_cliente" class="form-select" required>
+                            <select id="id_cliente" name="id_cliente" class="form-select" required <?php echo $select_disabled; ?>>
                                 <option value="" selected disabled>Selecione o cliente...</option>
-                                <?php foreach ($clientes_para_select as $cliente): ?>
-                                    <option value="<?php echo $cliente['id']; ?>">
-                                        <?php echo htmlspecialchars($cliente['nome_responsavel']); ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php if (isContador() && $contador_sem_clientes): ?>
+                                    <option value="" disabled>Você não possui clientes associados — contate o administrador.</option>
+                                <?php else: ?>
+                                    <?php foreach ($clientes_para_select as $cliente): ?>
+                                        <option value="<?php echo $cliente['id']; ?>">
+                                            <?php echo htmlspecialchars($cliente['nome_responsavel']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </select>
                         </div>
 
@@ -206,13 +213,17 @@ $empresas = $stmt_empresas->fetchAll();
                      <div class="row g-3">
                         <div class="col-md-12">
                             <label for="edit_id_cliente" class="form-label">Cliente Proprietário</label>
-                            <select id="edit_id_cliente" name="id_cliente" class="form-select" required>
+                            <select id="edit_id_cliente" name="id_cliente" class="form-select" required <?php echo $select_disabled; ?>>
                                 <option value="" selected disabled>Selecione o cliente...</option>
-                                <?php foreach ($clientes_para_select as $cliente): ?>
-                                    <option value="<?php echo $cliente['id']; ?>">
-                                        <?php echo htmlspecialchars($cliente['nome_responsavel']); ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php if (isContador() && $contador_sem_clientes): ?>
+                                    <option value="" disabled>Você não possui clientes associados — contate o administrador.</option>
+                                <?php else: ?>
+                                    <?php foreach ($clientes_para_select as $cliente): ?>
+                                        <option value="<?php echo $cliente['id']; ?>">
+                                            <?php echo htmlspecialchars($cliente['nome_responsavel']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </select>
                         </div>
                         

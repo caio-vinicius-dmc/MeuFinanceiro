@@ -118,7 +118,7 @@ global $page;
                     <?php endif; ?>
 
                     <?php // Menu exclusivo do Admin - agrupado em seções colapsáveis ?>
-                    <?php if (isAdmin()): ?>
+                    <?php if (isAdmin() || isSuperAdmin()): ?>
                         <li class="nav-item-divider"></li>
                         <!-- Cadastros -->
                         <li class="nav-item">
@@ -149,6 +149,12 @@ global $page;
                                     <a class="nav-link <?php echo ($page == 'gerenciar_formas_pagamento') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_formas_pagamento'); ?>">
                                         <i class="bi bi-wallet2 me-2"></i>
                                         <span class="sidebar-link-text">Formas de Pagamento</span>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link <?php echo ($page == 'associacoes_contador') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=associacoes_contador'); ?>">
+                                        <i class="bi bi-people-fill me-2"></i>
+                                        <span class="sidebar-link-text">Associar contador</span>
                                     </a>
                                 </li>
                             </ul>

@@ -32,7 +32,8 @@ $allowed_pages = [
     'gerenciar_categorias',
     'documentos',
     'gerenciar_documentos',
-    'configuracoes_documentos'
+    'configuracoes_documentos',
+    'associacoes_contador'
 ];
 
 // Se a página não for de login E não estiver logado, força o login

@@ -230,6 +230,163 @@ switch ($action) {
         exit;
         break;
 
+    case 'associar_me_cliente':
+        // Permite que um contador se associe imediatamente a um cliente (auto-associação)
+        if (isContador()) {
+            $id_cliente = intval($_POST['id_cliente'] ?? 0);
+            if ($id_cliente <= 0) {
+                $_SESSION['error_message'] = 'Cliente inválido.';
+                break;
+            }
+            try {
+                $chk = $pdo->prepare("SELECT 1 FROM contador_clientes_assoc WHERE id_usuario_contador = ? AND id_cliente = ? LIMIT 1");
+                $chk->execute([$_SESSION['user_id'], $id_cliente]);
+                if ($chk->fetchColumn()) {
+                    $_SESSION['info_message'] = 'Você já está associado a este cliente.';
+                } else {
+                    $ins = $pdo->prepare("INSERT INTO contador_clientes_assoc (id_usuario_contador, id_cliente) VALUES (?, ?)");
+                    if ($ins->execute([$_SESSION['user_id'], $id_cliente])) {
+                        $_SESSION['success_message'] = 'Associação realizada com sucesso.';
+                        logAction('Associação Contador-Cliente', 'contador_clientes_assoc', $id_cliente, 'Contador: ' . $_SESSION['user_id']);
+                    } else {
+                        $_SESSION['error_message'] = 'Erro ao associar.';
+                    }
+                }
+            } catch (Exception $e) {
+                error_log('Erro ao associar contador: ' . $e->getMessage());
+                $_SESSION['error_message'] = 'Erro ao processar associação.';
+            }
+        }
+        header('Location: ' . base_url('index.php?page=cadastro_clientes'));
+        exit;
+
+    case 'solicitar_assoc_cliente':
+        // Fluxo de solicitação de associação (cria um pedido para revisão)
+        if (isContador()) {
+            try {
+                // Buscar cliente por id (se fornecido) ou por email
+                if (!empty($_POST['id_cliente'])) {
+                    $cliente_id = intval($_POST['id_cliente']);
+                    $stmtC = $pdo->prepare('SELECT id FROM clientes WHERE id = ? LIMIT 1');
+                    $stmtC->execute([$cliente_id]);
+                    $cliente_id = $stmtC->fetchColumn();
+                    if (!$cliente_id) {
+                        $_SESSION['error_message'] = 'Cliente não encontrado.';
+                        break;
+                    }
+                } else {
+                    $email = trim($_POST['request_email_cliente'] ?? '');
+                    if (empty($email)) {
+                        $_SESSION['error_message'] = 'Informe o email do cliente.';
+                        break;
+                    }
+                    // Buscar pelo email
+                    $stmtC = $pdo->prepare('SELECT id FROM clientes WHERE email_contato = ? LIMIT 1');
+                    $stmtC->execute([$email]);
+                    $cliente_id = $stmtC->fetchColumn();
+                    if (!$cliente_id) {
+                        $_SESSION['error_message'] = 'Cliente não encontrado com esse email.';
+                        break;
+                    }
+                }
+
+                // Criar tabela de requests simples
+                $pdo->exec("CREATE TABLE IF NOT EXISTS contador_assoc_requests (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id_usuario_contador INT NOT NULL,
+                    id_cliente INT NOT NULL,
+                    status VARCHAR(20) DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+                // Inserir pedido
+                $ins = $pdo->prepare('INSERT INTO contador_assoc_requests (id_usuario_contador, id_cliente, status) VALUES (?, ?, ?)');
+                if ($ins->execute([$_SESSION['user_id'], $cliente_id, 'pending'])) {
+                    $_SESSION['success_message'] = 'Solicitação enviada com sucesso. Aguarde aprovação do administrador.';
+                    logAction('Solicitação Associação', 'contador_assoc_requests', $cliente_id, 'Contador: ' . $_SESSION['user_id']);
+                } else {
+                    $_SESSION['error_message'] = 'Erro ao enviar solicitação.';
+                }
+            } catch (Exception $e) {
+                error_log('Erro ao solicitar associação: ' . $e->getMessage());
+                $_SESSION['error_message'] = 'Falha ao processar solicitação.';
+            }
+        }
+        header('Location: ' . base_url('index.php?page=cadastro_clientes'));
+        exit;
+
+    case 'aprovar_assoc_request':
+        // Aprovar pedido de associação (apenas Admin/SuperAdmin)
+        if (isAdmin() || isSuperAdmin()) {
+            $request_id = intval($_POST['request_id'] ?? 0);
+            if ($request_id <= 0) {
+                $_SESSION['error_message'] = 'Solicitação inválida.';
+                break;
+            }
+            try {
+                $stmt = $pdo->prepare('SELECT * FROM contador_assoc_requests WHERE id = ? LIMIT 1');
+                $stmt->execute([$request_id]);
+                $r = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$r) {
+                    $_SESSION['error_message'] = 'Solicitação não encontrada.';
+                    break;
+                }
+                if ($r['status'] !== 'pending') {
+                    $_SESSION['info_message'] = 'Solicitação já processada.';
+                    break;
+                }
+
+                // Inserir associação
+                $ins = $pdo->prepare('INSERT INTO contador_clientes_assoc (id_usuario_contador, id_cliente) VALUES (?, ?)');
+                $ins->execute([$r['id_usuario_contador'], $r['id_cliente']]);
+
+                // Atualizar status da solicitação
+                $upd = $pdo->prepare('UPDATE contador_assoc_requests SET status = ? WHERE id = ?');
+                $upd->execute(['approved', $request_id]);
+
+                $_SESSION['success_message'] = 'Solicitação aprovada e associação realizada.';
+                logAction('Aprovação Associação', 'contador_assoc_requests', $request_id, 'Aprovado por: ' . $_SESSION['user_id']);
+            } catch (Exception $e) {
+                error_log('Erro ao aprovar solicitação: ' . $e->getMessage());
+                $_SESSION['error_message'] = 'Erro ao aprovar solicitação.';
+            }
+        }
+        header('Location: ' . base_url('index.php?page=associacoes_contador'));
+        exit;
+
+    case 'recusar_assoc_request':
+        // Recusar pedido de associação (apenas Admin/SuperAdmin)
+        if (isAdmin() || isSuperAdmin()) {
+            $request_id = intval($_POST['request_id'] ?? 0);
+            if ($request_id <= 0) {
+                $_SESSION['error_message'] = 'Solicitação inválida.';
+                break;
+            }
+            try {
+                $stmt = $pdo->prepare('SELECT * FROM contador_assoc_requests WHERE id = ? LIMIT 1');
+                $stmt->execute([$request_id]);
+                $r = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$r) {
+                    $_SESSION['error_message'] = 'Solicitação não encontrada.';
+                    break;
+                }
+                if ($r['status'] !== 'pending') {
+                    $_SESSION['info_message'] = 'Solicitação já processada.';
+                    break;
+                }
+
+                $upd = $pdo->prepare('UPDATE contador_assoc_requests SET status = ? WHERE id = ?');
+                $upd->execute(['rejected', $request_id]);
+                $_SESSION['success_message'] = 'Solicitação recusada.';
+                logAction('Recusa Associação', 'contador_assoc_requests', $request_id, 'Recusado por: ' . $_SESSION['user_id']);
+            } catch (Exception $e) {
+                error_log('Erro ao recusar solicitação: ' . $e->getMessage());
+                $_SESSION['error_message'] = 'Erro ao recusar solicitação.';
+            }
+        }
+        header('Location: ' . base_url('index.php?page=associacoes_contador'));
+        exit;
+
     case 'salvar_config_smtp':
         // Salva as configurações SMTP no banco (tabela system_settings)
         if (!isAdmin()) {
@@ -1309,6 +1466,16 @@ switch ($action) {
             if ($stmt->execute([$_POST['nome_responsavel'], $_POST['email_contato'], $_POST['telefone']])) {
                 $id_novo = $pdo->lastInsertId();
 
+                // Se o usuário atual for um contador, auto-associa o novo cliente a ele
+                try {
+                    if (isContador()) {
+                        $stmt_assoc_ins = $pdo->prepare("INSERT INTO contador_clientes_assoc (id_usuario_contador, id_cliente) VALUES (?, ?)");
+                        $stmt_assoc_ins->execute([$_SESSION['user_id'], $id_novo]);
+                    }
+                } catch (Exception $e) {
+                    error_log('Falha ao associar contador ao novo cliente: ' . $e->getMessage());
+                }
+
                 // 2) Garante existência da tabela simples de configuração e insere as flags
                 try {
                     $pdo->exec("CREATE TABLE IF NOT EXISTS tb_confg_emailCliente (
@@ -1354,6 +1521,15 @@ switch ($action) {
 
     case 'editar_cliente':
          if (isAdmin() || isContador()) {
+                // Se for contador, verificar associação com o cliente alvo
+                if (isContador()) {
+                    $chkAssoc = $pdo->prepare("SELECT 1 FROM contador_clientes_assoc WHERE id_usuario_contador = ? AND id_cliente = ? LIMIT 1");
+                    $chkAssoc->execute([$_SESSION['user_id'], $_POST['id_cliente']]);
+                    if (!$chkAssoc->fetchColumn()) {
+                        $_SESSION['error_message'] = 'Você não tem permissão para editar este cliente.';
+                        break;
+                    }
+                }
             $id = $_POST['id_cliente'];
             $nome_novo = $_POST['nome_responsavel'];
             $email_novo = $_POST['email_contato'];
