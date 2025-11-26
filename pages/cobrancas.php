@@ -519,9 +519,11 @@ if (isClient()) {
                                 <div class="d-flex justify-content-between align-items-center mt-3">
                                     <small class="text-muted">ID: #<?php echo $cobranca['id']; ?></small>
                                     <div>
-                                        <a href="process/crud_handler.php?action=enviar_cobranca_email&id=<?php echo $cobranca['id']; ?>" class="btn btn-sm btn-outline-primary" onclick="return confirm('Enviar cobrança por email para o contato cadastrado?');">
-                                            <i class="bi bi-envelope-fill"></i> Enviar por Email
-                                        </a>
+                                        <?php if (($cobranca['status_pagamento'] ?? '') !== 'Pago'): ?>
+                                            <a href="process/crud_handler.php?action=enviar_cobranca_email&id=<?php echo $cobranca['id']; ?>" class="btn btn-sm btn-outline-primary" onclick="return confirm('Enviar cobrança por email para o contato cadastrado?');">
+                                                <i class="bi bi-envelope-fill"></i> Enviar por Email
+                                            </a>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -788,7 +790,7 @@ if (isClient()) {
                                             
                                             <?php // Botão de Reverter: Visível apenas se pago
                                             if ($status_pagamento === 'Pago'): ?>
-                                                <form action="process/crud_handler.php" method="POST" class="d-inline">
+                                                <form action="process/crud_handler.php" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja reverter a confirmação de pagamento desta cobrança?');">
                                                     <input type="hidden" name="action" value="reverter_pago_cobranca">
                                                     <input type="hidden" name="id_cobranca" value="<?php echo $cobranca['id']; ?>">
                                                     <button type="submit" class="btn btn-sm btn-secondary" title="Reverter para Pendente"><i class="bi bi-arrow-counterclockwise"></i></button>
@@ -812,10 +814,12 @@ if (isClient()) {
                                                 </a>
                                             <?php endif; ?>
                                             
-                                                <!-- Botão Enviar por Email -->
-                                                <a href="process/crud_handler.php?action=enviar_cobranca_email&id=<?php echo $cobranca['id']; ?>" class="btn btn-sm btn-outline-primary" title="Enviar por Email" onclick="return confirm('Enviar cobrança por email para o contato cadastrado?');">
-                                                    <i class="bi bi-envelope-fill"></i>
-                                                </a>
+                                                <!-- Botão Enviar por Email (oculto se já estiver Pago) -->
+                                                <?php if ($status_pagamento !== 'Pago'): ?>
+                                                    <a href="process/crud_handler.php?action=enviar_cobranca_email&id=<?php echo $cobranca['id']; ?>" class="btn btn-sm btn-outline-primary" title="Enviar por Email" onclick="return confirm('Enviar cobrança por email para o contato cadastrado?');">
+                                                        <i class="bi bi-envelope-fill"></i>
+                                                    </a>
+                                                <?php endif; ?>
 
                                                 <?php
                                                 // Para Admin/Contador: quando a cobrança estiver Paga ou Confirmada, exibe opções de Recibo
