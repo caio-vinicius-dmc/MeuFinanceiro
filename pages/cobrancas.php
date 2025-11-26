@@ -433,16 +433,7 @@ if (isClient()) {
             </div>
         </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-    try {
-        var el = document.getElementById('filtersCollapseCobrancasCliente');
-        if (el && window.innerWidth < 768) {
-            el.classList.add('show');
-        }
-    } catch(e) { console.warn(e); }
-});
-</script>
+
         <!-- Filtros ativos (cliente) -->
         <?php
         $activeFilters = [];
@@ -741,16 +732,7 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
         </div>
 
-        <script>
-        document.addEventListener('DOMContentLoaded', function(){
-            try {
-                var el = document.getElementById('filtersCollapseCobrancas');
-                if (el && window.innerWidth < 768) {
-                    el.classList.add('show');
-                }
-            } catch(e) { console.warn(e); }
-        });
-        </script>
+        
         
         <div class="card shadow-sm">
             <div class="card-header">

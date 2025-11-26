@@ -1158,3 +1158,20 @@ function initCobTipoChart(canvasElement) {
         console.error('Erro initCobTipoChart', e);
     }
 }
+
+
+// =========================
+// Auto-open filter collapses on small screens
+// Centralizado aqui to keep inline scripts out of pages
+// =========================
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        const AUTO_COLLAPSES = ['filtersCollapseLancamentos', 'filtersCollapseDashboard', 'filtersCollapseCobrancas', 'filtersCollapseCobrancasCliente'];
+        AUTO_COLLAPSES.forEach(function(id){
+            try {
+                const el = document.getElementById(id);
+                if (el && window.innerWidth < 768) el.classList.add('show');
+            } catch (e) { /* ignore individual failures */ }
+        });
+    } catch (e) { console.warn('Erro no auto-open de collapses:', e); }
+});
