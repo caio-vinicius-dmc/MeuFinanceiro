@@ -1,7 +1,7 @@
 {
-  "name": "MeuFinanceiro",
-  "short_name": "MeuFin",
-  "description": "Aplicação de gestão financeira - MeuFinanceiro",
+  "name": "WorkFlow",
+  "short_name": "DMC-WorkFlow",
+  "description": "Aplicação de gestão contábil - WorkFlow",
   "start_url": "/index.php",
   "scope": "/",
   "display": "standalone",

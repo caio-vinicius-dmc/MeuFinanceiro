@@ -7,7 +7,7 @@
     <div class="container-fluid">
         <div class="row align-items-center gy-3">
             <div class="col-12 col-md-12 d-flex align-items-center gap-3">
-                <img src="<?php echo base_url('assets/img/logo-dmc.jpg'); ?>" alt="DMC" class="footer-logo">
+                <img src="<?php echo base_url('assets/img/logo-dmc.png'); ?>" alt="DMC" class="footer-logo">
                 <div class="fw-bold">Dynamic Motion Century</div>
             </div>
         </div>

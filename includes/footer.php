@@ -24,7 +24,7 @@
                 <div class="row align-items-center gy-3">
                     <div class="col-md-6 d-flex flex-column justify-content-center">
                         <div class="d-flex align-items-center">
-                                <img src="<?php echo base_url('assets/img/logo-dmc.jpg'); ?>" alt="DMC" class="footer-logo me-2" />
+                                <img src="<?php echo base_url('assets/img/logo-dmc.png'); ?>" alt="DMC" class="footer-logo me-2" />
                             <div>
                                 <div class="fw-bold">DMC (Dynamic Motion Century) - <small class="text-muted">&copy;2025. Todos os direitos reservados.</small></div> 
                             </div>

@@ -1209,7 +1209,22 @@ if ('serviceWorker' in navigator) {
 // === PWA: custom install prompt handler (beforeinstallprompt) ===
 (function() {
     let deferredPrompt = null;
+
+    function isPWA() {
+        try {
+            // Chrome/modern browsers
+            if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+            // iOS
+            if (window.navigator.standalone === true) return true;
+            // Android WebAPK referrer (rare)
+            if (document.referrer && document.referrer.indexOf('android-app://') === 0) return true;
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
     function createInstallBanner() {
+        // don't show banner if we're already running as a PWA
+        if (isPWA()) return;
         // banner simples no canto inferior direito
         const banner = document.createElement('div');
         banner.id = 'pwa-install-banner';
@@ -1229,7 +1244,7 @@ if ('serviceWorker' in navigator) {
         const text = document.createElement('div');
         text.style.fontSize = '14px';
         text.style.color = '#212529';
-        text.textContent = 'Instalar MeuFinanceiro';
+        text.textContent = 'Instalar WorkFlow';
 
         const btn = document.createElement('button');
         btn.className = 'btn btn-sm btn-primary';
@@ -1271,6 +1286,7 @@ if ('serviceWorker' in navigator) {
         // also expose globally so other UI can access it
         window.deferredPWAInstallPrompt = e;
         // show our custom install banner
+        if (isPWA()) return; // already installed / standalone — skip
         if (document.readyState === 'complete') createInstallBanner();
         else window.addEventListener('load', createInstallBanner);
     });
@@ -1298,6 +1314,11 @@ if ('serviceWorker' in navigator) {
     }
 
     // Try once on DOMContentLoaded
+    // Also remove any install banner if we're already running as a PWA
+    try {
+        if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) removePwaButtonOnce();
+        if (window.navigator.standalone === true) removePwaButtonOnce();
+    } catch(e) {}
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', removePwaButtonOnce);
     else removePwaButtonOnce();
 
