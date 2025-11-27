@@ -25,10 +25,27 @@ $perms = $pdo->query('SELECT * FROM permissions ORDER BY name')->fetchAll();
         <h6>Criar nova permissão</h6>
         <form method="POST" action="process/rbac_handler.php">
             <input type="hidden" name="action" value="create_permission">
-            <div class="mb-2"><input class="form-control" name="name" placeholder="Nome da permissão"></div>
-            <div class="mb-2"><input class="form-control" name="slug" placeholder="slug_unico"></div>
+            <div class="mb-2"><input class="form-control" id="perm_name" name="name" placeholder="Nome da permissão"></div>
+            <div class="mb-2"><input class="form-control" id="perm_slug" name="slug" placeholder="slug_unico"></div>
             <div class="mb-2"><textarea class="form-control" name="description" placeholder="Descrição (opcional)"></textarea></div>
-            <button class="btn btn-primary">Criar permissão</button>
+            <button class="btn btn-primary" id="btnCreatePerm">Criar permissão</button>
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var btn = document.getElementById('btnCreatePerm');
+    if (btn) {
+        btn.addEventListener('click', function (e) {
+            var name = document.getElementById('perm_name').value.trim();
+            var slug = document.getElementById('perm_slug').value.trim();
+            if (!name || !slug) {
+                e.preventDefault();
+                alert('Nome e slug são obrigatórios para criar uma permissão.');
+                return false;
+            }
+        });
+    }
+});
+</script>

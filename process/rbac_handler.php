@@ -19,6 +19,7 @@ try {
         if (!$name || !$slug) throw new Exception('Nome e slug são obrigatórios');
         $stmt = $pdo->prepare('INSERT INTO roles (name, slug, description) VALUES (?, ?, ?)');
         $stmt->execute([$name, $slug, $desc]);
+        $_SESSION['success_message'] = 'Papel criado com sucesso.';
         header('Location: ' . base_url('index.php?page=gerenciar_papeis'));
         exit;
     }
@@ -36,6 +37,7 @@ try {
         $pdo->prepare('DELETE FROM role_permissions WHERE role_id = ?')->execute([$id]);
         $stmtIns = $pdo->prepare('INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)');
         foreach ($perms as $pid) { $stmtIns->execute([$id, intval($pid)]); }
+        $_SESSION['success_message'] = 'Papel atualizado com sucesso.';
         header('Location: ' . base_url('index.php?page=gerenciar_papeis'));
         exit;
     }
@@ -47,6 +49,7 @@ try {
         if (!$name || !$slug) throw new Exception('Nome e slug são obrigatórios');
         $stmt = $pdo->prepare('INSERT INTO permissions (name, slug, description) VALUES (?, ?, ?)');
         $stmt->execute([$name, $slug, $desc]);
+        $_SESSION['success_message'] = 'Permissão criada com sucesso.';
         header('Location: ' . base_url('index.php?page=gerenciar_permissoes'));
         exit;
     }
@@ -57,6 +60,7 @@ try {
         if (!$user_id || !$role_id) throw new Exception('Dados inválidos');
         $stmt = $pdo->prepare('INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)');
         $stmt->execute([$user_id, $role_id]);
+        $_SESSION['success_message'] = 'Papel atribuído ao usuário.';
         header('Location: ' . base_url('index.php?page=gerenciar_papeis'));
         exit;
     }
@@ -67,6 +71,7 @@ try {
         if (!$user_id || !$role_id) throw new Exception('Dados inválidos');
         $stmt = $pdo->prepare('DELETE FROM user_roles WHERE user_id = ? AND role_id = ?');
         $stmt->execute([$user_id, $role_id]);
+        $_SESSION['success_message'] = 'Papel removido do usuário.';
         header('Location: ' . base_url('index.php?page=gerenciar_papeis'));
         exit;
     }

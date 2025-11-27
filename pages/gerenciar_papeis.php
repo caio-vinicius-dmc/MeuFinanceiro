@@ -37,7 +37,7 @@ $users = $pdo->query('SELECT id, nome, email FROM usuarios ORDER BY nome')->fetc
             <div class="mb-2"><input class="form-control" name="name" placeholder="Nome do papel"></div>
             <div class="mb-2"><input class="form-control" name="slug" placeholder="slug_unico"></div>
             <div class="mb-2"><textarea class="form-control" name="description" placeholder="Descrição"></textarea></div>
-            <button class="btn btn-primary">Criar</button>
+            <button class="btn btn-primary" id="btnCreateRole">Criar</button>
         </form>
     </div>
 
@@ -77,3 +77,21 @@ $users = $pdo->query('SELECT id, nome, email FROM usuarios ORDER BY nome')->fetc
         </form>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var btn = document.getElementById('btnCreateRole');
+    if (btn) {
+        btn.addEventListener('click', function (e) {
+            var form = btn.closest('form');
+            var name = form.querySelector('input[name="name"]').value.trim();
+            var slug = form.querySelector('input[name="slug"]').value.trim();
+            if (!name || !slug) {
+                e.preventDefault();
+                alert('Nome e slug são obrigatórios para criar um papel.');
+                return false;
+            }
+        });
+    }
+});
+</script>
