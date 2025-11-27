@@ -2,7 +2,9 @@
 // pages/associacoes_contador.php
 global $pdo;
 
-if (!isLoggedIn() || !(isAdmin() || isSuperAdmin())) {
+// Permissão RBAC: 'acessar_associacoes_contador'
+// Mantemos os checks legados (isAdmin/isSuperAdmin) para compatibilidade.
+if (!isLoggedIn() || !(isAdmin() || isSuperAdmin() || current_user_has_permission('acessar_associacoes_contador'))) {
     header('Location: ' . base_url('index.php?page=dashboard'));
     exit;
 }

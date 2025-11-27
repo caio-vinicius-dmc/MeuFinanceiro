@@ -2,8 +2,8 @@
 // pages/logs.php
 global $pdo;
 
-// 1. Apenas Admin pode ver esta página
-if (!isAdmin()) {
+// 1. Acesso: Admin ou permissão RBAC 'acessar_logs'
+if (!isAdmin() && !(function_exists('current_user_has_permission') && current_user_has_permission('acessar_logs'))) {
     header("Location: " . base_url('index.php?page=dashboard'));
     exit;
 }

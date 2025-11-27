@@ -2,10 +2,14 @@
 // pages/cadastro_usuarios.php
 global $pdo;
 
-// Apenas Admin pode ver esta página
+// Protegido: gerenciar_usuarios (ou admin)
 if (!isAdmin()) {
-    header("Location: " . base_url('index.php?page=dashboard'));
-    exit;
+    if (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_usuarios')) {
+        // permitido
+    } else {
+        header("Location: " . base_url('index.php?page=dashboard'));
+        exit;
+    }
 }
 
 $stmt_users = $pdo->query("SELECT id, nome, email, telefone, tipo, ativo, id_cliente_associado, acesso_lancamentos, COALESCE(is_super_admin,0) AS is_super_admin FROM usuarios ORDER BY nome");

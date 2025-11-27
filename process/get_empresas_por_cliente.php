@@ -19,8 +19,8 @@ if (isClient()) {
     }
 }
 
-// Contador: só pode pedir clientes associados
-if (isContador()) {
+// Contador: só pode pedir clientes associados, a menos que seja admin ou tenha permissão RBAC 'gerenciar_empresas'
+if (isContador() && !(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_empresas')))) {
     $stmt = $pdo->prepare("SELECT COUNT(1) FROM contador_clientes_assoc WHERE id_usuario_contador = ? AND id_cliente = ?");
     $stmt->execute([$_SESSION['user_id'], $cliente_id]);
     if ($stmt->fetchColumn() == 0) {

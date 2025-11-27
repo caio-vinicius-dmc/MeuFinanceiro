@@ -24,8 +24,8 @@ function redirect_back($page = 'documentos', $extra = ''){
 try {
     switch ($action) {
         case 'criar_pasta_raiz':
-            if (!isAdmin()) {
-                $_SESSION['error_message'] = 'Apenas administradores podem criar pastas raiz.';
+            if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')))) {
+                $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem criar pastas raiz.';
                 if ($isAjax) json_response(['ok' => false, 'error' => $_SESSION['error_message']]);
                 redirect_back('gerenciar_documentos');
             }
@@ -74,8 +74,8 @@ try {
             break;
 
         case 'criar_subpasta':
-            if (!isAdmin()) {
-                $_SESSION['error_message'] = 'Apenas administradores podem criar subpastas.';
+            if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')))) {
+                $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem criar subpastas.';
                 if ($isAjax) json_response(['ok' => false, 'error' => $_SESSION['error_message']]);
                 redirect_back('gerenciar_documentos');
             }
@@ -101,8 +101,8 @@ try {
             break;
 
         case 'associar_pasta_usuario':
-            if (!isAdmin()) {
-                $_SESSION['error_message'] = 'Apenas administradores podem associar pastas a usuários.';
+            if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')))) {
+                $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem associar pastas a usuários.';
                 if ($isAjax) json_response(['ok' => false, 'error' => $_SESSION['error_message']]);
                 redirect_back('gerenciar_documentos');
             }
@@ -178,8 +178,8 @@ try {
 
         case 'editar_pasta':
             // Edita nome e parent de uma pasta
-            if (!isAdmin()) {
-                $_SESSION['error_message'] = 'Apenas administradores podem editar pastas.';
+            if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')))) {
+                $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem editar pastas.';
                 redirect_back('gerenciar_documentos');
             }
             $pasta_id = intval($_POST['pasta_id'] ?? 0);
@@ -238,8 +238,8 @@ try {
             break;
 
         case 'deletar_pasta':
-            if (!isAdmin()) {
-                $_SESSION['error_message'] = 'Apenas administradores podem excluir pastas.';
+            if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')))) {
+                $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem excluir pastas.';
                 if ($isAjax) json_response(['ok' => false, 'error' => $_SESSION['error_message']]);
                 redirect_back('gerenciar_documentos');
             }
@@ -404,7 +404,7 @@ try {
                 $_SESSION['error_message'] = 'Pasta não encontrada.';
                 redirect_back('documentos');
             }
-            if (!isAdmin() && !isUserAssociatedToPasta($user_id, $pasta_id)) {
+            if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')) || isUserAssociatedToPasta($user_id, $pasta_id))) {
                 $_SESSION['error_message'] = 'Você não tem permissão para enviar para essa pasta.';
                 redirect_back('documentos');
             }
@@ -487,8 +487,8 @@ try {
             break;
 
         case 'aprovar_arquivo':
-            if (!isAdmin()) {
-                $_SESSION['error_message'] = 'Apenas administradores podem aprovar arquivos.';
+            if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')))) {
+                $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem aprovar arquivos.';
                 redirect_back('gerenciar_documentos');
             }
             $arquivo_id = intval($_POST['arquivo_id'] ?? 0);
@@ -554,9 +554,9 @@ try {
                 $_SESSION['error_message'] = 'Arquivo não encontrado.';
                 redirect_back('documentos');
             }
-            // Only administrators are allowed to delete files (clients/contadors cannot delete)
-            if (!isAdmin()) {
-                $_SESSION['error_message'] = 'Apenas administradores podem excluir arquivos.';
+            // Only administrators or users with RBAC permission are allowed to delete files (clients/contadors cannot delete)
+            if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')))) {
+                $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem excluir arquivos.';
                 redirect_back('documentos');
             }
             // delete file from disk

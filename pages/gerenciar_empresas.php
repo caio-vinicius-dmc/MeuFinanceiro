@@ -2,6 +2,14 @@
 require_once __DIR__ . '/../config/functions.php';
 requireLogin();
 
+// Permissão: acessar_configuracoes (apenas admins ou quem tiver essa permissão)
+if (function_exists('current_user_has_permission')) {
+    if (! (current_user_has_permission('acessar_configuracoes') || isSuperAdmin() || isAdmin())) {
+        header('Location: ' . base_url('index.php?page=dashboard'));
+        exit;
+    }
+}
+
 $user_id = $_SESSION['user_id'];
 
 // Se for admin global, lista todas as empresas. Senão, lista as associadas.
@@ -26,7 +34,7 @@ $page_title = 'Gerenciar Empresas';
 ?>
 <div class="container-fluid py-4">
     <?php render_page_title('Gerenciar Empresas', '', 'bi-building'); ?>
-    <?php if (isAdmin()): ?>
+    <?php if (isAdmin() || (function_exists('current_user_has_permission') && (current_user_has_permission('gerenciar_empresas') || current_user_has_permission('acessar_configuracoes')))): ?>
         <div class="mb-3 text-end">
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCreateEmpresa">Nova Empresa</button>
         </div>
@@ -53,7 +61,7 @@ $page_title = 'Gerenciar Empresas';
                                 <td><?php echo htmlspecialchars($e['cnpj'] ?? ''); ?></td>
                                 <td><?php echo htmlspecialchars($e['created_at'] ?? ''); ?></td>
                                 <td>
-                                    <?php if (isAdmin()): ?>
+                                    <?php if (isAdmin() || (function_exists('current_user_has_permission') && (current_user_has_permission('gerenciar_empresas') || current_user_has_permission('acessar_configuracoes')))): ?>
                                         <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalEditEmpresa" 
                                             data-id="<?php echo $e['id']; ?>" data-nome="<?php echo htmlspecialchars($e['nome'], ENT_QUOTES); ?>" data-cnpj="<?php echo htmlspecialchars($e['cnpj'] ?? '', ENT_QUOTES); ?>">Editar</button>
                                         <form action="<?php echo base_url('process/empresas_handler.php'); ?>" method="post" class="d-inline empresa-delete-form" onsubmit="return confirm('Confirmar exclusão desta empresa?');">
@@ -328,7 +336,7 @@ document.addEventListener('DOMContentLoaded', function(){
         setTimeout(function(){ div.remove(); }, 3500);
     }
 
-    var MF_isAdmin = <?php echo isAdmin() ? 'true' : 'false'; ?>;
+    var MF_isAdmin = <?php echo (isAdmin() || (function_exists('current_user_has_permission') && (current_user_has_permission('gerenciar_empresas') || current_user_has_permission('acessar_configuracoes')))) ? 'true' : 'false'; ?>;
 
     // Create
     var formCreate = document.getElementById('formCreateEmpresa');

@@ -1,10 +1,14 @@
 <?php
 // pages/gerenciar_tipos_cobranca.php
 
-// Apenas Admin pode acessar esta página
+// Protegido: acessar_configuracoes ou Admin
 if (!isAdmin()) {
-    echo '<div class="alert alert-danger">Acesso negado.</div>';
-    return;
+    if (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')) {
+        // permitido
+    } else {
+        echo '<div class="alert alert-danger">Acesso negado.</div>';
+        return;
+    }
 }
 
 // Lógica para buscar os tipos de cobrança

@@ -2,10 +2,14 @@
 // pages/cadastro_empresas.php
 global $pdo;
 
-// Apenas Admin e Contador podem ver esta página
+// Protegido: acessar_configuracoes ou Admin/Contador
 if (!isAdmin() && !isContador()) {
-    header("Location: " . base_url('index.php?page=dashboard'));
-    exit;
+    if (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')) {
+        // permitido via RBAC
+    } else {
+        header("Location: " . base_url('index.php?page=dashboard'));
+        exit;
+    }
 }
 
 // Buscar clientes para o <select> do formulário de cadastro

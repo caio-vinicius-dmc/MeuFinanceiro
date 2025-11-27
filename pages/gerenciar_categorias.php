@@ -1,11 +1,15 @@
 <?php
 // pages/gerenciar_categorias.php
 
-// Apenas admins podem acessar esta página
+// Protegido: acessar_configuracoes ou admins
 if (!isAdmin()) {
-    $_SESSION['error_message'] = "Você não tem permissão para acessar esta página.";
-    header('Location: index.php?page=dashboard');
-    exit;
+    if (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')) {
+        // permitido
+    } else {
+        $_SESSION['error_message'] = "Você não tem permissão para acessar esta página.";
+        header('Location: index.php?page=dashboard');
+        exit;
+    }
 }
 
 // Busca todas as categorias para listar na tabela

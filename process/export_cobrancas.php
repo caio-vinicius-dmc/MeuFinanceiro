@@ -29,18 +29,18 @@ if (isClient()) {
         $params[] = $filtro_id_empresa;
     }
 } elseif (isContador()) {
-    // limitar aos clientes associados do contador
-    $stmt_clientes_assoc = $pdo->prepare("SELECT id_cliente FROM contador_clientes_assoc WHERE id_usuario_contador = ?");
-    $stmt_clientes_assoc->execute([$_SESSION['user_id']]);
-    $clientes_permitidos_ids = $stmt_clientes_assoc->fetchAll(PDO::FETCH_COLUMN);
-    if (!empty($clientes_permitidos_ids)) {
-        $placeholders = implode(',', array_fill(0, count($clientes_permitidos_ids), '?'));
-        $where_conditions[] = "emp.id_cliente IN ($placeholders)";
-        $params = array_merge($params, $clientes_permitidos_ids);
-    } else {
-        // sem clientes permitidos -> nada a exportar
-        $where_conditions[] = '1=0';
-    }
+        // limitar aos clientes associados do contador (a menos que tenha permissão 'acessar_cobrancas')
+        $stmt_clientes_assoc = $pdo->prepare("SELECT id_cliente FROM contador_clientes_assoc WHERE id_usuario_contador = ?");
+        $stmt_clientes_assoc->execute([$_SESSION['user_id']]);
+        $clientes_permitidos_ids = $stmt_clientes_assoc->fetchAll(PDO::FETCH_COLUMN);
+        if (!empty($clientes_permitidos_ids)) {
+            $placeholders = implode(',', array_fill(0, count($clientes_permitidos_ids), '?'));
+            $where_conditions[] = "emp.id_cliente IN ($placeholders)";
+            $params = array_merge($params, $clientes_permitidos_ids);
+        } else {
+            // sem clientes permitidos -> nada a exportar
+            $where_conditions[] = '1=0';
+        }
 } // isAdmin não tem restrição adicional
 
 // Aplicar filtro por empresa também para admin/contador quando fornecido
@@ -56,8 +56,8 @@ if ($filtro_data_inicio && $filtro_data_fim) {
     $params[] = $filtro_data_fim;
 }
 
-if ($filtro_cliente_id && isAdmin()) {
-    // filtro por cliente usado apenas em admin
+if ($filtro_cliente_id && (isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('acessar_cobrancas')))) {
+    // filtro por cliente usado apenas em admin ou quem tem permissão 'acessar_cobrancas'
     $where_conditions[] = 'emp.id_cliente = ?';
     $params[] = $filtro_cliente_id;
 }

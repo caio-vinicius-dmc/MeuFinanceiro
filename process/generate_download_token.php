@@ -46,7 +46,7 @@ try {
     // best-effort only: if anything fails here, continue to the regular permission checks below
 }
 
-if (!isAdmin() && intval($a['enviado_por_user_id']) !== intval($user_id) && !isUserAssociatedToPasta($user_id, $a['pasta_id'])) {
+if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('visualizar_documentos')) || intval($a['enviado_por_user_id']) === intval($user_id) || isUserAssociatedToPasta($user_id, $a['pasta_id']))) {
     http_response_code(403);
     echo json_encode(['error' => 'sem permissão']);
     exit;

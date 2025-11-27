@@ -31,7 +31,8 @@ $params = [];
 
 // 2a. Permissão de Dados (Clientes e Contadores)
 $clientes_permitidos_ids = []; 
-if (isContador()) {
+// Se usuário for contador e NÃO possuir permissão RBAC 'acessar_lancamentos', aplica scoping por clientes associados.
+if (isContador() && !(function_exists('current_user_has_permission') && current_user_has_permission('acessar_lancamentos'))) {
     $stmt_clientes_assoc = $pdo->prepare("SELECT id_cliente FROM contador_clientes_assoc WHERE id_usuario_contador = ?");
     $stmt_clientes_assoc->execute([$_SESSION['user_id']]);
     $clientes_permitidos_ids = $stmt_clientes_assoc->fetchAll(PDO::FETCH_COLUMN);

@@ -1,8 +1,16 @@
 <?php
 // pages/gerenciar_formas_pagamento.php
+require_once 'config/functions.php';
+// Permissão: acessar_configuracoes
+if (function_exists('current_user_has_permission')) {
+    if (! (current_user_has_permission('acessar_configuracoes') || isSuperAdmin() || isAdmin())) {
+        header('Location: ' . base_url('index.php?page=dashboard'));
+        exit;
+    }
+}
 
-// Apenas admins podem acessar esta página
-if (!isAdmin()) {
+// Garantir acesso: Admin, SuperAdmin ou permissão 'acessar_configuracoes'
+if (! (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')) && !isSuperAdmin() && !isAdmin()) {
     $_SESSION['error_message'] = "Você não tem permissão para acessar esta página.";
     header('Location: index.php?page=dashboard');
     exit;

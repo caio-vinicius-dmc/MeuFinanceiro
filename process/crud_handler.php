@@ -119,8 +119,8 @@ switch ($action) {
 
         case 'test_smtp':
             // Testar envio SMTP usando as configurações salvas
-            if (!isAdmin()) {
-                $_SESSION['error_message'] = 'Apenas administradores podem testar a conexão SMTP.';
+            if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')))) {
+                $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem testar a conexão SMTP.';
                 header('Location: ' . base_url('index.php?page=configuracoes_email'));
                 exit;
             }
@@ -536,8 +536,8 @@ switch ($action) {
 
     case 'salvar_config_smtp':
         // Salva as configurações SMTP no banco (tabela system_settings)
-        if (!isAdmin()) {
-            $_SESSION['error_message'] = 'Apenas administradores podem alterar as configurações de e-mail.';
+        if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')))) {
+            $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem alterar as configurações de e-mail.';
             header('Location: ' . base_url('index.php?page=configuracoes_email'));
             exit;
         }
@@ -606,8 +606,8 @@ switch ($action) {
 
     case 'salvar_templates_email':
         // Salva apenas os modelos/templates de e-mail (sem exigir campos SMTP)
-        if (!isAdmin()) {
-            $_SESSION['error_message'] = 'Apenas administradores podem alterar os modelos de e-mail.';
+        if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')))) {
+            $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem alterar os modelos de e-mail.';
             header('Location: ' . base_url('index.php?page=configuracoes_email'));
             exit;
         }
@@ -660,8 +660,8 @@ switch ($action) {
 
     case 'salvar_config_documentos':
         // Salva templates para Termo e Recibo
-        if (!isAdmin()) {
-            $_SESSION['error_message'] = 'Apenas administradores podem alterar templates de documentos.';
+        if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')))) {
+            $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem alterar templates de documentos.';
             header('Location: ' . base_url('index.php?page=configuracoes_documentos'));
             exit;
         }
@@ -704,8 +704,8 @@ switch ($action) {
         break;
 
     case 'criar_categoria_lancamento':
-        if (!isAdmin()) {
-            $_SESSION['error_message'] = 'Apenas administradores podem criar categorias.';
+        if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')))) {
+            $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem criar categorias.';
             header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
             exit;
         }
@@ -730,8 +730,8 @@ switch ($action) {
         break;
 
     case 'editar_categoria_lancamento':
-        if (!isAdmin()) {
-            $_SESSION['error_message'] = 'Apenas administradores podem editar categorias.';
+        if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')))) {
+            $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem editar categorias.';
             header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
             exit;
         }
@@ -757,7 +757,7 @@ switch ($action) {
         break;
 
     case 'excluir_categoria_lancamento':
-        if (!isAdmin()) {
+        if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')))) {
             $_SESSION['error_message'] = 'Apenas administradores podem excluir categorias.';
             header('Location: ' . base_url('index.php?page=gerenciar_categorias'));
             exit;

@@ -1,9 +1,14 @@
 <?php
 // pages/gerenciar_documentos.php
+// Permissão: visualizar_documentos ou acesso administrativo
 if (!isAdmin()) {
-    $_SESSION['error_message'] = 'Apenas administradores podem acessar esta página.';
-    header('Location: index.php?page=dashboard');
-    exit;
+    if (function_exists('current_user_has_permission') && current_user_has_permission('visualizar_documentos')) {
+        // permitido via RBAC
+    } else {
+        $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem acessar esta página.';
+        header('Location: index.php?page=dashboard');
+        exit;
+    }
 }
 
 $doc_templates = getDocumentTemplates();
@@ -180,7 +185,7 @@ try {
                                                     <td><span class="badge bg-secondary"><?php echo count($ass_ids); ?> associados</span></td>
                                             
                                                     <td>
-                                                        <?php $canModify = isAdmin(); ?>
+                                                        <?php $canModify = isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')); ?>
                                                         <?php if ($canModify): ?>
                                                             <button type="button" class="btn btn-sm btn-primary ms-1 pasta-actions-btn" 
                                                                 data-pasta-id="<?php echo $p['id']; ?>"
@@ -228,7 +233,7 @@ try {
                                                     <td><?php echo htmlspecialchars($sp['parent_nome'] ?? '-'); ?></td>
                                                     
                                                     <td>
-                                                        <?php $canModify = isAdmin(); ?>
+                                                        <?php $canModify = isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')); ?>
                                                         <?php if ($canModify): ?>
                                                             <div style="display:inline-block; vertical-align:middle; width:220px;">
                                                                 <!-- Subpastas não mostram associados nesta listagem -->

@@ -7,8 +7,8 @@ header('Content-Type: application/json; charset=utf-8');
 
 // Allow global admins or company admins (for the currently selected company).
 if (!isAdmin()) {
-    // require the user to be admin for the current company
-    if (!function_exists('is_admin_for_current_company') || !is_admin_for_current_company()) {
+    // require the user to be admin for the current company OR have RBAC 'gerenciar_documentos'
+    if (!((function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos')) || (function_exists('is_admin_for_current_company') && is_admin_for_current_company()))) {
         echo json_encode(['ok' => false, 'error' => 'Acesso negado']);
         exit;
     }
@@ -29,7 +29,7 @@ try {
         exit;
     }
     // If global admin, list all users; otherwise list only users associated to the current company
-    if (isAdmin()) {
+    if (isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_documentos'))) {
         $stmt = $pdo->prepare('SELECT u.id, u.nome, u.email, u.id_cliente_associado, c.nome_responsavel as cliente_nome FROM usuarios u LEFT JOIN clientes c ON u.id_cliente_associado = c.id ORDER BY u.nome ASC');
         $stmt->execute();
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);

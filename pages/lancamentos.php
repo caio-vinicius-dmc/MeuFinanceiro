@@ -4,8 +4,8 @@ global $pdo;
 // detect company column name at runtime (empresa_id or id_empresa)
 $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
 
-// Redireciona se o usuário não tiver acesso a lançamentos
-if (!hasLancamentosAccess()) {
+// Redireciona se o usuário não tiver acesso a lançamentos (legacy) ou permissão RBAC
+if (!hasLancamentosAccess() && !(function_exists('current_user_has_permission') && current_user_has_permission('acessar_lancamentos'))) {
     header("Location: " . base_url('index.php?page=dashboard'));
     exit;
 }

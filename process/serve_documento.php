@@ -64,7 +64,7 @@ try {
 }
 if ($a['status'] !== 'approved') {
     $allowed = false;
-    if (isAdmin()) $allowed = true;
+    if (isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('visualizar_documentos'))) $allowed = true;
     if (intval($a['enviado_por_user_id']) === intval($user_id)) $allowed = true;
     // check association via helper (fallbacks included)
     if (isUserAssociatedToPasta($user_id, $a['pasta_id'])) $allowed = true;

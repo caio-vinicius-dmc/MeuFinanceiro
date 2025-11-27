@@ -25,8 +25,8 @@ $action = $_POST['action'] ?? '';
 try {
     global $pdo;
     if ($action === 'create') {
-        if (!isAdmin()) {
-            $_SESSION['error_message'] = 'Apenas administradores podem criar empresas.';
+        if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_empresas')))) {
+            $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem criar empresas.';
             header('Location: ' . base_url('index.php?page=gerenciar_empresas'));
             exit;
         }
@@ -58,8 +58,8 @@ try {
     }
 
     if ($action === 'update') {
-        if (!isAdmin()) {
-            $_SESSION['error_message'] = 'Apenas administradores podem editar empresas.';
+        if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_empresas')))) {
+            $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem editar empresas.';
             header('Location: ' . base_url('index.php?page=gerenciar_empresas'));
             exit;
         }
@@ -82,8 +82,8 @@ try {
     }
 
     if ($action === 'delete') {
-        if (!isAdmin()) {
-            $_SESSION['error_message'] = 'Apenas administradores podem excluir empresas.';
+        if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_empresas')))) {
+            $_SESSION['error_message'] = 'Apenas administradores ou usuários com permissão podem excluir empresas.';
             header('Location: ' . base_url('index.php?page=gerenciar_empresas'));
             exit;
         }
@@ -108,7 +108,7 @@ try {
         $role = $_POST['role'] ?? 'cliente';
         if ($empresa_id <= 0 || $usuario_id <= 0) throw new Exception('Dados inválidos.');
         // verificar permissão: admin global OU admin da empresa
-        $allowed = isAdmin() || user_has_role($_SESSION['user_id'], $empresa_id, 'admin');
+        $allowed = isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_empresas')) || user_has_role($_SESSION['user_id'], $empresa_id, 'admin');
         if (!$allowed) {
             $_SESSION['error_message'] = 'Permissão negada para associar usuários.';
             header('Location: ' . base_url('index.php?page=gerenciar_empresas'));
@@ -133,7 +133,7 @@ try {
     }
 
         if ($action === 'remove_association') {
-                if (!isAdmin() && !user_has_role($_SESSION['user_id'], intval($_POST['empresa_id'] ?? 0), 'admin')) {
+                if (!(isAdmin() || (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_empresas')) || user_has_role($_SESSION['user_id'], intval($_POST['empresa_id'] ?? 0), 'admin'))) {
                     if (is_ajax_request()) json_response(['success' => false, 'message' => 'Permissão negada para remover associação.'], 403);
                     $_SESSION['error_message'] = 'Permissão negada para remover associação.';
                     header('Location: ' . base_url('index.php?page=gerenciar_empresas'));
