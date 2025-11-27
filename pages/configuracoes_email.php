@@ -3,10 +3,14 @@
 require_once 'config/functions.php';
 global $pdo;
 
-// 1. Apenas Admin pode ver esta página
+// 1. Apenas Admin ou quem tiver permissão pode ver esta página
 if (!isAdmin()) {
-    header("Location: " . base_url('index.php?page=dashboard'));
-    exit;
+    if (function_exists('current_user_has_permission') && current_user_has_permission('acessar_configuracoes')) {
+        // permitido
+    } else {
+        header("Location: " . base_url('index.php?page=dashboard'));
+        exit;
+    }
 }
 
 $settings = getSmtpSettings();

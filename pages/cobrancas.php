@@ -50,6 +50,13 @@ function getStatusInfo($cobranca) {
 
 global $pdo;
 $cobrancas = [];
+// Permissão: acessar_cobrancas
+if (function_exists('current_user_has_permission')) {
+    if (! (current_user_has_permission('acessar_cobrancas') || isAdmin() || isContador() || isClient())) {
+        header('Location: ' . base_url('index.php?page=dashboard'));
+        exit;
+    }
+}
 // detect company column name at runtime (empresa_id or id_empresa)
 $company_col = function_exists('get_company_column_name') ? get_company_column_name() : 'id_empresa';
 

@@ -2,6 +2,14 @@
 // pages/dashboard.php
 global $pdo;
 
+// Checagem de permissão: acessar_dashboard
+if (function_exists('current_user_has_permission')) {
+    if (! (current_user_has_permission('acessar_dashboard') || isAdmin() || isContador() || isClient())) {
+        header('Location: ' . base_url('index.php?page=login'));
+        exit;
+    }
+}
+
 // --- 1. Lógica de Filtros (Novo filtro id_empresa) ---
 $filtro_cliente_id = $_GET['cliente_id'] ?? null;
 $filtro_empresa_id = $_GET['id_empresa'] ?? null; 

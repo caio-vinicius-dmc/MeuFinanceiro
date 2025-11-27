@@ -6,8 +6,13 @@ $company_col = function_exists('get_company_column_name') ? get_company_column_n
 
 // Redireciona se o usuário não tiver acesso a lançamentos
 if (!hasLancamentosAccess()) {
-    header("Location: " . base_url('index.php?page=dashboard'));
-    exit;
+    // tenta checagem RBAC como fallback
+    if (function_exists('current_user_has_permission') && current_user_has_permission('acessar_lancamentos')) {
+        // permitido
+    } else {
+        header("Location: " . base_url('index.php?page=dashboard'));
+        exit;
+    }
 }
 
 // Helpers locais para nomes usados nos filtros (reduz chamadas JS/ajax)
