@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS `role_permissions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `user_roles` (
-  `user_id` INT UNSIGNED NOT NULL,
+  `user_id` INT NOT NULL,
   `role_id` INT UNSIGNED NOT NULL,
   PRIMARY KEY (`user_id`,`role_id`),
   CONSTRAINT `fk_ur_user` FOREIGN KEY (`user_id`) REFERENCES `usuarios`(`id`) ON DELETE CASCADE,
