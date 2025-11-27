@@ -24,7 +24,11 @@ $users = $pdo->query('SELECT id, nome, email FROM usuarios ORDER BY nome')->fetc
                     <td><?php echo htmlspecialchars($r['name']); ?></td>
                     <td><?php echo htmlspecialchars($r['slug']); ?></td>
                     <td>
-                        <a class="btn btn-sm btn-outline-primary" href="index.php?page=editar_papel&id=<?php echo $r['id']; ?>">Editar</a>
+                        <?php if (isset($r['slug']) && $r['slug'] === 'super_admin'): ?>
+                            <span class="text-muted small">Protegido</span>
+                        <?php else: ?>
+                            <a class="btn btn-sm btn-outline-primary" href="index.php?page=editar_papel&id=<?php echo $r['id']; ?>">Editar</a>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>

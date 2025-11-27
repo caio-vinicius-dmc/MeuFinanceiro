@@ -1810,8 +1810,44 @@ switch ($action) {
             $nome = $_POST['nome'];
             $email = $_POST['email'];
             $telefone = $_POST['telefone'] ?? null;
-            $senha = password_hash($_POST['senha'], PASSWORD_DEFAULT); 
-            $tipo = $_POST['tipo_usuario'];
+            $senha = password_hash($_POST['senha'], PASSWORD_DEFAULT);
+            // Nova UI envia role_ids[]; prioriza roles para derivar tipo
+            $incoming_role_ids = $_POST['role_ids'] ?? [];
+            if (!is_array($incoming_role_ids)) $incoming_role_ids = [$incoming_role_ids];
+            $incoming_role_ids = array_map('intval', $incoming_role_ids);
+
+            // Buscar slugs das roles recebidas (ignora papel super_admin caso tente ser atribuído)
+            $tipo = $_POST['tipo_usuario'] ?? null; // fallback
+            $id_cliente_associado = null;
+            $acesso_lancamentos = 0;
+            try {
+                if (!empty($incoming_role_ids)) {
+                    $place = implode(',', array_fill(0, count($incoming_role_ids), '?'));
+                    $stmtR = $pdo->prepare("SELECT id, slug FROM roles WHERE id IN ($place)");
+                    $stmtR->execute($incoming_role_ids);
+                    $rowsR = $stmtR->fetchAll(PDO::FETCH_ASSOC);
+                    $incoming_slugs = array_column($rowsR, 'slug', 'id'); // id => slug
+                    // Remove any super_admin role from incoming (UI shouldn't assign it)
+                    foreach ($rowsR as $r) {
+                        if ($r['slug'] === 'super_admin') {
+                            // remove from arrays
+                            unset($incoming_slugs[$r['id']]);
+                            $incoming_role_ids = array_filter($incoming_role_ids, function($v) use ($r){ return intval($v) !== intval($r['id']); });
+                        }
+                    }
+                    // Deriva tipo por prioridade
+                    if (in_array('admin', $incoming_slugs)) {
+                        $tipo = 'admin';
+                    } elseif (in_array('contador', $incoming_slugs)) {
+                        $tipo = 'contador';
+                    } elseif (in_array('cliente', $incoming_slugs)) {
+                        $tipo = 'cliente';
+                    }
+                }
+            } catch (Exception $e) {
+                error_log('Erro ao mapear incoming roles na criação: ' . $e->getMessage());
+            }
+            // Após derivar tipo, preencher campos de associação/legado
             $id_cliente_associado = ($tipo == 'cliente' && !empty($_POST['id_cliente_associado'])) ? $_POST['id_cliente_associado'] : null;
             $acesso_lancamentos = ($tipo == 'cliente' && isset($_POST['acesso_lancamentos'])) ? 1 : 0;
             $ativo = isset($_POST['ativo']) ? 1 : 0;
@@ -1823,7 +1859,7 @@ switch ($action) {
                 $id_novo_usuario = $pdo->lastInsertId();
                 $_SESSION['success_message'] = "Usuário cadastrado com sucesso!";
                 logAction("Cadastro Usuário", "usuarios", $id_novo_usuario, "Email: $email, Tipo: $tipo");
-                
+
                 if ($tipo == 'contador' && !empty($_POST['id_clientes_associados'])) {
                     $ids_clientes_assoc = $_POST['id_clientes_associados'];
                     $sql_assoc = "INSERT INTO contador_clientes_assoc (id_usuario_contador, id_cliente) VALUES (?, ?)";
@@ -1831,6 +1867,29 @@ switch ($action) {
                     foreach ($ids_clientes_assoc as $id_cliente) {
                         $stmt_assoc->execute([$id_novo_usuario, $id_cliente]);
                     }
+                }
+                // Sincroniza roles explícitas (se fornecidas) — mantém segurança para super_admin
+                try {
+                    if (!empty($incoming_role_ids)) {
+                        // Inserir cada role recebida (INSERT IGNORE)
+                        $insRole = $pdo->prepare('INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)');
+                        foreach ($incoming_role_ids as $rid) {
+                            $insRole->execute([$id_novo_usuario, $rid]);
+                        }
+                    } else {
+                        // Se não vier roles, atribui role padrão pelo tipo (comportamento legado)
+                        $roleStmt = $pdo->prepare('SELECT id FROM roles WHERE slug = ? LIMIT 1');
+                        $roleStmt->execute([$tipo]);
+                        $roleId = $roleStmt->fetchColumn();
+                        if ($roleId) {
+                            $insRole = $pdo->prepare('INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)');
+                            $insRole->execute([$id_novo_usuario, $roleId]);
+                        }
+                    }
+                    // Bump RBAC version so sessions re-evaluate when roles change
+                    if (function_exists('rbac_bump_version')) rbac_bump_version();
+                } catch (Exception $e) {
+                    error_log('Erro ao sincronizar roles na criação: ' . $e->getMessage());
                 }
             } else {
                  $_SESSION['error_message'] = "Erro ao cadastrar usuário.";
@@ -1852,7 +1911,40 @@ switch ($action) {
             $nome = $_POST['nome'];
             $email = $_POST['email'];
             $telefone = $_POST['telefone'] ?? null;
-            $tipo = $_POST['tipo_usuario'];
+            // Novo: prioriza role_ids[] enviados pela UI para derivar o tipo do usuário
+            $incoming_role_ids = $_POST['role_ids'] ?? [];
+            if (!is_array($incoming_role_ids)) $incoming_role_ids = [$incoming_role_ids];
+            $incoming_role_ids = array_map('intval', $incoming_role_ids);
+
+            $tipo = $_POST['tipo_usuario'] ?? null; // fallback caso roles não sejam fornecidos
+            $id_cliente_associado = null;
+            $acesso_lancamentos = 0;
+            try {
+                if (!empty($incoming_role_ids)) {
+                    $place = implode(',', array_fill(0, count($incoming_role_ids), '?'));
+                    $stmtR = $pdo->prepare("SELECT id, slug FROM roles WHERE id IN ($place)");
+                    $stmtR->execute($incoming_role_ids);
+                    $rowsR = $stmtR->fetchAll(PDO::FETCH_ASSOC);
+                    $incoming_slugs = array_column($rowsR, 'slug', 'id');
+                    // Prevenir atribuição do papel super_admin via UI: removemos se enviado
+                    foreach ($rowsR as $r) {
+                        if ($r['slug'] === 'super_admin') {
+                            unset($incoming_slugs[$r['id']]);
+                            $incoming_role_ids = array_filter($incoming_role_ids, function($v) use ($r){ return intval($v) !== intval($r['id']); });
+                        }
+                    }
+                    // Deriva tipo por prioridade: admin > contador > cliente
+                    if (in_array('admin', $incoming_slugs)) {
+                        $tipo = 'admin';
+                    } elseif (in_array('contador', $incoming_slugs)) {
+                        $tipo = 'contador';
+                    } elseif (in_array('cliente', $incoming_slugs)) {
+                        $tipo = 'cliente';
+                    }
+                }
+            } catch (Exception $e) {
+                error_log('Erro ao mapear incoming roles na edição: ' . $e->getMessage());
+            }
             $id_cliente_associado = ($tipo == 'cliente' && !empty($_POST['id_cliente_associado'])) ? $_POST['id_cliente_associado'] : null;
             $acesso_lancamentos = ($tipo == 'cliente' && isset($_POST['acesso_lancamentos'])) ? 1 : 0;
             $ativo = isset($_POST['ativo']) ? 1 : 0;
@@ -1896,6 +1988,70 @@ switch ($action) {
                     foreach ($ids_clientes_assoc as $id_cliente) {
                         $stmt_assoc->execute([$id_usuario_edit, $id_cliente]);
                     }
+                }
+
+                // Atualiza papéis do usuário: sincroniza com role_ids[] (se fornecido), preservando super_admin
+                try {
+                    // Recuperar roles existentes do usuário
+                    $stmtExist = $pdo->prepare('SELECT r.id, r.slug FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = ?');
+                    $stmtExist->execute([$id_usuario_edit]);
+                    $existing = $stmtExist->fetchAll(PDO::FETCH_ASSOC);
+                    $existing_map = [];
+                    $has_super = false;
+                    foreach ($existing as $er) {
+                        $existing_map[intval($er['id'])] = $er['slug'];
+                        if ($er['slug'] === 'super_admin') $has_super = true;
+                    }
+
+                    // If incoming roles provided, sync to that set (but preserve super_admin if present)
+                    if (!empty($incoming_role_ids)) {
+                        // remove existing roles except super_admin
+                        $to_delete = array_filter(array_keys($existing_map), function($rid) use ($existing_map) {
+                            return $existing_map[$rid] !== 'super_admin';
+                        });
+                        if (!empty($to_delete)) {
+                            $holders = implode(',', array_fill(0, count($to_delete), '?'));
+                            $delParams = array_merge([$id_usuario_edit], $to_delete);
+                            $del = $pdo->prepare("DELETE FROM user_roles WHERE user_id = ? AND role_id IN ($holders)");
+                            $del->execute($delParams);
+                        }
+                        // insert incoming (ignoring super_admin ids already stripped earlier)
+                        $ins = $pdo->prepare('INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)');
+                        foreach ($incoming_role_ids as $rid) {
+                            $ins->execute([$id_usuario_edit, $rid]);
+                        }
+                    } else {
+                        // No incoming explicit roles: fallback to mapping by tipo as legacy (keep super_admin)
+                        $mapped = ['admin','contador','cliente'];
+                        $in = str_repeat('?,', count($mapped) - 1) . '?';
+                        $stmtRoles = $pdo->prepare("SELECT id, slug FROM roles WHERE slug IN ($in)");
+                        $stmtRoles->execute($mapped);
+                        $roleMap = $stmtRoles->fetchAll(PDO::FETCH_KEY_PAIR); // id => slug
+                        if (!empty($roleMap)) {
+                            $roleIds = array_keys($roleMap);
+                            $placeholders = implode(',', array_fill(0, count($roleIds), '?'));
+                            $params = array_merge([$id_usuario_edit], $roleIds);
+                            $del = $pdo->prepare("DELETE FROM user_roles WHERE user_id = ? AND role_id IN ($placeholders)");
+                            $del->execute($params);
+                        }
+                        $stmtRoleForType = $pdo->prepare('SELECT id FROM roles WHERE slug = ? LIMIT 1');
+                        $stmtRoleForType->execute([$tipo]);
+                        $roleForTypeId = $stmtRoleForType->fetchColumn();
+                        if ($roleForTypeId) {
+                            $ins = $pdo->prepare('INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)');
+                            $ins->execute([$id_usuario_edit, $roleForTypeId]);
+                        }
+                    }
+
+                    // Bump RBAC global version if roles changed — this will cause sessions to refresh lazily
+                    if (function_exists('rbac_bump_version')) rbac_bump_version();
+
+                    // If editing current user, refresh their permissions in session
+                    if (isset($_SESSION['user_id']) && intval($_SESSION['user_id']) === intval($id_usuario_edit) && function_exists('rbac_maybe_refresh_permissions')) {
+                        rbac_maybe_refresh_permissions($id_usuario_edit);
+                    }
+                } catch (Exception $e) {
+                    error_log('Erro ao atualizar roles na edição: ' . $e->getMessage());
                 }
             } else {
                 $_SESSION['error_message'] = "Erro ao atualizar usuário.";

@@ -63,6 +63,12 @@ global $page;
 
 <?php if (isLoggedIn()): ?>
 
+    <?php
+    // Garantir que as permissões RBAC estejam atualizadas na sessão a cada request
+    if (function_exists('rbac_load_user_permissions_into_session')) {
+           rbac_maybe_refresh_permissions($_SESSION['user_id']);
+    }
+    ?>
     <div class="offcanvas offcanvas-start offcanvas-lg sidebar-nav" tabindex="-1" id="sidebarMenu" 
          data-bs-scroll="true" data-bs-backdrop="false" aria-labelledby="sidebarMenuLabel">
         
@@ -124,7 +130,7 @@ global $page;
                     <?php endif; ?>
 
                     <?php // Menu exclusivo do Admin - agrupado em seções colapsáveis ?>
-                    <?php if (isAdmin() || isSuperAdmin()): ?>
+                    <?php if (isAdmin() || isSuperAdmin() || (function_exists('current_user_has_permission_or_legacy') && current_user_has_permission_or_legacy('gerenciar_papeis'))): ?>
                         <li class="nav-item-divider"></li>
                         <!-- Cadastros -->
                         <li class="nav-item">
@@ -191,6 +197,20 @@ global $page;
                                         <span class="sidebar-link-text">Gerenciar Documentos</span>
                                     </a>
                                 </li>
+                                <?php if (function_exists('current_user_has_permission_or_legacy') && current_user_has_permission_or_legacy('gerenciar_papeis')): ?>
+                                    <li class="nav-item">
+                                        <a class="nav-link <?php echo ($page == 'gerenciar_papeis') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_papeis'); ?>">
+                                            <i class="bi bi-key me-2"></i>
+                                            <span class="sidebar-link-text">Gerenciar Papéis</span>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link <?php echo ($page == 'gerenciar_permissoes') ? 'active' : ''; ?>" href="<?php echo base_url('index.php?page=gerenciar_permissoes'); ?>">
+                                            <i class="bi bi-shield-lock me-2"></i>
+                                            <span class="sidebar-link-text">Gerenciar Permissões</span>
+                                        </a>
+                                    </li>
+                                <?php endif; ?>
                             </ul>
                         </li>
 

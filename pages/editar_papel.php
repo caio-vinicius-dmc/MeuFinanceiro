@@ -10,6 +10,13 @@ if (!$id) { header('Location: ' . base_url('index.php?page=gerenciar_papeis')); 
 $role = $pdo->prepare('SELECT * FROM roles WHERE id = ?'); $role->execute([$id]); $role = $role->fetch();
 if (!$role) { header('Location: ' . base_url('index.php?page=gerenciar_papeis')); exit; }
 
+// Protege papel super_admin contra edição pela UI
+if (isset($role['slug']) && $role['slug'] === 'super_admin') {
+    $_SESSION['error_message'] = 'O papel super_admin é protegido e não pode ser editado.';
+    header('Location: ' . base_url('index.php?page=gerenciar_papeis'));
+    exit;
+}
+
 $perms = $pdo->query('SELECT * FROM permissions ORDER BY name')->fetchAll();
 $rolePermsStmt = $pdo->prepare('SELECT permission_id FROM role_permissions WHERE role_id = ?'); $rolePermsStmt->execute([$id]);
 $rolePerms = $rolePermsStmt->fetchAll(PDO::FETCH_COLUMN);

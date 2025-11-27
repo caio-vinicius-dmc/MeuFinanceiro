@@ -924,18 +924,39 @@ function initStatusChart(canvasElement) {
  * @param {string} prefix Prefixo dos IDs dos campos ('', 'edit_', etc.)
  */
 function toggleUsuarioCampos(prefix) {
-    const tipoEl = document.getElementById(prefix + 'tipo_usuario');
-    if (!tipoEl) return; // Se o select não existir, sai cedo
-    const tipo = tipoEl.value;
     const divCliente = document.getElementById(prefix + 'assoc_cliente_div');
     const divContador = document.getElementById(prefix + 'assoc_contador_div');
+    if (!divCliente || !divContador) return;
 
-    if (!divCliente || !divContador) return; 
+    // Try to find explicit tipo select first (legacy). If missing, infer from role checkboxes.
+    const tipoEl = document.getElementById(prefix + 'tipo_usuario');
+    let isCliente = false, isContador = false;
+    if (tipoEl) {
+        isCliente = tipoEl.value === 'cliente';
+        isContador = tipoEl.value === 'contador';
+    } else {
+        // infer from role checkboxes: look for checkboxes with ids like 'role_check_{id}' or 'edit_role_check_{id}'
+        try {
+            // role ids injected into page as global variables if available
+            const clienteId = window.__ROLE_ID_CLIENTE__ || 0;
+            const contadorId = window.__ROLE_ID_CONTADOR__ || 0;
+            if (clienteId) {
+                const el = document.getElementById((prefix === 'edit_' ? 'edit_role_check_' : 'role_check_') + clienteId);
+                if (el && el.checked) isCliente = true;
+            }
+            if (contadorId) {
+                const el2 = document.getElementById((prefix === 'edit_' ? 'edit_role_check_' : 'role_check_') + contadorId);
+                if (el2 && el2.checked) isContador = true;
+            }
+        } catch (e) {
+            // ignore
+        }
+    }
 
-    if (tipo === 'cliente') {
+    if (isCliente) {
         divCliente.style.display = 'block';
         divContador.style.display = 'none';
-    } else if (tipo === 'contador') {
+    } else if (isContador) {
         divCliente.style.display = 'none';
         divContador.style.display = 'block';
     } else {

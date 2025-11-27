@@ -14,6 +14,7 @@ Thumbs.db
 
 # Composer
 vendor/
+/uploads/
 
 # Node modules (se houver)
 node_modules/

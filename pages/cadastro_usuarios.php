@@ -1,16 +1,6 @@
 <?php
-// pages/cadastro_usuarios.php
-global $pdo;
-
-// Protegido: gerenciar_usuarios (ou admin)
-if (!isAdmin()) {
-    if (function_exists('current_user_has_permission') && current_user_has_permission('gerenciar_usuarios')) {
-        // permitido
-    } else {
-        header("Location: " . base_url('index.php?page=dashboard'));
-        exit;
-    }
-}
+// pages/cadastro_usuarios.php (reconstructed)
+$pdo;
 
 $stmt_users = $pdo->query("SELECT id, nome, email, telefone, tipo, ativo, id_cliente_associado, acesso_lancamentos, COALESCE(is_super_admin,0) AS is_super_admin FROM usuarios ORDER BY nome");
 $usuarios = $stmt_users->fetchAll();
@@ -18,6 +8,26 @@ $usuarios = $stmt_users->fetchAll();
 // Buscar clientes para os selects (usado no form de 'Novo' e no 'Modal de Edição')
 $stmt_clientes = $pdo->query("SELECT id, nome_responsavel FROM clientes ORDER BY nome_responsavel");
 $clientes = $stmt_clientes->fetchAll();
+
+// Buscar papéis (roles) disponíveis para atribuição, exclui super_admin
+$stmt_roles = $pdo->query("SELECT id, name, slug FROM roles WHERE slug != 'super_admin' ORDER BY name");
+$available_roles = $stmt_roles->fetchAll(PDO::FETCH_ASSOC);
+
+// Buscar roles atribuídos por usuário para popular os botões de edição
+$stmt_user_roles = $pdo->query('SELECT user_id, role_id FROM user_roles');
+$user_roles_rows = $stmt_user_roles->fetchAll(PDO::FETCH_ASSOC);
+$user_roles_map = [];
+foreach ($user_roles_rows as $ur) {
+    $user_roles_map[$ur['user_id']][] = intval($ur['role_id']);
+}
+
+// Map role ids by slug for client-side logic
+$role_id_cliente = 0; $role_id_contador = 0; $role_id_admin = 0;
+foreach ($available_roles as $r) {
+    if ($r['slug'] === 'cliente') $role_id_cliente = intval($r['id']);
+    if ($r['slug'] === 'contador') $role_id_contador = intval($r['id']);
+    if ($r['slug'] === 'admin') $role_id_admin = intval($r['id']);
+}
 
 // Buscar TODAS as associações de contadores para popular os modais
 $stmt_assoc = $pdo->query("SELECT id_usuario_contador, id_cliente FROM contador_clientes_assoc");
@@ -40,7 +50,7 @@ foreach ($all_associations_raw as $assoc) {
                 <h5 class="mb-0">Novo Usuário</h5>
             </div>
             <div class="card-body">
-                <form action="process/crud_handler.php" method="POST">
+                <form id="formNovoUsuario" action="process/crud_handler.php" method="POST">
                     <input type="hidden" name="action" value="cadastrar_usuario">
                     
                     <div class="mb-3">
@@ -63,15 +73,8 @@ foreach ($all_associations_raw as $assoc) {
                         <input type="password" class="form-control" id="senha" name="senha" required>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="tipo_usuario" class="form-label">Tipo de Usuário</label>
-                        <select class="form-select" id="tipo_usuario" name="tipo_usuario" required>
-                            <option value="" selected disabled>Selecione o tipo...</option>
-                            <option value="admin">Admin</option>
-                            <option value="contador">Contador</option>
-                            <option value="cliente">Cliente (Acesso Portal)</option>
-                        </select>
-                    </div>
+                    <!-- Tipo de usuário agora é derivado a partir dos papéis atribuídos (roles). -->
+                    <input type="hidden" id="tipo_usuario" name="tipo_usuario" value="">
 
                     <div class="mb-3" id="assoc_cliente_div" style="display: none;">
                         <label for="id_cliente_associado" class="form-label">Associar ao Cliente:</label>
@@ -81,10 +84,7 @@ foreach ($all_associations_raw as $assoc) {
                                 <option value="<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nome_responsavel']); ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <div class="form-check mt-2">
-                            <input class="form-check-input" type="checkbox" id="acesso_lancamentos" name="acesso_lancamentos" value="1">
-                            <label class="form-check-label" for="acesso_lancamentos">Permitir acesso à tela de Lançamentos</label>
-                        </div>
+                        <div class="mt-2 small text-muted">As permissões de acesso (ex.: Lançamentos) são gerenciadas por papéis e permissões. Para controlar o acesso, edite o papel do cliente em <a href="<?php echo base_url('index.php?page=gerenciar_papeis'); ?>">Gerenciar Papéis</a>.</div>
                     </div>
                     
                     <div class="mb-3" id="assoc_contador_div" style="display: none;">
@@ -106,6 +106,21 @@ foreach ($all_associations_raw as $assoc) {
                             <label class="form-check-label" for="ativo">Usuário ativo (permite login)</label>
                         </div>
                     </div>
+
+                    <?php if (!empty($available_roles)): ?>
+                    <div class="mb-3">
+                        <label class="form-label">Papéis (roles)</label>
+                        <div class="border rounded p-2" style="max-height:200px; overflow:auto;">
+                            <?php foreach ($available_roles as $role): ?>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="role_ids[]" id="role_check_<?php echo $role['id']; ?>" value="<?php echo $role['id']; ?>">
+                                    <label class="form-check-label" for="role_check_<?php echo $role['id']; ?>"><?php echo htmlspecialchars($role['name']); ?> <small class="text-muted">(<?php echo htmlspecialchars($role['slug']); ?>)</small></label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <small class="form-text text-muted">Atribua papéis ao usuário. Não é possível atribuir o papel Super Admin por esta interface.</small>
+                    </div>
+                    <?php endif; ?>
 
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary">Salvar Usuário</button>
@@ -154,23 +169,24 @@ foreach ($all_associations_raw as $assoc) {
                                     <?php echo ($usuario['ativo']) ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-danger">Inativo</span>'; ?>
                                 </td>
                                 <td>
-                                        <button class="btn btn-sm btn-outline-secondary" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#modalEditarUsuario"
-                                            data-id="<?php echo $usuario['id']; ?>"
-                                            data-nome="<?php echo htmlspecialchars($usuario['nome']); ?>"
-                                            data-email="<?php echo htmlspecialchars($usuario['email']); ?>"
-                                            data-telefone="<?php echo htmlspecialchars($usuario['telefone'] ?? ''); ?>"
-                                            data-tipo="<?php echo $usuario['tipo']; ?>"
-                                            data-ativo="<?php echo $usuario['ativo']; ?>"
-                                            data-is-super="<?php echo intval($usuario['is_super_admin']); ?>"
-                                            data-id_cliente_associado="<?php echo $usuario['id_cliente_associado']; ?>"
-                                            data-acesso_lancamentos="<?php echo $usuario['acesso_lancamentos']; ?>"
-                                            data-assoc_clientes='<?php echo json_encode($user_assoc_ids); ?>'
-                                            title="Editar" <?php echo !empty($usuario['is_super_admin']) ? 'disabled' : ''; ?>>
+                                    <!-- Botões: Editar / Excluir -->
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalEditarUsuario"
+                                        data-id="<?php echo $usuario['id']; ?>"
+                                        data-nome="<?php echo htmlspecialchars($usuario['nome']); ?>"
+                                        data-email="<?php echo htmlspecialchars($usuario['email']); ?>"
+                                        data-telefone="<?php echo htmlspecialchars($usuario['telefone'] ?? ''); ?>"
+                                        data-id_cliente_associado="<?php echo $usuario['id_cliente_associado']; ?>"
+                                        data-acesso_lancamentos="<?php echo $usuario['acesso_lancamentos']; ?>"
+                                        data-ativo="<?php echo $usuario['ativo']; ?>"
+                                        data-is-super="<?php echo intval($usuario['is_super_admin']); ?>"
+                                        data-assoc_clientes='<?php echo json_encode($user_assoc_ids); ?>'
+                                        data-user-roles='<?php echo json_encode($user_roles_map[$usuario['id']] ?? []); ?>'
+                                        title="Editar" <?php echo !empty($usuario['is_super_admin']) ? 'disabled' : ''; ?>>
                                         <i class="bi bi-pencil"></i>
                                     </button>
-                                    
+
                                     <form action="process/crud_handler.php" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir este usuário?');">
                                         <input type="hidden" name="action" value="deletar_usuario">
                                         <input type="hidden" name="id_usuario" value="<?php echo $usuario['id']; ?>">
@@ -189,7 +205,7 @@ foreach ($all_associations_raw as $assoc) {
     </div>
 </div>
 
-
+<!-- Modal de Edição -->
 <div class="modal fade" id="modalEditarUsuario" tabindex="-1" aria-labelledby="modalEditarUsuarioLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -197,10 +213,10 @@ foreach ($all_associations_raw as $assoc) {
                 <h5 class="modal-title" id="modalEditarUsuarioLabel">Editar Usuário</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="process/crud_handler.php" method="POST">
+            <form id="formEditarUsuario" action="process/crud_handler.php" method="POST">
                 <input type="hidden" name="action" value="editar_usuario">
                 <input type="hidden" name="id_usuario" id="edit_id_usuario">
-                
+                <input type="hidden" id="edit_tipo_usuario" name="tipo_usuario" value="">
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -215,17 +231,8 @@ foreach ($all_associations_raw as $assoc) {
                             <label for="edit_telefone" class="form-label">Telefone</label>
                             <input type="text" class="form-control" id="edit_telefone" name="telefone" placeholder="(XX) XXXXX-XXXX">
                         </div>
-                        <div class="col-md-6">
-                            <label for="edit_tipo_usuario" class="form-label">Tipo de Usuário</label>
-                            <select class="form-select" id="edit_tipo_usuario" name="tipo_usuario" required>
-                                <option value="admin">Admin</option>
-                                <option value="contador">Contador</option>
-                                <option value="cliente">Cliente (Acesso Portal)</option>
-                            </select>
-                        </div>
 
                         <hr>
-                        
                         <div class="col-12" id="edit_assoc_cliente_div" style="display: none;">
                             <label for="edit_id_cliente_associado" class="form-label">Associar ao Cliente:</label>
                             <select class="form-select" id="edit_id_cliente_associado" name="id_cliente_associado">
@@ -234,12 +241,9 @@ foreach ($all_associations_raw as $assoc) {
                                     <option value="<?php echo $cliente['id']; ?>"><?php echo htmlspecialchars($cliente['nome_responsavel']); ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="form-check mt-2">
-                                <input class="form-check-input" type="checkbox" id="edit_acesso_lancamentos" name="acesso_lancamentos" value="1">
-                                <label class="form-check-label" for="edit_acesso_lancamentos">Permitir acesso à tela de Lançamentos</label>
-                            </div>
+                            <div class="mt-2 small text-muted">As permissões de acesso (ex.: Lançamentos) são gerenciadas por papéis e permissões. Para controlar o acesso, edite o papel do cliente em <a href="<?php echo base_url('index.php?page=gerenciar_papeis'); ?>">Gerenciar Papéis</a>.</div>
                         </div>
-                        
+
                         <div class="col-12" id="edit_assoc_contador_div" style="display: none;">
                             <label class="form-label">Associar Contador aos Clientes:</label>
                             <div class="border rounded p-2" style="max-height:200px; overflow:auto;">
@@ -254,7 +258,21 @@ foreach ($all_associations_raw as $assoc) {
                         </div>
 
                         <hr>
-                        
+                        <?php if (!empty($available_roles)): ?>
+                        <div class="col-12">
+                            <label class="form-label">Papéis (roles)</label>
+                            <div class="border rounded p-2" style="max-height:200px; overflow:auto;">
+                                <?php foreach ($available_roles as $role): ?>
+                                    <div class="form-check">
+                                        <input class="form-check-input edit-role-checkbox" type="checkbox" name="role_ids[]" id="edit_role_check_<?php echo $role['id']; ?>" value="<?php echo $role['id']; ?>">
+                                        <label class="form-check-label" for="edit_role_check_<?php echo $role['id']; ?>"><?php echo htmlspecialchars($role['name']); ?> <small class="text-muted"><?php echo '(' . htmlspecialchars($role['slug']) . ')'; ?></small></label>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <small class="form-text text-muted">Edite os papéis deste usuário. O papel Super Admin não aparece aqui.</small>
+                        </div>
+                        <?php endif; ?>
+
                         <div class="col-12">
                              <label for="nova_senha" class="form-label">Nova Senha</label>
                              <input type="password" class="form-control" id="nova_senha" name="nova_senha">
@@ -280,25 +298,22 @@ foreach ($all_associations_raw as $assoc) {
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const tipoUsuarioSelect = document.getElementById('tipo_usuario');
     const assocClienteDiv = document.getElementById('assoc_cliente_div');
     const assocContadorDiv = document.getElementById('assoc_contador_div');
     const acessoLancamentosCheckbox = document.getElementById('acesso_lancamentos');
 
-    function toggleAssocDivs() {
-        assocClienteDiv.style.display = 'none';
-        assocContadorDiv.style.display = 'none';
-        acessoLancamentosCheckbox.checked = false; // Reset checkbox when type changes
-
-        if (tipoUsuarioSelect.value === 'cliente') {
-            assocClienteDiv.style.display = 'block';
-        } else if (tipoUsuarioSelect.value === 'contador') {
-            assocContadorDiv.style.display = 'block';
+    // Attach listeners to role checkboxes to show assoc blocks when role 'cliente' or 'contador' is selected
+    (function attachRoleListeners() {
+        try {
+            // role checkboxes in create form have ids like 'role_check_{id}'
+            const roleBoxes = Array.from(document.querySelectorAll('[id^="role_check_"]'));
+            roleBoxes.forEach(cb => cb.addEventListener('change', function() { toggleUsuarioCampos(''); }));
+            // run once on load
+            toggleUsuarioCampos('');
+        } catch (e) {
+            // ignore
         }
-    }
-
-    tipoUsuarioSelect.addEventListener('change', toggleAssocDivs);
-    toggleAssocDivs(); // Call on load to set initial state
+    })();
 
     // Modal de Edição
     const modalEditarUsuario = document.getElementById('modalEditarUsuario');
@@ -320,8 +335,7 @@ document.addEventListener('DOMContentLoaded', function () {
         modalEditarUsuario.querySelector('#edit_email').value = email;
         modalEditarUsuario.querySelector('#edit_telefone').value = telefone;
         
-        const editTipoUsuarioSelect = modalEditarUsuario.querySelector('#edit_tipo_usuario');
-        editTipoUsuarioSelect.value = tipo;
+        // Tipo agora derivado por papéis; o modal irá marcar papéis e ajustar blocos abaixo
         const isSuper = button.getAttribute('data-is-super') === '1';
 
         const editAssocClienteDiv = modalEditarUsuario.querySelector('#edit_assoc_cliente_div');
@@ -335,12 +349,23 @@ document.addEventListener('DOMContentLoaded', function () {
         editAssocClienteDiv.style.display = 'none';
         editAssocContadorDiv.style.display = 'none';
         editAcessoLancamentosCheckbox.checked = false; // Reset checkbox
-    editAtivoCheckbox.checked = false; // Reset ativo checkbox
+        editAtivoCheckbox.checked = false; // Reset ativo checkbox
 
-        if (tipo === 'cliente') {
+        // After roles are pre-checked, display assoc blocks based on presence of 'cliente' or 'contador' role
+        const userRolesJson = button.getAttribute('data-user-roles') || '[]';
+        let userRoles = [];
+        try { userRoles = JSON.parse(userRolesJson); } catch(e) { userRoles = []; }
+        // If cliente role selected, show client assoc and set selected client and acesso_lancamentos
+        const clienteRoleId = <?php echo json_encode($role_id_cliente); ?>;
+        const contadorRoleId = <?php echo json_encode($role_id_contador); ?>;
+        if (userRoles.includes(clienteRoleId)) {
             editAssocClienteDiv.style.display = 'block';
             editIdClienteAssociadoSelect.value = id_cliente_associado;
-            editAcessoLancamentosCheckbox.checked = (acesso_lancamentos == 1); // Set checked state
+            editAcessoLancamentosCheckbox.checked = (acesso_lancamentos == 1);
+        }
+        if (userRoles.includes(contadorRoleId)) {
+            editAssocContadorDiv.style.display = 'block';
+            // check associated clients later when we pre-check checkboxes
         }
 
         // Set ativo state (aplica para qualquer tipo)
@@ -407,5 +432,85 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         };
     });
+});
+</script>
+
+<script>
+// Marca papéis atribuídos ao abrir o modal (já populado via data-user-roles)
+document.addEventListener('DOMContentLoaded', function () {
+    const modalEditarUsuario = document.getElementById('modalEditarUsuario');
+    modalEditarUsuario.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        const userRolesJson = button.getAttribute('data-user-roles') || '[]';
+        let userRoles = [];
+        try { userRoles = JSON.parse(userRolesJson); } catch(e) { userRoles = []; }
+
+        // Uncheck all edit role checkboxes then check only those belonging to user
+        const roleCheckboxes = modalEditarUsuario.querySelectorAll('.edit-role-checkbox');
+        roleCheckboxes.forEach(cb => cb.checked = false);
+        userRoles.forEach(rid => {
+            const cb = modalEditarUsuario.querySelector('#edit_role_check_' + rid);
+            if (cb) cb.checked = true;
+        });
+    });
+});
+</script>
+
+<!-- Expor role ids e garantir preenchimento de tipo_usuario antes do envio -->
+<script>
+window.__ROLE_ID_CLIENTE__ = <?php echo json_encode($role_id_cliente); ?>;
+window.__ROLE_ID_CONTADOR__ = <?php echo json_encode($role_id_contador); ?>;
+window.__ROLE_ID_ADMIN__ = <?php echo json_encode($role_id_admin); ?>;
+
+document.addEventListener('DOMContentLoaded', function () {
+    const formNovo = document.getElementById('formNovoUsuario');
+    if (formNovo) {
+        formNovo.addEventListener('submit', function () {
+            try {
+                const clienteId = window.__ROLE_ID_CLIENTE__ || 0;
+                const contadorId = window.__ROLE_ID_CONTADOR__ || 0;
+                const adminId = window.__ROLE_ID_ADMIN__ || 0;
+                let tipo = '';
+                if (adminId) {
+                    const a = document.getElementById('role_check_' + adminId);
+                    if (a && a.checked) tipo = 'admin';
+                }
+                if (!tipo && contadorId) {
+                    const c = document.getElementById('role_check_' + contadorId);
+                    if (c && c.checked) tipo = 'contador';
+                }
+                if (!tipo && clienteId) {
+                    const cl = document.getElementById('role_check_' + clienteId);
+                    if (cl && cl.checked) tipo = 'cliente';
+                }
+                const tipoEl = document.getElementById('tipo_usuario'); if (tipoEl) tipoEl.value = tipo;
+            } catch (e) {}
+        });
+    }
+
+    const formEdit = document.getElementById('formEditarUsuario');
+    if (formEdit) {
+        formEdit.addEventListener('submit', function () {
+            try {
+                const clienteId = window.__ROLE_ID_CLIENTE__ || 0;
+                const contadorId = window.__ROLE_ID_CONTADOR__ || 0;
+                const adminId = window.__ROLE_ID_ADMIN__ || 0;
+                let tipo = '';
+                if (adminId) {
+                    const a = document.getElementById('edit_role_check_' + adminId);
+                    if (a && a.checked) tipo = 'admin';
+                }
+                if (!tipo && contadorId) {
+                    const c = document.getElementById('edit_role_check_' + contadorId);
+                    if (c && c.checked) tipo = 'contador';
+                }
+                if (!tipo && clienteId) {
+                    const cl = document.getElementById('edit_role_check_' + clienteId);
+                    if (cl && cl.checked) tipo = 'cliente';
+                }
+                const editTipoEl = document.getElementById('edit_tipo_usuario'); if (editTipoEl) editTipoEl.value = tipo;
+            } catch (e) {}
+        });
+    }
 });
 </script>

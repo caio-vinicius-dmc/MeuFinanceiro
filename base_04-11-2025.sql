@@ -565,3 +565,142 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+-- Migration: Add RBAC tables, seed roles/permissions, and assign existing users
+-- Generated: 2025-11-27
+
+SELECT @@SQL_MODE INTO @OLD_SQL_MODE;
+SET SESSION SQL_MODE='STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION';
+START TRANSACTION;
+
+-- 1) Create core RBAC tables if they do not exist
+CREATE TABLE IF NOT EXISTS roles (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  slug VARCHAR(150) NOT NULL UNIQUE,
+  description TEXT DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS permissions (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  slug VARCHAR(150) NOT NULL UNIQUE,
+  description TEXT DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+  role_id INT NOT NULL,
+  permission_id INT NOT NULL,
+  PRIMARY KEY (role_id, permission_id),
+  INDEX idx_rp_role (role_id),
+  INDEX idx_rp_perm (permission_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS user_roles (
+  user_id INT NOT NULL,
+  role_id INT NOT NULL,
+  PRIMARY KEY (user_id, role_id),
+  INDEX idx_ur_user (user_id),
+  INDEX idx_ur_role (role_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 2) Ensure system_settings.rbac_version exists (initialize to 1 if absent)
+INSERT INTO system_settings (setting_key, setting_value)
+SELECT 'rbac_version', '0'
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'rbac_version');
+
+-- 3) Seed core roles (no duplicates)
+INSERT INTO roles (name, slug, description)
+SELECT t.name, t.slug, t.description FROM (
+  SELECT 'Super Admin' AS name, 'super_admin' AS slug, 'Super administrator (protected)' AS description
+  UNION ALL SELECT 'Admin', 'admin', 'Admin users'
+  UNION ALL SELECT 'Contador', 'contador', 'Accounting / bookkeeper'
+  UNION ALL SELECT 'Cliente', 'cliente', 'Client (default)'
+  UNION ALL SELECT 'Cliente - Lançamentos', 'cliente_lancamentos', 'Cliente com acesso a lançamentos'
+  UNION ALL SELECT 'Cliente - Cobranças', 'cliente_cobranca', 'Cliente com acesso a cobranças'
+) AS t
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE slug = t.slug);
+
+-- 4) Seed common permissions (observed in current codebase)
+INSERT INTO permissions (name, slug, description)
+SELECT p.name, p.slug, p.description FROM (
+  SELECT 'Acessar dashboard' AS name, 'acessar_dashboard' AS slug, NULL AS description
+  UNION ALL SELECT 'Acessar lançamentos','acessar_lancamentos',NULL
+  UNION ALL SELECT 'Criar lançamento','criar_lancamento',NULL
+  UNION ALL SELECT 'Editar lançamento','editar_lancamento',NULL
+  UNION ALL SELECT 'Excluir lançamento','excluir_lancamento',NULL
+  UNION ALL SELECT 'Acessar cobranças','acessar_cobrancas',NULL
+  UNION ALL SELECT 'Acessar configurações','acessar_configuracoes',NULL
+  UNION ALL SELECT 'Gerenciar usuários','gerenciar_usuarios',NULL
+  UNION ALL SELECT 'Gerenciar papéis','gerenciar_papeis',NULL
+  UNION ALL SELECT 'Gerar relatórios','gerar_relatorios',NULL
+  UNION ALL SELECT 'Visualizar documentos','visualizar_documentos',NULL
+  UNION ALL SELECT 'Acessar associações contador','acessar_associacoes_contador',NULL
+  UNION ALL SELECT 'Acessar logs','acessar_logs',NULL
+  UNION ALL SELECT 'Gerenciar empresas','gerenciar_empresas',NULL
+  UNION ALL SELECT 'Gerenciar documentos','gerenciar_documentos',NULL
+  UNION ALL SELECT 'Gerenciar cobranças','gerenciar_cobrancas',NULL
+) AS p
+WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE slug = p.slug);
+
+-- 5) Map sensible default role_permissions (idempotent)
+-- Admin and Super Admin should have all seeded permissions; contador a subset; cliente roles limited
+
+-- Grant all seeded permissions to admin
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.id AS role_id, p.id AS permission_id
+FROM roles r
+JOIN permissions p ON 1=1
+WHERE r.slug IN ('admin','super_admin')
+  AND p.slug IN (
+    'acessar_dashboard','acessar_lancamentos','criar_lancamento','editar_lancamento','excluir_lancamento',
+    'acessar_cobrancas','acessar_configuracoes','gerenciar_usuarios','gerenciar_papeis','gerar_relatorios',
+    'visualizar_documentos','acessar_associacoes_contador','acessar_logs','gerenciar_empresas','gerenciar_documentos','gerenciar_cobrancas'
+  );
+
+-- Grant subset to contador
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.id AS role_id, p.id AS permission_id
+FROM roles r
+JOIN permissions p ON p.slug IN ('acessar_dashboard','acessar_lancamentos','criar_lancamento','editar_lancamento','acessar_cobrancas','gerar_relatorios')
+WHERE r.slug = 'contador';
+
+-- Grant client-lançamentos limited perms
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('acessar_dashboard','acessar_lancamentos','visualizar_documentos') WHERE r.slug = 'cliente_lancamentos';
+
+-- 6) Assign roles to existing users based on `usuarios.tipo` or `is_super_admin` flag
+-- Assign super_admin role to users flagged as is_super_admin
+INSERT IGNORE INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM usuarios u JOIN roles r ON r.slug = 'super_admin' WHERE u.is_super_admin = 1;
+
+-- Map legacy tipo -> role
+INSERT IGNORE INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM usuarios u JOIN roles r ON r.slug = 'admin' WHERE u.tipo = 'admin';
+INSERT IGNORE INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM usuarios u JOIN roles r ON r.slug = 'contador' WHERE u.tipo = 'contador';
+INSERT IGNORE INTO user_roles (user_id, role_id)
+SELECT u.id, r.id FROM usuarios u JOIN roles r ON r.slug = 'cliente' WHERE u.tipo = 'cliente';
+
+-- 7) Add foreign key constraints for pivot tables if possible
+ALTER TABLE role_permissions
+  ADD CONSTRAINT fk_rp_role FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE;
+ALTER TABLE role_permissions
+  ADD CONSTRAINT fk_rp_perm FOREIGN KEY (permission_id) REFERENCES permissions (id) ON DELETE CASCADE;
+
+ALTER TABLE user_roles
+  ADD CONSTRAINT fk_ur_user FOREIGN KEY (user_id) REFERENCES usuarios (id) ON DELETE CASCADE;
+ALTER TABLE user_roles
+  ADD CONSTRAINT fk_ur_role FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE;
+
+-- 8) Initialize rbac_version to current value + 1 to force session refresh on deploy
+UPDATE system_settings SET setting_value = (
+  SELECT CAST((SELECT COALESCE(MAX(CAST(setting_value AS SIGNED)), 0) FROM system_settings WHERE setting_key = 'rbac_version') + 1 AS CHAR)
+) WHERE setting_key = 'rbac_version';
+
+COMMIT;
+SET SESSION SQL_MODE = @OLD_SQL_MODE;
+
+-- End of migration

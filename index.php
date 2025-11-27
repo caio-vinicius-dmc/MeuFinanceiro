@@ -33,7 +33,11 @@ $allowed_pages = [
     'documentos',
     'gerenciar_documentos',
     'configuracoes_documentos',
-    'associacoes_contador'
+    'associacoes_contador',
+    // Adiciona páginas de administração RBAC (criadas recentemente)
+    'gerenciar_papeis',
+    'gerenciar_permissoes',
+    'editar_papel'
 ];
 
 // Se a página não for de login E não estiver logado, força o login

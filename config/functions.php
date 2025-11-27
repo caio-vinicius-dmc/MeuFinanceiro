@@ -12,6 +12,12 @@ $composerAutoload = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($composerAutoload)) {
     require_once $composerAutoload;
 }
+
+// Carrega helpers RBAC se disponíveis
+$rbacHelpers = __DIR__ . '/../lib/rbac_helpers.php';
+if (file_exists($rbacHelpers)) {
+    require_once $rbacHelpers;
+}
 // Define timezone padrão para o sistema (evita horários incorretos ao usar date()/DateTime)
 date_default_timezone_set('America/Sao_Paulo');
 define('BASE_URL', 'http://localhost/DMC-finanças/');
@@ -67,6 +73,12 @@ function isSuperAdmin() {
 // Função para verificar se o usuário tem acesso à tela de lançamentos
 function hasLancamentosAccess() {
     global $pdo;
+    // Prefer RBAC when available
+    if (function_exists('current_user_has_permission_or_legacy')) {
+        return current_user_has_permission_or_legacy('acessar_lancamentos');
+    }
+
+    // Fallback legacy behavior
     if (isAdmin() || isContador()) {
         return true;
     }
@@ -76,6 +88,37 @@ function hasLancamentosAccess() {
         return (bool) $stmt->fetchColumn();
     }
     return false;
+}
+
+// Verifica se o usuário atual possui a permissão RBAC informada.
+// Usa helper `current_user_has_permission` quando disponível. Em caso de SuperAdmin, passa automaticamente.
+function current_user_has_permission_or_legacy($perm_slug) {
+    if (!isLoggedIn()) return false;
+    if (function_exists('isSuperAdmin') && isSuperAdmin()) return true;
+    if (function_exists('current_user_has_permission') && current_user_has_permission($perm_slug)) return true;
+    // Fallback: legacy admin bypass
+    if (function_exists('isAdmin') && isAdmin()) return true;
+    return false;
+}
+
+// Require permission: redireciona / responde 403 se usuário não tiver a permissão
+function require_permission($perm_slug) {
+    if (!isLoggedIn()) {
+        header('Location: ' . base_url('index.php?page=login'));
+        exit;
+    }
+    if (!current_user_has_permission_or_legacy($perm_slug)) {
+        // Se for requisição AJAX, retorna 403 JSON
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Permissão negada']);
+            exit;
+        }
+        http_response_code(403);
+        $_SESSION['error_message'] = 'Você não tem permissão para acessar esta página.';
+        header('Location: ' . base_url());
+        exit;
+    }
 }
 
 // Função de Log

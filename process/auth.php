@@ -32,6 +32,11 @@ if (isset($_POST['action']) && $_POST['action'] == 'login') {
             $_SESSION['user_acesso_lancamentos'] = $user['acesso_lancamentos'];
         }
 
+        // Carrega permissões RBAC na sessão (se o helper estiver disponível)
+        if (function_exists('rbac_load_user_permissions_into_session')) {
+            rbac_load_user_permissions_into_session($user['id']);
+        }
+
         logAction("Login bem-sucedido");
         header("Location: " . base_url('index.php?page=dashboard'));
         exit;
