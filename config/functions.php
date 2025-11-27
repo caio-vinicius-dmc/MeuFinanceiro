@@ -12,6 +12,11 @@ $composerAutoload = __DIR__ . '/../vendor/autoload.php';
 if (file_exists($composerAutoload)) {
     require_once $composerAutoload;
 }
+// Carrega biblioteca RBAC (se existir)
+$rbacFile = __DIR__ . '/../lib/rbac.php';
+if (file_exists($rbacFile)) {
+    require_once $rbacFile;
+}
 // Define timezone padrão para o sistema (evita horários incorretos ao usar date()/DateTime)
 date_default_timezone_set('America/Sao_Paulo');
 define('BASE_URL', 'http://localhost/DMC-finanças/');
